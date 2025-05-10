@@ -1,10 +1,12 @@
 import express from 'express';
-const app = express();
+import { configDotenv } from 'dotenv';
+import authRoutes from './routes/auth';
 
-app.get('/', (req, res) => {
-  const name = process.env.NAME || 'World';
-  res.send(`Hello ${name}!`);
-});
+const app = express();
+configDotenv();
+
+
+app.use('/auth', authRoutes);
 
 const port = parseInt(process.env.PORT) || 3000;
 app.listen(port, () => {
