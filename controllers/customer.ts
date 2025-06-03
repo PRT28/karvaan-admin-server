@@ -21,10 +21,13 @@ export const getCustomers = async (_req: Request, res: Response) => {
     }
 };
 
-export const getCustomerById = async (req: Request, res: Response) => {
+export const getCustomerById = async (req: Request, res: Response): Promise<void> => {
   try {
     const customer = await Customer.findById(req.params.id);
-    if (!customer) return res.status(404).json({ message: 'Customer not found' });
+    if (!customer) {
+      res.status(404).json({ message: 'Customer not found' });
+      return;
+    }  
     res.status(200).json({ customer });
   } catch (err: unknown) {
     const errorMessage = err instanceof Error ? err.message : 'Something went wrong';
@@ -32,10 +35,13 @@ export const getCustomerById = async (req: Request, res: Response) => {
 }
 };
 
-export const updateCustomer = async (req: Request, res: Response) => {
+export const updateCustomer = async (req: Request, res: Response): Promise<void> => {
   try {
     const customer = await Customer.findByIdAndUpdate(req.params.id, req.body, { new: true });
-    if (!customer) return res.status(404).json({ message: 'Customer not found' });
+    if (!customer) {
+      res.status(404).json({ message: 'Customer not found' });
+      return;
+    }  
     res.status(200).json({ customer });
   }catch (err: unknown) {
     const errorMessage = err instanceof Error ? err.message : 'Something went wrong';
@@ -43,10 +49,13 @@ export const updateCustomer = async (req: Request, res: Response) => {
     }
 };
 
-export const deleteCustomer = async (req: Request, res: Response) => {
+export const deleteCustomer = async (req: Request, res: Response): Promise<void> => {
   try {
     const customer = await Customer.findByIdAndDelete(req.params.id);
-    if (!customer) return res.status(404).json({ message: 'Customer not found' });
+    if (!customer) {
+      res.status(404).json({ message: 'Customer not found' });
+      return;
+    }
     res.status(200).json({ message: 'Customer deleted' });
   }catch (err: unknown) {
     const errorMessage = err instanceof Error ? err.message : 'Something went wrong';

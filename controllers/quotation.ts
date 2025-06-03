@@ -14,22 +14,28 @@ export const createQuotation = async (req: Request, res: Response) => {
   }
 };
 
-export const updateQuotation = async (req: Request, res: Response) => {
+export const updateQuotation = async (req: Request, res: Response): Promise<void> => {
   try {
     const { id } = req.params;
     const updated = await Quotation.findByIdAndUpdate(id, req.body, { new: true });
-    if (!updated) return res.status(404).json({ success: false, message: 'Quotation not found' });
+    if (!updated) {
+      res.status(404).json({ success: false, message: 'Quotation not found' });
+      return;
+    } 
     res.status(200).json({ success: true, quotation: updated });
   } catch (err) {
     res.status(500).json({ success: false, message: 'Failed to update quotation', error: (err as Error).message });
   }
 };
 
-export const deleteQuotation = async (req: Request, res: Response) => {
+export const deleteQuotation = async (req: Request, res: Response): Promise<void> => {
   try {
     const { id } = req.params;
     const deleted = await Quotation.findByIdAndDelete(id);
-    if (!deleted) return res.status(404).json({ success: false, message: 'Quotation not found' });
+    if (!deleted) {
+      res.status(404).json({ success: false, message: 'Quotation not found' });
+      return
+    }
     res.status(200).json({ success: true, message: 'Quotation deleted successfully' });
   } catch (err) {
     res.status(500).json({ success: false, message: 'Failed to delete quotation', error: (err as Error).message });
@@ -75,15 +81,16 @@ export const getAllQuotations = async (req: Request, res: Response) => {
   }
 };
 
-export const getQuotationsByParty = async (req: Request, res: Response) => {
+export const getQuotationsByParty = async (req: Request, res: Response): Promise<void> => {
   try {
-    const { partyId } = req.params;
+    const { id } = req.params;
 
-    if (!mongoose.Types.ObjectId.isValid(partyId)) {
-      return res.status(400).json({ success: false, message: 'Invalid party ID' });
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      res.status(400).json({ success: false, message: 'Invalid party ID' });
+      return;
     }
 
-    const quotations = await Quotation.find({ partyId }).sort({ createdAt: -1 });
+    const quotations = await Quotation.find({ id }).sort({ createdAt: -1 });
 
     res.status(200).json({ success: true, quotations });
   } catch (err) {

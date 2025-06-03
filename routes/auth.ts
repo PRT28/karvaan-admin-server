@@ -7,8 +7,10 @@ import {
     getAllUsers,
     getUserById
 } from "../controllers/auth";
+import express from "express";
+
 import { checkKarvaanToken } from "../utils/middleware";
-const express = require("express");
+
 const router = express.Router(); 
  
 router.post("/send-otp", sendOtp);

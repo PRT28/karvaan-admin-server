@@ -21,10 +21,13 @@ export const getVendors = async (_req: Request, res: Response) => {
   }
 };
 
-export const getVendorById = async (req: Request, res: Response) => {
+export const getVendorById = async (req: Request, res: Response): Promise<void> => {
   try {
     const vendor = await Vendor.findById(req.params.id);
-    if (!vendor) return res.status(404).json({ message: 'Vendor not found' });
+    if (!vendor) {
+      res.status(404).json({ message: 'Vendor not found' });
+      return;
+    }  
     res.status(200).json({ vendor });
   } catch (err: unknown) {
     const errorMessage = err instanceof Error ? err.message : 'Something went wrong';
@@ -32,10 +35,13 @@ export const getVendorById = async (req: Request, res: Response) => {
   }
 };
 
-export const updateVendor = async (req: Request, res: Response) => {
+export const updateVendor = async (req: Request, res: Response): Promise<void> => {
   try {
     const vendor = await Vendor.findByIdAndUpdate(req.params.id, req.body, { new: true });
-    if (!vendor) return res.status(404).json({ message: 'Vendor not found' });
+     if (!vendor) {
+      res.status(404).json({ message: 'Vendor not found' });
+      return;
+    } 
     res.status(200).json({ vendor });
   } catch (err: unknown) {
     const errorMessage = err instanceof Error ? err.message : 'Something went wrong';
@@ -43,10 +49,13 @@ export const updateVendor = async (req: Request, res: Response) => {
   }
 };
 
-export const deleteVendor = async (req: Request, res: Response) => {
+export const deleteVendor = async (req: Request, res: Response): Promise<void> => {
   try {
     const vendor = await Vendor.findByIdAndDelete(req.params.id);
-    if (!vendor) return res.status(404).json({ message: 'Vendor not found' });
+     if (!vendor) {
+      res.status(404).json({ message: 'Vendor not found' });
+      return;
+    } 
     res.status(200).json({ message: 'Vendor deleted' });
   } catch (err: unknown) {
     const errorMessage = err instanceof Error ? err.message : 'Something went wrong';
