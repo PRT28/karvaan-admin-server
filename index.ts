@@ -1,5 +1,6 @@
 import express, {Application} from 'express';
 import { configDotenv } from 'dotenv';
+import cors from 'cors';
 
 import { connectToDatabase } from './utils/database';
 import { checkKarvaanToken } from './utils/middleware';
@@ -8,17 +9,22 @@ import authRoutes from './routes/auth';
 import customerRoutes from './routes/customer';
 import vendorRoutes from './routes/vendor';
 import quotationRoutes from './routes/quotation';
+import teamRoutes from './routes/team';
+import logsRoutes from './routes/logs';
 
 configDotenv();
 
 const app: Application = express();
 app.use(express.json());
+app.use(cors());
 
 
 app.use('/auth', authRoutes);
 app.use('/customer', checkKarvaanToken, customerRoutes);
 app.use('/vendor', checkKarvaanToken, vendorRoutes);
 app.use('/quotation', checkKarvaanToken, quotationRoutes);
+app.use('/team', checkKarvaanToken, teamRoutes);
+app.use('/logs', checkKarvaanToken, logsRoutes);
 app.get('/health', (req, res) => {
   res.status(200).json({ status: 'ok' });
 })

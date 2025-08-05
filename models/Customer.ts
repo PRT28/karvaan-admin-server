@@ -1,4 +1,7 @@
-import { Schema, model, Document } from 'mongoose';
+import mongoose, { Schema, model, Document } from 'mongoose';
+import Team from './Team';
+
+export type Tiers = 'tier1' | 'tier2' | 'tier3';
 
 export interface ICustomer extends Document {
   name: string;
@@ -6,6 +9,8 @@ export interface ICustomer extends Document {
   phone: string;
   address?: string;
   createdAt: Date;
+  ownerId: mongoose.Types.ObjectId;
+  tier?: Tiers;
 }
 
 const customerSchema = new Schema<ICustomer>({
@@ -14,8 +19,15 @@ const customerSchema = new Schema<ICustomer>({
   phone: { type: String, required: true },
   address: { type: String },
   createdAt: { type: Date, default: Date.now },
+  ownerId: { type: Schema.Types.ObjectId, ref: 'Team', required: true },
+  tier: {
+    type: String,
+    enum: ['tier1', 'tier2', 'tier3'],
+  },
 });
 
 const Customer = model<ICustomer>('Customer', customerSchema);
+
+console.log('Team model:', Team.modelName);
 
 export default Customer;

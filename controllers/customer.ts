@@ -13,7 +13,10 @@ export const createCustomer = async (req: Request, res: Response) => {
 
 export const getCustomers = async (_req: Request, res: Response) => {
   try {
-    const customers = await Customer.find();
+    const customers = await Customer.find().populate({
+      path: 'ownerId',
+      select: 'name email phone',
+    });
     res.status(200).json({ customers });
   } catch (err: unknown) {
         const errorMessage = err instanceof Error ? err.message : 'Something went wrong';
@@ -23,7 +26,11 @@ export const getCustomers = async (_req: Request, res: Response) => {
 
 export const getCustomerById = async (req: Request, res: Response): Promise<void> => {
   try {
-    const customer = await Customer.findById(req.params.id);
+    console.log('Fetching customer by ID:', req.params);
+    const customer = await Customer.findById(req.params.id).populate({
+      path: 'ownerId',
+      select: 'name email phone',
+    });
     if (!customer) {
       res.status(404).json({ message: 'Customer not found' });
       return;

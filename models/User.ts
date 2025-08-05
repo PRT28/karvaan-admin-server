@@ -4,8 +4,10 @@ export interface IUser extends Document {
   name: string;
   email: string;
   mobile: string;
+  agentId: string | null;
   phoneCode: number;
   roleId: Types.ObjectId; 
+  superAdmin: boolean;
 }
 
 const userSchema = new Schema<IUser>({
@@ -22,6 +24,10 @@ const userSchema = new Schema<IUser>({
     type: String,
     required: true,
   },
+  agentId: {
+    type: String,
+    required: false,
+  },
   phoneCode: {
     type: Number,
     required: true,
@@ -30,6 +36,10 @@ const userSchema = new Schema<IUser>({
     type: Schema.Types.ObjectId,
     ref: 'Role',
     required: true,
+  },
+  superAdmin: {
+    type: Boolean,
+    default: false,
   },
 }, {
   timestamps: true,

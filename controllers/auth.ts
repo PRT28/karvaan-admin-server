@@ -1,37 +1,99 @@
 import axios from 'axios';
 import { Request, Response } from 'express';
-import User from '../models/User';
+import User, { IUser } from '../models/User';
 import { createToken } from '../utils/jwt';
 import { isValidPermissions } from '../utils/utils';
 import Role from '../models/Roles';
+import twilio from '../utils/twilio';
+import cache from 'node-cache';
 
-const otpLessHeaders = {
-  clientId: process.env.CLIENT_ID || '',
-  clientSecret: process.env.CLIENT_SECRET || '',
-  'Content-Type': 'application/json',
-};
+const otpCache = new cache({ stdTTL: 300 }); // 5 minutes TTL
 
-export const sendOtp = async (req: Request, res: Response): Promise<void> => {
+export const sendOtpSU = async (req: Request, res: Response): Promise<void> => {
   try {
-    const { phoneNumber, phoneCode } = req.body;
-    if (!phoneNumber || !phoneCode) {
-      res.status(400).json({ message: 'Phone number and phone code are required' });
+    const { phoneNumber } = req.body;
+    if (!phoneNumber) {
+      res.status(400).json({ message: 'Phone number is required' });
       return;
     }
-
-    const otpLessBody = {
-      phoneNumber: phoneCode + phoneNumber,
-      channel: 'SMS',
-      otpLength: 6,
-      expiry: 60,
-    };
-
-    try {
-      const response = await axios.post('https://auth.otpless.app/auth/otp/v1/send', otpLessBody, { headers: otpLessHeaders });
-      res.status(200).json({ message: 'OTP sent successfully', data: response.data });
-    } catch (error: any) {
-      res.status(500).json({ message: 'Error sending OTP', error: error.message });
+    const user = await User.findOne({ mobile: phoneNumber });
+    if (!user) {
+      res.status(404).json({ message: 'User not found with this Phone number' });
+      return;
+    } else if (user.superAdmin === false) {
+      res.status(403).json({ message: 'User is not a super admin' });
+      return;
     }
+    const otp = Math.floor(100000 + Math.random() * 900000);
+    const message = `Your OTP is ${otp}. Please use this to login in Karvaan.`;
+    // const response = await twilio.messages.create({
+    //   body: message,
+    //   from: process.env.TWILIO_PHONE_NUMBER,
+    //   to: user.mobile,
+    // });
+
+    console.log(`OTP sent to ${phoneNumber}: ${otp}`); // For debugging purposes
+
+    otpCache.set(phoneNumber, otp);
+    res.status(200).json({
+      message: 'OTP sent successfully',
+      success: true,
+    });
+  } catch (error: any) {
+    console.error(error);
+    res.status(500).json({ message: 'Internal server error', error: error.message });
+  }
+};
+
+export const insertTest = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { name, email, mobile, agentId, phoneCode, roleId, superAdmin } = req.body;
+
+    const newUser = new User({
+      name,
+      email,
+      mobile,
+      agentId,
+      phoneCode,
+      roleId,
+      superAdmin
+    });
+
+    await newUser.save();
+    res.status(201).json({ message: 'User created successfully', user: newUser });
+  } catch (error: any) {
+    console.error(error);
+    res.status(500).json({ message: 'Internal server error', error: error.message });
+  }
+};
+
+export const sendOtpAgent = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { agentId } = req.body;
+    if (!agentId) {
+      res.status(400).json({ message: 'Agent ID is required' });
+      return;
+    }
+    const user = await User.findOne({ agentId });
+    if (!user) {
+      res.status(404).json({ message: 'User not found with this Agent ID' });
+      return;
+    }
+    const otp = Math.floor(100000 + Math.random() * 900000);
+    const message = `Your OTP is ${otp}. Please use this to login in Karvaan.`;
+    // const response = await twilio.messages.create({
+    //   body: message,
+    //   from: process.env.TWILIO_PHONE_NUMBER,
+    //   to: user.mobile,
+    // });
+
+    console.log(`OTP sent to ${user.mobile}: ${otp}`); // For debugging purposes
+
+    otpCache.set(agentId, otp);
+    res.status(200).json({
+      message: 'OTP sent successfully',
+      success: true,
+    });
   } catch (error: any) {
     console.error(error);
     res.status(500).json({ message: 'Internal server error', error: error.message });
@@ -40,30 +102,38 @@ export const sendOtp = async (req: Request, res: Response): Promise<void> => {
 
 export const verifyOtp = async (req: Request, res: Response): Promise<void> => {
   try {
-    const { requestId, otp, phoneNumber, phoneCode } = req.body;
-    if (!requestId || !otp) {
-      res.status(400).json({ message: 'RequestID and OTP are required' });
+    const { signingId, otp, superAdmin } = req.body;
+    if (!signingId || !otp) {
+      res.status(400).json({ message: 'Signing ID and OTP are required' });
       return;
     }
 
-    try {
-      const response = await axios.post('https://auth.otpless.app/auth/otp/v1/send', { requestId, otp }, { headers: otpLessHeaders });
-      const user = await User.findOne({ phoneNum: phoneCode + phoneNumber });
+    const cachedOtp = otpCache.get<number>(signingId);
+    if (!cachedOtp) {
+      res.status(400).json({ message: 'Invalid Signing ID or OTP is expired' });
+      return;
+    }
 
-      const token = user ? createToken(user) : null;
-      res.status(200).json({
-        message: 'OTP verified successfully',
-        data: response.data,
-        token,
-        user,
-        success: true,
-      });
-    } catch (error: any) {
-      res.status(500).json({ message: 'Error validating OTP', error: error.message, success: false });
+    console.log(`Verifying OTP for ${signingId}: ${otp} (cached: ${cachedOtp})`); // For debugging purposes
+
+    if (cachedOtp == otp) {
+      otpCache.del(signingId);
+      let user: IUser | null = null;
+      if (superAdmin) {
+        user = await User.findOne({ mobile: signingId, superAdmin });
+      } else {
+        user = await User.findOne({ agentId: signingId });
+      }
+      if (!user) {
+        res.status(404).json({ message: 'User not found' });
+        return;
+      }
+      res.status(200).json({ message: 'OTP verified successfully', success: true, user, token: createToken(user.toObject()) });
+    } else {
+      res.status(400).json({ message: 'Invalid OTP', success: false });
     }
   } catch (error: any) {
-    console.error(error);
-    res.status(500).json({ message: 'Internal server error', error: error.message, success: false });
+    res.status(500).json({ message: 'Error validating OTP', error: error.message, success: false });
   }
 };
 
