@@ -3,7 +3,8 @@ import {
     getQuotationsByParty,
     createQuotation,
     updateQuotation,
-    deleteQuotation
+    deleteQuotation,
+    getQuotationById
 } from '../controllers/quotation'
 
 import express from 'express';
@@ -11,7 +12,8 @@ import express from 'express';
 const router = express.Router();
 
 router.get('/get-all-quotations', getAllQuotations);
-router.get('/get-quotations-by-party:id', getQuotationsByParty);
+router.get('/get-quotation/:id', getQuotationById)
+router.get('/get-quotations-by-party/:id', getQuotationsByParty);
 router.post('/create-quotation', createQuotation);
 router.put('/update-quotation/:id', updateQuotation);
 router.delete('/delete-quotation/:id', deleteQuotation);

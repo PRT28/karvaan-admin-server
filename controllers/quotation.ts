@@ -81,6 +81,23 @@ export const getAllQuotations = async (req: Request, res: Response) => {
   }
 };
 
+export const getQuotationById = async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+
+    const quotations = await Quotation.findById(id).populate({
+      path: 'partyId',
+      model: req.query.channel === 'B2B' ? 'Vendor' : 'Customer',
+    });
+
+    res.status(200).json({ success: true, quotations });
+  } catch (err) {
+    res.status(500).json({ success: false, message: 'Failed to fetch quotations', error: (err as Error).message });
+  }
+};
+
+
+
 export const getQuotationsByParty = async (req: Request, res: Response): Promise<void> => {
   try {
     const { id } = req.params;

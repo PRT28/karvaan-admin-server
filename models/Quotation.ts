@@ -8,19 +8,7 @@ export interface IQuotation extends Document {
   quotationType: QuotationType;
   channel: ChannelType;
   partyId: mongoose.Types.ObjectId;
-  travelDetails: {
-    from: string;
-    to: string;
-    date: Date;
-    returnDate?: Date;
-    passengers: number;
-  };
-  items: {
-    name: string;
-    price: number;
-    quantity: number;
-    description?: string;
-  }[];
+  formFields: Map<String, Object>,
   totalAmount: number;
   status: QuotationStatus;
   createdAt: Date;
@@ -44,21 +32,10 @@ const QuotationSchema = new Schema<IQuotation>(
       required: true,
       refPath: 'channel',
     },
-    travelDetails: {
-      from: { type: String, required: true },
-      to: { type: String, required: true },
-      date: { type: Date, required: true },
-      returnDate: { type: Date },
-      passengers: { type: Number, required: true },
+    formFields: {
+      type: Map,
+      reqired: true
     },
-    items: [
-      {
-        name: { type: String, required: true },
-        price: { type: Number, required: true },
-        quantity: { type: Number, required: true },
-        description: { type: String },
-      },
-    ],
     totalAmount: { type: Number, required: true },
     status: {
       type: String,
@@ -70,3 +47,4 @@ const QuotationSchema = new Schema<IQuotation>(
 );
 
 export default mongoose.model<IQuotation>('Quotation', QuotationSchema);
+
