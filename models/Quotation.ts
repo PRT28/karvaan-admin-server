@@ -8,6 +8,7 @@ export interface IQuotation extends Document {
   quotationType: QuotationType;
   channel: ChannelType;
   partyId: mongoose.Types.ObjectId;
+  partyModel: 'Customer' | 'Vendor';
   formFields: Map<String, Object>,
   totalAmount: number;
   status: QuotationStatus;
@@ -30,7 +31,12 @@ const QuotationSchema = new Schema<IQuotation>(
     partyId: {
       type: Schema.Types.ObjectId,
       required: true,
-      refPath: 'channel',
+      refPath: 'partyModel',
+    },
+    partyModel: {
+      type: String,
+      required: true,
+      enum: ['Customer', 'Vendor'],
     },
     formFields: {
       type: Map,

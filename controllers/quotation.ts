@@ -6,7 +6,16 @@ import mongoose from 'mongoose';
 
 export const createQuotation = async (req: Request, res: Response) => {
   try {
-    const newQuotation = new Quotation(req.body);
+    const quotationData = { ...req.body };
+
+    // Set partyModel based on channel
+    if (quotationData.channel === 'B2B') {
+      quotationData.partyModel = 'Vendor';
+    } else if (quotationData.channel === 'B2C') {
+      quotationData.partyModel = 'Customer';
+    }
+
+    const newQuotation = new Quotation(quotationData);
     await newQuotation.save();
     res.status(201).json({ success: true, quotation: newQuotation });
   } catch (err) {
@@ -46,34 +55,51 @@ export const getAllQuotations = async (req: Request, res: Response) => {
   try {
     const { startDate, endDate, name, channel } = req.query;
 
+    // Build date filter
     const dateFilter: any = {};
     if (startDate) dateFilter.$gte = new Date(startDate as string);
     if (endDate) dateFilter.$lte = new Date(endDate as string);
 
+    // Build name filter
     let nameFilter: any = {};
     if (name && channel) {
-      let parties: any;
+      let parties: any[] = [];
+
       if (channel === 'B2B') {
-        nameFilter.partyModel = 'Vendor';
-        parties =  Vendor.find({
-            name: { $regex: name, $options: 'i' }
+        // Search vendors by company name
+        parties = await Vendor.find({
+          companyName: { $regex: name, $options: 'i' }
         });
-      } else {
-        nameFilter.partyModel = 'Customer';
-        parties = Customer.find({
+      } else if (channel === 'B2C') {
+        // Search customers by name
+        parties = await Customer.find({
           name: { $regex: name, $options: 'i' }
         });
-      };
-      nameFilter.partyId = { $in: parties.map((p: any) => p._id) };
+      }
+
+      if (parties.length > 0) {
+        nameFilter.partyId = { $in: parties.map((p: any) => p._id) };
+      } else {
+        // If no parties found with the name, return empty result
+        res.status(200).json({ success: true, quotations: [] });
+        return;
+      }
     }
 
-    const quotations = await Quotation.find({
-      ...(startDate || endDate ? { createdAt: dateFilter } : {}),
-      ...(nameFilter.partyId ? nameFilter : {})
-    }).populate({
-      path: 'partyId',
-      model: req.query.channel === 'B2B' ? 'Vendor' : 'Customer',
-    });
+    // Build final query
+    const query: any = {};
+    if (startDate || endDate) {
+      query.createdAt = dateFilter;
+    }
+    if (nameFilter.partyId) {
+      query.partyId = nameFilter.partyId;
+    }
+    if (channel && !name) {
+      query.channel = channel;
+    }
+
+    // Get quotations with population
+    const quotations = await Quotation.find(query).populate('partyId').sort({ createdAt: -1 });
 
     res.status(200).json({ success: true, quotations });
   } catch (err) {
@@ -85,14 +111,21 @@ export const getQuotationById = async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
 
-    const quotations = await Quotation.findById(id).populate({
-      path: 'partyId',
-      model: req.query.channel === 'B2B' ? 'Vendor' : 'Customer',
-    });
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      res.status(400).json({ success: false, message: 'Invalid quotation ID' });
+      return;
+    }
 
-    res.status(200).json({ success: true, quotations });
+    const quotation = await Quotation.findById(id).populate('partyId');
+
+    if (!quotation) {
+      res.status(404).json({ success: false, message: 'Quotation not found' });
+      return;
+    }
+
+    res.status(200).json({ success: true, quotation });
   } catch (err) {
-    res.status(500).json({ success: false, message: 'Failed to fetch quotations', error: (err as Error).message });
+    res.status(500).json({ success: false, message: 'Failed to fetch quotation', error: (err as Error).message });
   }
 };
 
@@ -107,7 +140,8 @@ export const getQuotationsByParty = async (req: Request, res: Response): Promise
       return;
     }
 
-    const quotations = await Quotation.find({ id }).sort({ createdAt: -1 });
+    // Query by partyId, not id
+    const quotations = await Quotation.find({ partyId: id }).populate('partyId').sort({ createdAt: -1 });
 
     res.status(200).json({ success: true, quotations });
   } catch (err) {

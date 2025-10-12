@@ -1,53 +1,27 @@
-import axios from 'axios';
 import { Request, Response } from 'express';
-import User, { IUser } from '../models/User';
+import User from '../models/User';
 import { createToken } from '../utils/jwt';
 import { isValidPermissions } from '../utils/utils';
 import Role from '../models/Roles';
-import twilio from '../utils/twilio';
 import cache from 'node-cache';
+import bcrypt from 'bcryptjs';
+import { send2FACode } from '../utils/email';
 
-const otpCache = new cache({ stdTTL: 300 }); // 5 minutes TTL
-
-export const sendOtpSU = async (req: Request, res: Response): Promise<void> => {
-  try {
-    const { phoneNumber } = req.body;
-    if (!phoneNumber) {
-      res.status(400).json({ message: 'Phone number is required' });
-      return;
-    }
-    const user = await User.findOne({ mobile: phoneNumber });
-    if (!user) {
-      res.status(404).json({ message: 'User not found with this Phone number' });
-      return;
-    } else if (user.superAdmin === false) {
-      res.status(403).json({ message: 'User is not a super admin' });
-      return;
-    }
-    const otp = Math.floor(100000 + Math.random() * 900000);
-    const message = `Your OTP is ${otp}. Please use this to login in Karvaan.`;
-    // const response = await twilio.messages.create({
-    //   body: message,
-    //   from: process.env.TWILIO_PHONE_NUMBER,
-    //   to: user.mobile,
-    // });
-
-    console.log(`OTP sent to ${phoneNumber}: ${otp}`); // For debugging purposes
-
-    otpCache.set(phoneNumber, otp);
-    res.status(200).json({
-      message: 'OTP sent successfully',
-      success: true,
-    });
-  } catch (error: any) {
-    console.error(error);
-    res.status(500).json({ message: 'Internal server error', error: error.message });
-  }
-};
+// Cache for storing 2FA codes with email as key
+const twoFACache = new cache({ stdTTL: 300 }); // 5 minutes TTL
 
 export const insertTest = async (req: Request, res: Response): Promise<void> => {
   try {
-    const { name, email, mobile, agentId, phoneCode, roleId, superAdmin } = req.body;
+    const { name, email, mobile, agentId, phoneCode, roleId, superAdmin, password } = req.body;
+
+    if (!password) {
+      res.status(400).json({ message: 'Password is required' });
+      return;
+    }
+
+    // Hash the password
+    const saltRounds = 10;
+    const hashedPassword = await bcrypt.hash(password, saltRounds);
 
     const newUser = new User({
       name,
@@ -56,86 +30,26 @@ export const insertTest = async (req: Request, res: Response): Promise<void> => 
       agentId,
       phoneCode,
       roleId,
-      superAdmin
+      superAdmin,
+      password: hashedPassword
     });
 
     await newUser.save();
-    res.status(201).json({ message: 'User created successfully', user: newUser });
+
+    // Remove password from response
+    const userResponse = newUser.toObject();
+    delete (userResponse as any).password;
+
+    res.status(201).json({ message: 'User created successfully', user: userResponse });
   } catch (error: any) {
     console.error(error);
     res.status(500).json({ message: 'Internal server error', error: error.message });
   }
 };
 
-export const sendOtpAgent = async (req: Request, res: Response): Promise<void> => {
-  try {
-    const { agentId } = req.body;
-    if (!agentId) {
-      res.status(400).json({ message: 'Agent ID is required' });
-      return;
-    }
-    const user = await User.findOne({ agentId });
-    if (!user) {
-      res.status(404).json({ message: 'User not found with this Agent ID' });
-      return;
-    }
-    const otp = Math.floor(100000 + Math.random() * 900000);
-    const message = `Your OTP is ${otp}. Please use this to login in Karvaan.`;
-    // const response = await twilio.messages.create({
-    //   body: message,
-    //   from: process.env.TWILIO_PHONE_NUMBER,
-    //   to: user.mobile,
-    // });
 
-    console.log(`OTP sent to ${user.mobile}: ${otp}`); // For debugging purposes
 
-    otpCache.set(agentId, otp);
-    res.status(200).json({
-      message: 'OTP sent successfully',
-      success: true,
-    });
-  } catch (error: any) {
-    console.error(error);
-    res.status(500).json({ message: 'Internal server error', error: error.message });
-  }
-};
 
-export const verifyOtp = async (req: Request, res: Response): Promise<void> => {
-  try {
-    const { signingId, otp, superAdmin } = req.body;
-    if (!signingId || !otp) {
-      res.status(400).json({ message: 'Signing ID and OTP are required' });
-      return;
-    }
-
-    const cachedOtp = otpCache.get<number>(signingId);
-    if (!cachedOtp) {
-      res.status(400).json({ message: 'Invalid Signing ID or OTP is expired' });
-      return;
-    }
-
-    console.log(`Verifying OTP for ${signingId}: ${otp} (cached: ${cachedOtp})`); // For debugging purposes
-
-    if (cachedOtp == otp) {
-      otpCache.del(signingId);
-      let user: IUser | null = null;
-      if (superAdmin) {
-        user = await User.findOne({ mobile: signingId, superAdmin });
-      } else {
-        user = await User.findOne({ agentId: signingId });
-      }
-      if (!user) {
-        res.status(404).json({ message: 'User not found' });
-        return;
-      }
-      res.status(200).json({ message: 'OTP verified successfully', success: true, user, token: createToken(user.toObject()) });
-    } else {
-      res.status(400).json({ message: 'Invalid OTP', success: false });
-    }
-  } catch (error: any) {
-    res.status(500).json({ message: 'Error validating OTP', error: error.message, success: false });
-  }
-};
 
 export const createNewRole = async (req: Request, res: Response): Promise<void> => {
     try {
@@ -248,7 +162,7 @@ export const getUserById = async (req: Request, res: Response): Promise<void> =>
     res.status(500).json({ message: 'Internal server error', error: error.message, success: false });
     }
 }
-export const getAllUsers = async (req: Request, res: Response): Promise<void> => {
+export const getAllUsers = async (_req: Request, res: Response): Promise<void> => {
   try {
     const users = await User.find().populate('roleId');
     res.status(200).json({
@@ -284,3 +198,133 @@ export const deleteUser = async (req: Request, res: Response): Promise<void> => 
         res.status(500).json({ message: 'Internal server error', error: error.message, success: false });
     }
 }
+
+// New authentication functions for username/password with 2FA
+
+// Login with username (email) and password
+export const loginWithPassword = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { email, password } = req.body;
+    console.log('Login attempt for email:', email);
+
+    if (!email || !password) {
+      res.status(400).json({ message: 'Email and password are required' });
+      return;
+    }
+
+    // Find user by email
+    console.log('Searching for user with email:', email);
+    console.log('Database name:', User.db.name);
+    console.log('Collection name:', User.collection.name);
+
+    // Try to count all users first
+    const totalUsers = await User.countDocuments();
+    console.log('Total users in collection:', totalUsers);
+
+    const user = await User.findOne({ email }).select('+password');
+    console.log('User found:', user ? 'YES' : 'NO', user);
+
+    if (!user) {
+      res.status(404).json({ message: 'User not found with this email' });
+      return;
+    }
+
+    const hashedPassword = await hashPassword(password);
+
+    console.log('Comparing password...');
+    console.log('Input password:', password);
+    console.log('Stored password hash:', user.password);
+    console.log('Password hash exists:', !!user.password);
+    console.log('Password hash length:', user.password ? user.password.length : 'N/A');
+    console.log('Password hash type:', user.password, hashedPassword, user.password === hashedPassword);
+
+    // Verify password
+    const isPasswordValid = await bcrypt.compare(password, user.password);
+    console.log('Password comparison result:', isPasswordValid);
+
+    if (!isPasswordValid) {
+      res.status(401).json({ message: 'Invalid email or password' });
+      return;
+    }
+
+    // Generate 2FA code
+    const twoFACode = Math.floor(100000 + Math.random() * 900000).toString();
+
+    // Send 2FA code via email
+    // const emailSent = await send2FACode(user.email, twoFACode);
+    // if (!emailSent) {
+    //   res.status(500).json({ message: 'Failed to send 2FA code. Please try again.' });
+    //   return;
+    // }
+
+    // Store 2FA code in cache with email as key
+    twoFACache.set(user.email, twoFACode);
+
+    console.log(`2FA code sent to ${user.email}: ${twoFACode}`); // For debugging purposes
+
+    res.status(200).json({
+      message: '2FA code sent to your email',
+      success: true,
+      email: user.email, // Return email for the next step
+    });
+  } catch (error: any) {
+    console.error(error);
+    res.status(500).json({ message: 'Internal server error', error: error.message });
+  }
+};
+
+// Verify 2FA code and create session
+export const verify2FA = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { email, twoFACode } = req.body;
+
+    if (!email || !twoFACode) {
+      res.status(400).json({ message: 'Email and 2FA code are required' });
+      return;
+    }
+
+    // Get cached 2FA code
+    const cachedCode = twoFACache.get<string>(email);
+    if (!cachedCode) {
+      res.status(400).json({ message: 'Invalid email or 2FA code has expired' });
+      return;
+    }
+
+    console.log(`Verifying 2FA for ${email}: ${twoFACode} (cached: ${cachedCode})`); // For debugging purposes
+
+    // Verify 2FA code
+    if (cachedCode !== twoFACode) {
+      res.status(400).json({ message: 'Invalid 2FA code' });
+      return;
+    }
+
+    // Remove 2FA code from cache
+    twoFACache.del(email);
+
+    // Find user and populate role
+    const user = await User.findOne({ email }).populate('roleId');
+    if (!user) {
+      res.status(404).json({ message: 'User not found' });
+      return;
+    }
+
+    // Create JWT token
+    const token = createToken(user.toObject());
+
+    res.status(200).json({
+      message: '2FA verified successfully. Login successful.',
+      success: true,
+      user,
+      token,
+    });
+  } catch (error: any) {
+    console.error(error);
+    res.status(500).json({ message: 'Error verifying 2FA code', error: error.message });
+  }
+};
+
+// Utility function to hash password (for manual user creation or password updates)
+export const hashPassword = async (password: string): Promise<string> => {
+  const saltRounds = 10;
+  return await bcrypt.hash(password, saltRounds);
+};

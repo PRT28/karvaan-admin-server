@@ -6,8 +6,9 @@ export interface IUser extends Document {
   mobile: string;
   agentId: string | null;
   phoneCode: number;
-  roleId: Types.ObjectId; 
+  roleId: Types.ObjectId;
   superAdmin: boolean;
+  password: string;
 }
 
 const userSchema = new Schema<IUser>({
@@ -40,6 +41,10 @@ const userSchema = new Schema<IUser>({
   superAdmin: {
     type: Boolean,
     default: false,
+  },
+  password: {
+    type: String,
+    required: true,
   },
 }, {
   timestamps: true,
