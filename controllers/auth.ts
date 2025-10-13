@@ -251,11 +251,11 @@ export const loginWithPassword = async (req: Request, res: Response): Promise<vo
     const twoFACode = Math.floor(100000 + Math.random() * 900000).toString();
 
     // Send 2FA code via email
-    // const emailSent = await send2FACode(user.email, twoFACode);
-    // if (!emailSent) {
-    //   res.status(500).json({ message: 'Failed to send 2FA code. Please try again.' });
-    //   return;
-    // }
+    const emailSent = await send2FACode(user.email, twoFACode);
+    if (!emailSent) {
+      res.status(500).json({ message: 'Failed to send 2FA code. Please try again.' });
+      return;
+    }
 
     // Store 2FA code in cache with email as key
     twoFACache.set(user.email, twoFACode);
