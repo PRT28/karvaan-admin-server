@@ -2,10 +2,12 @@ import {
     createNewRole,
     createOrUpdateUser,
     deleteUser,
+    forgotPassword,
     getAllUsers,
     getUserById,
     insertTest,
     loginWithPassword,
+    registerBusinessUser,
     verify2FA
 } from "../controllers/auth";
 import express from "express";
@@ -108,6 +110,78 @@ router.post("/login", loginWithPassword);
  *               $ref: '#/components/schemas/ErrorResponse'
  */
 router.post("/verify-2fa", verify2FA);
+
+/**
+ * @swagger
+ * /auth/forgot-password:
+ *   post:
+ *     summary: Request password reset
+ *     description: Send password reset notification to business administrator for the user
+ *     tags: [Authentication]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [email]
+ *             properties:
+ *               email:
+ *                 type: string
+ *                 format: email
+ *                 description: Email address of the user requesting password reset
+ *                 example: "user@example.com"
+ *     responses:
+ *       200:
+ *         description: Password reset notification sent successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 message:
+ *                   type: string
+ *                   example: "Password reset notification has been sent to your business administrator. They will contact you shortly to assist with password recovery."
+ *                 adminNotified:
+ *                   type: object
+ *                   properties:
+ *                     adminName:
+ *                       type: string
+ *                       example: "John Admin"
+ *                     businessName:
+ *                       type: string
+ *                       example: "Test Travel Agency"
+ *       400:
+ *         description: Email is required or user/business validation errors
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: false
+ *                 message:
+ *                   type: string
+ *                   example: "Email is required"
+ *       500:
+ *         description: Internal server error or email sending failure
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: false
+ *                 message:
+ *                   type: string
+ *                   example: "Failed to send password reset notification. Please try again later."
+ */
+router.post("/forgot-password", forgotPassword);
 
 /**
  * @swagger
@@ -348,5 +422,84 @@ router.get("/get-all-users", checkKarvaanToken, getAllUsers);
  *         description: Internal server error
  */
 router.get("/get-user/:id", checkKarvaanToken, getUserById);
+
+/**
+ * @swagger
+ * /auth/register-business-user:
+ *   post:
+ *     summary: Register a new user under a business
+ *     description: Register a new user under an existing business (Business Admin only)
+ *     tags: [Authentication]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - name
+ *               - email
+ *               - mobile
+ *               - phoneCode
+ *               - roleId
+ *               - password
+ *               - businessId
+ *             properties:
+ *               name:
+ *                 type: string
+ *                 description: User's full name
+ *                 example: "John Doe"
+ *               email:
+ *                 type: string
+ *                 format: email
+ *                 description: User's email address
+ *                 example: "john.doe@example.com"
+ *               mobile:
+ *                 type: string
+ *                 description: User's mobile number
+ *                 example: "9876543210"
+ *               phoneCode:
+ *                 type: number
+ *                 description: Country phone code
+ *                 example: 91
+ *               roleId:
+ *                 type: string
+ *                 description: Role ID for the user
+ *                 example: "60d5ecb74b24a1234567890a"
+ *               password:
+ *                 type: string
+ *                 format: password
+ *                 description: User's password
+ *                 example: "SecurePassword123!"
+ *               businessId:
+ *                 type: string
+ *                 description: Business ID the user belongs to
+ *                 example: "60d5ecb74b24a1234567890b"
+ *     responses:
+ *       201:
+ *         description: Business user registered successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 message:
+ *                   type: string
+ *                   example: "Business user registered successfully"
+ *                 user:
+ *                   $ref: '#/components/schemas/User'
+ *       400:
+ *         description: Validation error or business limit reached
+ *       404:
+ *         description: Business not found
+ *       500:
+ *         description: Internal server error
+ */
+router.post("/register-business-user", registerBusinessUser);
 
 export default router;

@@ -10,6 +10,7 @@ export const createLog = async (req: Request, res: Response) => {
       activity,
       userId,
       status,
+      businessId: req.user?.businessId || req.user?._id, // Use businessId or fallback to user ID for super admin
       assignedBy: req?.user?._id,
       dateTime: new Date()
     });
@@ -24,16 +25,30 @@ export const createLog = async (req: Request, res: Response) => {
 export const updateLog = async (req: Request, res: Response): Promise<void> => {
   try {
     const { id } = req.params;
-    const updates = req.body; // e.g., { activity: "New task", assignedBy: "..." }
 
-    const log = await Logs.findByIdAndUpdate(id, updates, { new: true });
+    // Build filter based on user type
+    const filter: any = { _id: id };
+    if (req.user?.userType !== 'super_admin') {
+      filter.businessId = req.user?.businessId;
+    }
+
+    // Don't allow updating businessId through this endpoint
+    const updateData = { ...req.body };
+    delete updateData.businessId;
+
+    const log = await Logs.findOneAndUpdate(filter, updateData, { new: true })
+      .populate('userId assignedBy')
+      .populate({
+        path: 'businessId',
+        select: 'businessName businessType',
+      });
 
     if (!log) {
      res.status(404).json({ success: false, message: 'Log not found' });
     } else {
       res.json({ success: true, log });
     }
-    
+
   } catch (error) {
     console.error('Error updating log:', error);
     res.status(500).json({ success: false, message: 'Failed to update log' });
@@ -48,7 +63,18 @@ export const updateLogStatus = async (req: Request, res: Response): Promise<void
     if (!['Pending', 'Completed', 'On Hold', 'In Progress'].includes(status)) {
      res.status(400).json({ success: false, message: 'Invalid status' });
     } else {
-      const log = await Logs.findByIdAndUpdate(id, { status }, { new: true });
+      // Build filter based on user type
+      const filter: any = { _id: id };
+      if (req.user?.userType !== 'super_admin') {
+        filter.businessId = req.user?.businessId;
+      }
+
+      const log = await Logs.findOneAndUpdate(filter, { status }, { new: true })
+        .populate('userId assignedBy')
+        .populate({
+          path: 'businessId',
+          select: 'businessName businessType',
+        });
 
       if (!log) {
       res.status(404).json({ success: false, message: 'Log not found' });
@@ -56,10 +82,10 @@ export const updateLogStatus = async (req: Request, res: Response): Promise<void
         res.json({ success: true, log });
       }
 
-      
+
     }
 
-    
+
   } catch (error) {
     console.error('Error updating log status:', error);
     res.status(500).json({ success: false, message: 'Failed to update status' });
@@ -70,14 +96,20 @@ export const deleteLog = async (req: Request, res: Response): Promise<void>  => 
   try {
     const { id } = req.params;
 
-    const result = await Logs.findByIdAndDelete(id);
+    // Build filter based on user type
+    const filter: any = { _id: id };
+    if (req.user?.userType !== 'super_admin') {
+      filter.businessId = req.user?.businessId;
+    }
+
+    const result = await Logs.findOneAndDelete(filter);
 
     if (!result) {
         res.status(404).json({ success: false, message: 'Log not found' });
     } else {
         res.json({ success: true, message: 'Log deleted successfully' });
     }
-    
+
   } catch (error) {
     console.error('Error deleting log:', error);
     res.status(500).json({ success: false, message: 'Failed to delete log' });
@@ -86,7 +118,16 @@ export const deleteLog = async (req: Request, res: Response): Promise<void>  => 
 
 export const getAllLogs = async (req: Request, res: Response) => {
   try {
-    const logs = await Logs.find().populate('userId assignedBy');
+    // Filter by business for business users, show all for super admin
+    const filter = req.user?.userType === 'super_admin' ? {} : { businessId: req.user?.businessId };
+
+    const logs = await Logs.find(filter)
+      .populate('userId assignedBy')
+      .populate({
+        path: 'businessId',
+        select: 'businessName businessType',
+      })
+      .sort({ dateTime: -1 });
 
     res.json({ success: true, logs });
   } catch (error) {
@@ -106,36 +147,45 @@ export const getUserLogsDashboard = async (req: Request, res: Response): Promise
     }
 
     const now = new Date();
-    const startDate = new Date(now);
-    startDate.setDate(now.getDate() - 2);
-    startDate.setHours(0, 0, 0, 0);
+    const today = new Date(now);
+    today.setHours(0, 0, 0, 0);
 
-    const endDate = new Date(now);
-    endDate.setDate(now.getDate() + 2);
-    endDate.setHours(23, 59, 59, 999);
+    const tomorrow = new Date(today);
+    tomorrow.setDate(today.getDate() + 1);
+
+    const nextWeek = new Date(today);
+    nextWeek.setDate(today.getDate() + 7);
 
     // Fetch all relevant logs
     const logs = await Logs.find({
-      userId: userId,
-      dateTime: { $gte: startDate, $lte: endDate }
+      userId: userId
     }).populate('assignedBy', 'name');
 
     const dateWiseLogs: Record<string, any[]> = {};
     const statusCounts: Record<string, number> = {
       Completed: 0,
       'In Progress': 0,
-      Pending: 0
+      Pending: 0,
+      'On Hold': 0
     };
 
     let currentUserPendingTaskCount = 0;
     const totalLogs = logs.length;
+
+    // Task categorization by due dates
+    const taskOverdue: any[] = [];
+    const tasksDueToday: any[] = [];
+    const upcomingTasks: any[] = [];
 
     const recentLogs = logs
       .sort((a, b) => +new Date(b.dateTime) - +new Date(a.dateTime))
       .slice(0, 3)
       .map(log => ({
         activity: log.activity,
-        dateTime: log.dateTime
+        dateTime: log.dateTime,
+        priority: log.priority,
+        dueDate: log.dueDate,
+        status: log.status
       }));
 
     const teamMap: Record<string, { completed: number; total: number }> = {};
@@ -157,6 +207,33 @@ export const getUserLogsDashboard = async (req: Request, res: Response): Promise
         currentUserPendingTaskCount++;
       }
 
+      // Categorize tasks by due date (only for non-completed tasks)
+      if (log.status !== 'Completed') {
+        const dueDate = new Date(log.dueDate);
+        dueDate.setHours(0, 0, 0, 0);
+
+        const taskInfo = {
+          _id: log._id,
+          activity: log.activity,
+          priority: log.priority,
+          dueDate: log.dueDate,
+          status: log.status,
+          assignedBy: (log.assignedBy as any)?.name || 'Unknown',
+          dateTime: log.dateTime
+        };
+
+        if (dueDate < today) {
+          // Overdue tasks
+          taskOverdue.push(taskInfo);
+        } else if (dueDate.getTime() === today.getTime()) {
+          // Tasks due today
+          tasksDueToday.push(taskInfo);
+        } else if (dueDate < nextWeek) {
+          // Upcoming tasks (within next 7 days)
+          upcomingTasks.push(taskInfo);
+        }
+      }
+
       // Calculate team % complete
       const assignerName = (log.assignedBy as any)?.name || 'Unknown';
       if (!teamMap[assignerName]) {
@@ -168,12 +245,25 @@ export const getUserLogsDashboard = async (req: Request, res: Response): Promise
       teamMap[assignerName].total++;
     });
 
+    // Sort tasks by priority and due date
+    const priorityOrder = { 'High': 3, 'Medium': 2, 'Low': 1 };
+    const sortByPriorityAndDate = (a: any, b: any) => {
+      const priorityDiff = priorityOrder[b.priority as keyof typeof priorityOrder] - priorityOrder[a.priority as keyof typeof priorityOrder];
+      if (priorityDiff !== 0) return priorityDiff;
+      return new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime();
+    };
+
+    taskOverdue.sort(sortByPriorityAndDate);
+    tasksDueToday.sort(sortByPriorityAndDate);
+    upcomingTasks.sort(sortByPriorityAndDate);
+
     // Status counts and percentages
     const percentageLogs = {
       completedCount: statusCounts.Completed,
       completedPercent: totalLogs ? `${Math.round((statusCounts.Completed / totalLogs) * 100)}%` : '0%',
       inProgressCount: statusCounts['In Progress'],
-      pendingCount: statusCounts.Pending
+      pendingCount: statusCounts.Pending,
+      onHoldCount: statusCounts['On Hold']
     };
 
     // Team percentage completion
@@ -182,12 +272,24 @@ export const getUserLogsDashboard = async (req: Request, res: Response): Promise
       teamPercentCompleteLogs[name] = `${Math.round((val.completed / val.total) * 100)}%`;
     }
 
+    // Task summary counts
+    const taskSummary = {
+      overdueCount: taskOverdue.length,
+      dueTodayCount: tasksDueToday.length,
+      upcomingCount: upcomingTasks.length,
+      totalActiveTasksCount: taskOverdue.length + tasksDueToday.length + upcomingTasks.length
+    };
+
     res.json({
       dateWiseLogs,
       percentageLogs,
       recentLogs,
       teamPercentCompleteLogs,
-      currentUserPendingTaskCount
+      currentUserPendingTaskCount,
+      taskOverdue,
+      tasksDueToday,
+      upcomingTasks,
+      taskSummary
     });
   } catch (error) {
     console.error('Error fetching user logs dashboard:', error);

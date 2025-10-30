@@ -15,6 +15,32 @@ export const createQuotation = async (req: Request, res: Response) => {
       quotationData.partyModel = 'Customer';
     }
 
+    // Get party to determine businessId
+    let party: any;
+    if (quotationData.partyModel === 'Customer') {
+      party = await Customer.findById(quotationData.partyId);
+    } else {
+      party = await Vendor.findById(quotationData.partyId);
+    }
+
+    if (!party) {
+      return res.status(404).json({
+        success: false,
+        message: `${quotationData.partyModel} not found`
+      });
+    }
+
+    // Verify user can access this party's business
+    if (req.user?.userType !== 'super_admin' && party.businessId.toString() !== req.user?.businessId?.toString()) {
+      return res.status(403).json({
+        success: false,
+        message: 'Forbidden: Cannot create quotation for other business'
+      });
+    }
+
+    // Add businessId to quotation data
+    quotationData.businessId = party.businessId;
+
     const newQuotation = new Quotation(quotationData);
     await newQuotation.save();
     res.status(201).json({ success: true, quotation: newQuotation });
@@ -26,11 +52,28 @@ export const createQuotation = async (req: Request, res: Response) => {
 export const updateQuotation = async (req: Request, res: Response): Promise<void> => {
   try {
     const { id } = req.params;
-    const updated = await Quotation.findByIdAndUpdate(id, req.body, { new: true });
+
+    // Build filter based on user type
+    const filter: any = { _id: id };
+    if (req.user?.userType !== 'super_admin') {
+      filter.businessId = req.user?.businessId;
+    }
+
+    // Don't allow updating businessId through this endpoint
+    const updateData = { ...req.body };
+    delete updateData.businessId;
+
+    const updated = await Quotation.findOneAndUpdate(filter, updateData, { new: true })
+      .populate('partyId')
+      .populate({
+        path: 'businessId',
+        select: 'businessName businessType',
+      });
+
     if (!updated) {
       res.status(404).json({ success: false, message: 'Quotation not found' });
       return;
-    } 
+    }
     res.status(200).json({ success: true, quotation: updated });
   } catch (err) {
     res.status(500).json({ success: false, message: 'Failed to update quotation', error: (err as Error).message });
@@ -40,7 +83,14 @@ export const updateQuotation = async (req: Request, res: Response): Promise<void
 export const deleteQuotation = async (req: Request, res: Response): Promise<void> => {
   try {
     const { id } = req.params;
-    const deleted = await Quotation.findByIdAndDelete(id);
+
+    // Build filter based on user type
+    const filter: any = { _id: id };
+    if (req.user?.userType !== 'super_admin') {
+      filter.businessId = req.user?.businessId;
+    }
+
+    const deleted = await Quotation.findOneAndDelete(filter);
     if (!deleted) {
       res.status(404).json({ success: false, message: 'Quotation not found' });
       return
@@ -55,6 +105,12 @@ export const getAllQuotations = async (req: Request, res: Response) => {
   try {
     const { startDate, endDate, name, channel } = req.query;
 
+    // Build business filter
+    const businessFilter: any = {};
+    if (req.user?.userType !== 'super_admin') {
+      businessFilter.businessId = req.user?.businessId;
+    }
+
     // Build date filter
     const dateFilter: any = {};
     if (startDate) dateFilter.$gte = new Date(startDate as string);
@@ -65,14 +121,18 @@ export const getAllQuotations = async (req: Request, res: Response) => {
     if (name && channel) {
       let parties: any[] = [];
 
+      const partyBusinessFilter = req.user?.userType === 'super_admin' ? {} : { businessId: req.user?.businessId };
+
       if (channel === 'B2B') {
-        // Search vendors by company name
+        // Search vendors by company name within user's business
         parties = await Vendor.find({
+          ...partyBusinessFilter,
           companyName: { $regex: name, $options: 'i' }
         });
       } else if (channel === 'B2C') {
-        // Search customers by name
+        // Search customers by name within user's business
         parties = await Customer.find({
+          ...partyBusinessFilter,
           name: { $regex: name, $options: 'i' }
         });
       }
@@ -87,7 +147,7 @@ export const getAllQuotations = async (req: Request, res: Response) => {
     }
 
     // Build final query
-    const query: any = {};
+    const query: any = { ...businessFilter };
     if (startDate || endDate) {
       query.createdAt = dateFilter;
     }
@@ -99,7 +159,13 @@ export const getAllQuotations = async (req: Request, res: Response) => {
     }
 
     // Get quotations with population
-    const quotations = await Quotation.find(query).populate('partyId').sort({ createdAt: -1 });
+    const quotations = await Quotation.find(query)
+      .populate('partyId')
+      .populate({
+        path: 'businessId',
+        select: 'businessName businessType',
+      })
+      .sort({ createdAt: -1 });
 
     res.status(200).json({ success: true, quotations });
   } catch (err) {

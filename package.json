@@ -7,7 +7,14 @@
   "scripts": {
     "dev": "nodemon",
     "start": "ts-node index.ts",
-    "create-dummy-data": "npx ts-node scripts/create-dummy-data.ts"
+    "create-dummy-data": "npx ts-node scripts/create-dummy-data.ts",
+    "migrate-users-to-business": "npx ts-node scripts/migrate-users-to-business.ts",
+    "migrate-data-to-business": "npx ts-node scripts/migrate-data-to-business.ts",
+    "create-test-users": "npx ts-node scripts/create-test-users.ts",
+    "update-test-users": "npx ts-node scripts/update-test-users.ts",
+    "reset-test-user-passwords": "npx ts-node scripts/reset-test-user-passwords.ts",
+    "test-dashboard": "npx ts-node scripts/test-dashboard.ts",
+    "create-test-logs": "npx ts-node scripts/create-test-logs.ts"
   },
   "author": "Google LLC",
   "license": "Apache-2.0",

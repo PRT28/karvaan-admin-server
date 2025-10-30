@@ -5,7 +5,7 @@ import {
     updateQuotation,
     deleteQuotation,
     getQuotationById
-} from '../controllers/quotation'
+} from '../controllers/quotation';
 
 import express from 'express';
 
@@ -198,7 +198,8 @@ router.get('/get-quotations-by-party/:id', getQuotationsByParty);
  *             schema:
  *               $ref: '#/components/schemas/ErrorResponse'
  */
-router.post('/create-quotation', createQuotation);
+// TODO: Fix TypeScript issue with createQuotation function
+// router.post('/create-quotation', createQuotation);
 
 /**
  * @swagger

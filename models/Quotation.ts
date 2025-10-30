@@ -9,6 +9,7 @@ export interface IQuotation extends Document {
   channel: ChannelType;
   partyId: mongoose.Types.ObjectId;
   partyModel: 'Customer' | 'Vendor';
+  businessId: mongoose.Types.ObjectId;
   formFields: Map<String, Object>,
   totalAmount: number;
   status: QuotationStatus;
@@ -38,9 +39,15 @@ const QuotationSchema = new Schema<IQuotation>(
       required: true,
       enum: ['Customer', 'Vendor'],
     },
+    businessId: {
+      type: Schema.Types.ObjectId,
+      ref: 'Business',
+      required: true,
+      index: true
+    },
     formFields: {
       type: Map,
-      reqired: true
+      required: true
     },
     totalAmount: { type: Number, required: true },
     status: {
@@ -51,6 +58,17 @@ const QuotationSchema = new Schema<IQuotation>(
   },
   { timestamps: true }
 );
+
+// Indexes for better performance
+QuotationSchema.index({ businessId: 1, createdAt: -1 });
+QuotationSchema.index({ businessId: 1, status: 1 });
+QuotationSchema.index({ businessId: 1, quotationType: 1 });
+QuotationSchema.index({ businessId: 1, channel: 1 });
+
+// Static method to find quotations by business
+QuotationSchema.statics.findByBusiness = function(businessId: string) {
+  return this.find({ businessId });
+};
 
 export default mongoose.model<IQuotation>('Quotation', QuotationSchema);
 

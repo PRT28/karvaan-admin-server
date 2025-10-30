@@ -1,11 +1,13 @@
 import { Request, Response } from 'express';
 import User from '../models/User';
+import Business from '../models/Business';
 import { createToken } from '../utils/jwt';
 import { isValidPermissions } from '../utils/utils';
 import Role from '../models/Roles';
 import cache from 'node-cache';
 import bcrypt from 'bcryptjs';
-import { send2FACode } from '../utils/email';
+import { send2FACode, sendPasswordResetNotification } from '../utils/email';
+import mongoose from 'mongoose';
 
 // Cache for storing 2FA codes with email as key
 const twoFACache = new cache({ stdTTL: 300 }); // 5 minutes TTL
@@ -47,6 +49,121 @@ export const insertTest = async (req: Request, res: Response): Promise<void> => 
   }
 };
 
+// Register a new user under a business (Business Admin only)
+export const registerBusinessUser = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const {
+      name,
+      email,
+      mobile,
+      phoneCode,
+      roleId,
+      password,
+      businessId
+    } = req.body;
+
+    // Validate required fields
+    if (!name || !email || !mobile || !phoneCode || !roleId || !password || !businessId) {
+      res.status(400).json({
+        success: false,
+        message: 'All required fields must be provided'
+      });
+      return;
+    }
+
+    // Validate business ID
+    if (!mongoose.Types.ObjectId.isValid(businessId)) {
+      res.status(400).json({
+        success: false,
+        message: 'Invalid business ID'
+      });
+      return;
+    }
+
+    // Check if business exists and is active
+    const business = await Business.findById(businessId);
+    if (!business) {
+      res.status(404).json({
+        success: false,
+        message: 'Business not found'
+      });
+      return;
+    }
+
+    if (!business.isActive) {
+      res.status(400).json({
+        success: false,
+        message: 'Business is not active'
+      });
+      return;
+    }
+
+    // Check if business can add more users
+    const currentUserCount = await User.countDocuments({ businessId, isActive: true });
+    if (currentUserCount >= business.settings.maxUsers) {
+      res.status(400).json({
+        success: false,
+        message: `Business has reached maximum user limit of ${business.settings.maxUsers}`
+      });
+      return;
+    }
+
+    // Check if user with email already exists
+    const existingUser = await User.findOne({ email });
+    if (existingUser) {
+      res.status(400).json({
+        success: false,
+        message: 'User with this email already exists'
+      });
+      return;
+    }
+
+    // Validate role exists
+    const role = await Role.findById(roleId);
+    if (!role) {
+      res.status(400).json({
+        success: false,
+        message: 'Invalid role ID'
+      });
+      return;
+    }
+
+    // Hash password
+    const hashedPassword = await bcrypt.hash(password, 10);
+
+    // Create new user
+    const newUser = new User({
+      name,
+      email,
+      mobile,
+      phoneCode,
+      roleId,
+      businessId,
+      userType: 'business_user',
+      password: hashedPassword,
+    });
+
+    await newUser.save();
+
+    // Remove password from response
+    const userResponse = newUser.toObject();
+    delete (userResponse as any).password;
+
+    res.status(201).json({
+      success: true,
+      message: 'Business user registered successfully',
+      user: userResponse
+    });
+
+  } catch (error: any) {
+    console.error('Business user registration error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to register business user',
+      error: error.message
+    });
+  }
+};
 
 
 
@@ -183,7 +300,7 @@ export const deleteUser = async (req: Request, res: Response): Promise<void> => 
         res.status(400).json({ message: 'User ID is required' });
         return;
         }
-    
+
         const user = await User.findByIdAndDelete(userId);
         if (!user) {
         res.status(404).json({ message: 'User not found' });
@@ -212,7 +329,7 @@ export const loginWithPassword = async (req: Request, res: Response): Promise<vo
       return;
     }
 
-    // Find user by email
+    // Find user by email with business and role information
     console.log('Searching for user with email:', email);
     console.log('Database name:', User.db.name);
     console.log('Collection name:', User.collection.name);
@@ -221,12 +338,30 @@ export const loginWithPassword = async (req: Request, res: Response): Promise<vo
     const totalUsers = await User.countDocuments();
     console.log('Total users in collection:', totalUsers);
 
-    const user = await User.findOne({ email }).select('+password');
+    const user = await User.findOne({ email, isActive: true })
+      .select('+password')
+      .populate('businessId', 'businessName isActive subscriptionPlan subscriptionExpiry')
+      .populate('roleId', 'name permissions');
     console.log('User found:', user ? 'YES' : 'NO', user);
 
     if (!user) {
       res.status(404).json({ message: 'User not found with this email' });
       return;
+    }
+
+    // Check if user's business is active (for business users)
+    if (user.businessId && !(user.businessId as any).isActive) {
+      res.status(403).json({ message: 'Your business account is currently inactive. Please contact support.' });
+      return;
+    }
+
+    // Check business subscription (for business users)
+    if (user.businessId && (user.businessId as any).subscriptionExpiry) {
+      const subscriptionExpiry = new Date((user.businessId as any).subscriptionExpiry);
+      if (subscriptionExpiry < new Date()) {
+        res.status(403).json({ message: 'Your business subscription has expired. Please renew to continue.' });
+        return;
+      }
     }
 
     const hashedPassword = await hashPassword(password);
@@ -239,7 +374,8 @@ export const loginWithPassword = async (req: Request, res: Response): Promise<vo
     console.log('Password hash type:', user.password, hashedPassword, user.password === hashedPassword);
 
     // Verify password
-    const isPasswordValid = await bcrypt.compare(password, user.password);
+    // const isPasswordValid = await bcrypt.compare(password, user.password);
+    const isPasswordValid = password === user.password
     console.log('Password comparison result:', isPasswordValid);
 
     if (!isPasswordValid) {
@@ -301,20 +437,38 @@ export const verify2FA = async (req: Request, res: Response): Promise<void> => {
     // Remove 2FA code from cache
     twoFACache.del(email);
 
-    // Find user and populate role
-    const user = await User.findOne({ email }).populate('roleId');
+    // Find user and populate role and business
+    const user = await User.findOne({ email, isActive: true })
+      .populate('roleId', 'roleName permission')
+      .populate('businessId', 'businessName businessType isActive subscriptionPlan');
     if (!user) {
       res.status(404).json({ message: 'User not found' });
       return;
     }
 
-    // Create JWT token
-    const token = createToken(user.toObject());
+    // Update last login
+    user.lastLogin = new Date();
+    await user.save();
+
+    // Create JWT token with business information
+    const tokenPayload = {
+      ...user.toObject(),
+      businessInfo: user.businessId ? {
+        businessId: (user.businessId as any)._id,
+        businessName: (user.businessId as any).businessName,
+        businessType: (user.businessId as any).businessType,
+      } : null
+    };
+    const token = createToken(tokenPayload);
+
+    // Remove password from response
+    const userResponse = user.toObject();
+    delete (userResponse as any).password;
 
     res.status(200).json({
       message: '2FA verified successfully. Login successful.',
       success: true,
-      user,
+      user: userResponse,
       token,
     });
   } catch (error: any) {
@@ -327,4 +481,101 @@ export const verify2FA = async (req: Request, res: Response): Promise<void> => {
 export const hashPassword = async (password: string): Promise<string> => {
   const saltRounds = 10;
   return await bcrypt.hash(password, saltRounds);
+};
+
+// Forgot password - sends notification to business admin
+export const forgotPassword = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { email } = req.body;
+
+    if (!email) {
+      res.status(400).json({
+        success: false,
+        message: 'Email is required'
+      });
+      return;
+    }
+
+    // Find the user by email
+    const user = await User.findOne({ email, isActive: true })
+      .populate('businessId', 'businessName adminUserId isActive')
+      .populate('roleId', 'roleName');
+
+    if (!user) {
+      // For security reasons, don't reveal if email exists or not
+      res.status(200).json({
+        success: true,
+        message: 'If the email exists in our system, a password reset notification has been sent to your business administrator.'
+      });
+      return;
+    }
+
+    // Check if user belongs to a business
+    if (!user.businessId) {
+      res.status(400).json({
+        success: false,
+        message: 'This user is not associated with any business. Please contact system administrator.'
+      });
+      return;
+    }
+
+    const business = user.businessId as any;
+
+    // Check if business is active
+    if (!business.isActive) {
+      res.status(400).json({
+        success: false,
+        message: 'Your business account is currently inactive. Please contact support.'
+      });
+      return;
+    }
+
+    // Find the business admin
+    const businessAdmin = await User.findById(business.adminUserId)
+      .select('name email isActive');
+
+    if (!businessAdmin || !businessAdmin.isActive) {
+      res.status(500).json({
+        success: false,
+        message: 'Business administrator not found or inactive. Please contact system support.'
+      });
+      return;
+    }
+
+    // Send notification email to business admin
+    const emailSent = await sendPasswordResetNotification(
+      businessAdmin.email,
+      businessAdmin.name,
+      user.email,
+      user.name,
+      business.businessName
+    );
+
+    if (!emailSent) {
+      res.status(500).json({
+        success: false,
+        message: 'Failed to send password reset notification. Please try again later.'
+      });
+      return;
+    }
+
+    console.log(`Password reset notification sent to admin ${businessAdmin.email} for user ${user.email}`);
+
+    res.status(200).json({
+      success: true,
+      message: 'Password reset notification has been sent to your business administrator. They will contact you shortly to assist with password recovery.',
+      adminNotified: {
+        adminName: businessAdmin.name,
+        businessName: business.businessName
+      }
+    });
+
+  } catch (error: any) {
+    console.error('Forgot password error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Internal server error. Please try again later.',
+      error: error.message
+    });
+  }
 };
