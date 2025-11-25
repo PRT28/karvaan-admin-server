@@ -18,6 +18,7 @@ export interface IBusiness extends Document {
   gstin?: string;
   panNumber?: string;
   registrationNumber?: string;
+  quotationPrefix: string; // Custom prefix for quotation IDs (e.g., "KVN", "SYS")
   isActive: boolean;
   subscriptionPlan: 'basic' | 'premium' | 'enterprise';
   subscriptionExpiry?: Date;
@@ -128,6 +129,19 @@ const businessSchema = new Schema<IBusiness>({
   registrationNumber: {
     type: String,
     trim: true,
+  },
+  quotationPrefix: {
+    type: String,
+    required: true,
+    trim: true,
+    uppercase: true,
+    maxlength: 5,
+    validate: {
+      validator: function(v: string) {
+        return /^[A-Z]{2,5}$/.test(v);
+      },
+      message: 'Quotation prefix must be 2-5 uppercase letters only'
+    }
   },
   isActive: {
     type: Boolean,

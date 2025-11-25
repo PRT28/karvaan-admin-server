@@ -279,9 +279,9 @@ export const getUserById = async (req: Request, res: Response): Promise<void> =>
     res.status(500).json({ message: 'Internal server error', error: error.message, success: false });
     }
 }
-export const getAllUsers = async (_req: Request, res: Response): Promise<void> => {
+export const getAllUsers = async (req: Request, res: Response): Promise<void> => {
   try {
-    const users = await User.find().populate('roleId');
+    const users = await User.find({businessId: req.user?.businessId}).populate('roleId');
     res.status(200).json({
       message: 'Users retrieved successfully',
       data: users,

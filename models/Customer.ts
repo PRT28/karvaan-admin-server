@@ -7,6 +7,12 @@ export interface ICustomer extends Document {
   name: string;
   email: string;
   phone: string;
+  alias?: string;
+  dateOfBirth?: Date;
+  gstin?: string;
+  companyName?: string;
+  openingBalance?: number;
+  balanceType?: 'credit' | 'debit';
   address?: string;
   businessId: mongoose.Types.ObjectId;
   createdAt: Date;
@@ -18,6 +24,12 @@ const customerSchema = new Schema<ICustomer>({
   name: { type: String, required: true },
   email: { type: String, required: true },
   phone: { type: String, required: true },
+  alias: { type: String },
+  dateOfBirth: { type: Date },
+  gstin: { type: String },
+  companyName: { type: String },
+  openingBalance: { type: Number },
+  balanceType: { type: String, enum: ['credit', 'debit'] },
   address: { type: String },
   businessId: {
     type: Schema.Types.ObjectId,

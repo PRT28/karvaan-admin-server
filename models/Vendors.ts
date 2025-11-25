@@ -4,6 +4,10 @@ import mongoose from 'mongoose';
 export interface IVendor extends Document {
   companyName: string;
   contactPerson: string;
+  alias?: string;
+  dateOfBirth?: Date;
+  openingBalance?: number;
+  balanceType?: 'credit' | 'debit';
   email: string;
   phone: string;
   GSTIN?: string;
@@ -15,6 +19,10 @@ export interface IVendor extends Document {
 const vendorSchema = new Schema<IVendor>({
   companyName: { type: String, required: true },
   contactPerson: { type: String, required: true },
+  alias: { type: String },
+  dateOfBirth: { type: Date },
+  openingBalance: { type: Number },
+  balanceType: { type: String, enum: ['credit', 'debit'] },
   email: { type: String, required: true },
   phone: { type: String, required: true },
   GSTIN: { type: String },

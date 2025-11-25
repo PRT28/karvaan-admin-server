@@ -3,7 +3,14 @@ import mongoose, { Schema, Document, Types } from 'mongoose';
 export interface IUser extends Document {
   name: string;
   email: string;
+  dateOfBirth?: Date;
+  gender?: string;
+  emergencyContact?: string;
+  alias?: string;
   mobile: string;
+  designation: string;
+  dateOfJoining?: Date;
+  dateOfLeaving?: Date;
   agentId: string | null;
   phoneCode: number;
   roleId: Types.ObjectId;
@@ -22,6 +29,19 @@ const userSchema = new Schema<IUser>({
     required: true,
     trim: true,
   },
+  dateOfBirth: {
+    type: Date,
+  },
+  gender: {
+    type: String,
+    enum: ['male', 'female', 'other'],
+  },
+  emergencyContact: {
+    type: String,
+  },
+  alias: {
+    type: String,
+  },
   email: {
     type: String,
     required: true,
@@ -33,6 +53,17 @@ const userSchema = new Schema<IUser>({
     type: String,
     required: true,
     trim: true,
+  },
+  designation: {
+    type: String,
+    required: true,
+    trim: true,
+  },
+  dateOfJoining: {
+    type: Date,
+  },
+  dateOfLeaving: {
+    type: Date,
   },
   agentId: {
     type: String,

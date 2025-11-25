@@ -14,7 +14,10 @@
     "update-test-users": "npx ts-node scripts/update-test-users.ts",
     "reset-test-user-passwords": "npx ts-node scripts/reset-test-user-passwords.ts",
     "test-dashboard": "npx ts-node scripts/test-dashboard.ts",
-    "create-test-logs": "npx ts-node scripts/create-test-logs.ts"
+    "create-test-logs": "npx ts-node scripts/create-test-logs.ts",
+    "update-business-prefixes": "npx ts-node scripts/update-business-prefixes.ts",
+    "test-quotation-custom-id": "npx ts-node scripts/test-quotation-custom-id.ts",
+    "create-test-business-with-prefix": "npx ts-node scripts/create-test-business-with-prefix.ts"
   },
   "author": "Google LLC",
   "license": "Apache-2.0",
