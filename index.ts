@@ -7,6 +7,7 @@ import { checkKarvaanToken } from './utils/middleware';
 import { setupSwagger } from './swagger';
 
 import authRoutes from './routes/auth';
+import businessRoutes from './routes/business';
 import customerRoutes from './routes/customer';
 import vendorRoutes from './routes/vendor';
 import quotationRoutes from './routes/quotation';
@@ -23,6 +24,7 @@ app.use(cors());
 setupSwagger(app);
 
 app.use('/auth', authRoutes);
+app.use('/business', businessRoutes);
 app.use('/customer', checkKarvaanToken, customerRoutes);
 app.use('/vendor', checkKarvaanToken, vendorRoutes);
 app.use('/quotation', quotationRoutes);

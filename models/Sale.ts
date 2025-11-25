@@ -4,6 +4,7 @@ export interface ISale extends Document {
   quotation: Types.ObjectId;
   channel: 'B2C' | 'B2B';
   partyId: Types.ObjectId;
+  businessId: Types.ObjectId;
   date: Date;
   amount: number;
   paymentStatus: 'pending' | 'paid' | 'failed';
@@ -23,6 +24,12 @@ const saleSchema = new Schema<ISale>({
     type: Schema.Types.ObjectId,
     required: true,
     refPath: 'partyModel',
+  },
+  businessId: {
+    type: Schema.Types.ObjectId,
+    ref: 'Business',
+    required: true,
+    index: true
   },
   date: {
     type: Date,
@@ -44,5 +51,15 @@ const saleSchema = new Schema<ISale>({
     type: String,
   },
 });
+
+// Indexes for better performance
+saleSchema.index({ businessId: 1, date: -1 });
+saleSchema.index({ businessId: 1, paymentStatus: 1 });
+saleSchema.index({ businessId: 1, channel: 1 });
+
+// Static method to find sales by business
+saleSchema.statics.findByBusiness = function(businessId: string) {
+  return this.find({ businessId });
+};
 
 export const Sale = model<ISale>('Sale', saleSchema);

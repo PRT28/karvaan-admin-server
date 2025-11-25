@@ -3,7 +3,13 @@ import Team from '../models/Team';
 
 export const createTeam = async (req: Request, res: Response) => {
   try {
-    const team = await Team.create(req.body);
+    // Add businessId from authenticated user
+    const teamData = {
+      ...req.body,
+      businessId: req.user?.businessId || req.user?._id // Use businessId or fallback to user ID for super admin
+    };
+
+    const team = await Team.create(teamData);
     res.status(201).json({ team });
   } catch (err: unknown) {
     const errorMessage = err instanceof Error ? err.message : 'Something went wrong';
@@ -14,10 +20,19 @@ export const createTeam = async (req: Request, res: Response) => {
 export const getTeams = async (req: Request, res: Response) => {
   try {
     console.log('Fetching all teams');
-    const teams = await Team.find().populate({
-      path: 'roleId',
-      select: 'roleName -_id', // Only get roleName
-    });
+
+    // Filter by business for business users, show all for super admin
+    const filter = req.user?.userType === 'super_admin' ? {} : { businessId: req.user?.businessId };
+
+    const teams = await Team.find(filter)
+      .populate({
+        path: 'roleId',
+        select: 'roleName -_id', // Only get roleName
+      })
+      .populate({
+        path: 'businessId',
+        select: 'businessName businessType',
+      });
 
     res.status(200).json(teams);
   } catch (error) {
@@ -29,14 +44,26 @@ export const getTeams = async (req: Request, res: Response) => {
 
 export const getTeamById = async (req: Request, res: Response): Promise<void> => {
   try {
-    const team = await Team.findById(req.params.id).populate({
-      path: 'roleId',
-      select: 'roleName -_id',
-    });
+    // Build filter based on user type
+    const filter: any = { _id: req.params.id };
+    if (req.user?.userType !== 'super_admin') {
+      filter.businessId = req.user?.businessId;
+    }
+
+    const team = await Team.findOne(filter)
+      .populate({
+        path: 'roleId',
+        select: 'roleName -_id',
+      })
+      .populate({
+        path: 'businessId',
+        select: 'businessName businessType',
+      });
+
     if (!team) {
       res.status(404).json({ message: 'Team not found' });
       return;
-    }  
+    }
     res.status(200).json({ team });
   } catch (err: unknown) {
     const errorMessage = err instanceof Error ? err.message : 'Something went wrong';
@@ -46,7 +73,26 @@ export const getTeamById = async (req: Request, res: Response): Promise<void> =>
 
 export const updateTeam = async (req: Request, res: Response): Promise<void> => {
   try {
-    const team = await Team.findByIdAndUpdate(req.params.id, req.body, { new: true });
+    // Build filter based on user type
+    const filter: any = { _id: req.params.id };
+    if (req.user?.userType !== 'super_admin') {
+      filter.businessId = req.user?.businessId;
+    }
+
+    // Don't allow updating businessId through this endpoint
+    const updateData = { ...req.body };
+    delete updateData.businessId;
+
+    const team = await Team.findOneAndUpdate(filter, updateData, { new: true })
+      .populate({
+        path: 'roleId',
+        select: 'roleName -_id',
+      })
+      .populate({
+        path: 'businessId',
+        select: 'businessName businessType',
+      });
+
     if (!team) {
       res.status(404).json({ message: 'Team not found' });
       return;
@@ -60,7 +106,13 @@ export const updateTeam = async (req: Request, res: Response): Promise<void> => 
 
 export const deleteTeam = async (req: Request, res: Response): Promise<void> => {
   try {
-    const team = await Team.findByIdAndDelete(req.params.id);
+    // Build filter based on user type
+    const filter: any = { _id: req.params.id };
+    if (req.user?.userType !== 'super_admin') {
+      filter.businessId = req.user?.businessId;
+    }
+
+    const team = await Team.findOneAndDelete(filter);
     if (!team) {
       res.status(404).json({ message: 'Team not found' });
       return;

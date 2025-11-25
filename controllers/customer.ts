@@ -3,7 +3,13 @@ import Customer from '../models/Customer';
 
 export const createCustomer = async (req: Request, res: Response) => {
   try {
-    const customer = await Customer.create(req.body);
+    // Add businessId from authenticated user
+    const customerData = {
+      ...req.body,
+      businessId: req.user?.businessId || req.user?._id // Use businessId or fallback to user ID for super admin
+    };
+
+    const customer = await Customer.create(customerData);
     res.status(201).json({ customer });
   } catch (err: unknown) {
     const errorMessage = err instanceof Error ? err.message : 'Something went wrong';
@@ -11,12 +17,20 @@ export const createCustomer = async (req: Request, res: Response) => {
   }
 };
 
-export const getCustomers = async (_req: Request, res: Response) => {
+export const getCustomers = async (req: Request, res: Response) => {
   try {
-    const customers = await Customer.find().populate({
-      path: 'ownerId',
-      select: 'name email phone',
-    });
+    // Filter by business for business users, show all for super admin
+    const filter = req.user?.userType === 'super_admin' ? {} : { businessId: req.user?.businessId };
+
+    const customers = await Customer.find(filter)
+      .populate({
+        path: 'ownerId',
+        select: 'name email phone',
+      })
+      .populate({
+        path: 'businessId',
+        select: 'businessName businessType',
+      });
     res.status(200).json({ customers });
   } catch (err: unknown) {
         const errorMessage = err instanceof Error ? err.message : 'Something went wrong';
@@ -27,14 +41,27 @@ export const getCustomers = async (_req: Request, res: Response) => {
 export const getCustomerById = async (req: Request, res: Response): Promise<void> => {
   try {
     console.log('Fetching customer by ID:', req.params);
-    const customer = await Customer.findById(req.params.id).populate({
-      path: 'ownerId',
-      select: 'name email phone',
-    });
+
+    // Build filter based on user type
+    const filter: any = { _id: req.params.id };
+    if (req.user?.userType !== 'super_admin') {
+      filter.businessId = req.user?.businessId;
+    }
+
+    const customer = await Customer.findOne(filter)
+      .populate({
+        path: 'ownerId',
+        select: 'name email phone',
+      })
+      .populate({
+        path: 'businessId',
+        select: 'businessName businessType',
+      });
+
     if (!customer) {
       res.status(404).json({ message: 'Customer not found' });
       return;
-    }  
+    }
     res.status(200).json({ customer });
   } catch (err: unknown) {
     const errorMessage = err instanceof Error ? err.message : 'Something went wrong';
@@ -44,11 +71,30 @@ export const getCustomerById = async (req: Request, res: Response): Promise<void
 
 export const updateCustomer = async (req: Request, res: Response): Promise<void> => {
   try {
-    const customer = await Customer.findByIdAndUpdate(req.params.id, req.body, { new: true });
+    // Build filter based on user type
+    const filter: any = { _id: req.params.id };
+    if (req.user?.userType !== 'super_admin') {
+      filter.businessId = req.user?.businessId;
+    }
+
+    // Don't allow updating businessId through this endpoint
+    const updateData = { ...req.body };
+    delete updateData.businessId;
+
+    const customer = await Customer.findOneAndUpdate(filter, updateData, { new: true })
+      .populate({
+        path: 'ownerId',
+        select: 'name email phone',
+      })
+      .populate({
+        path: 'businessId',
+        select: 'businessName businessType',
+      });
+
     if (!customer) {
       res.status(404).json({ message: 'Customer not found' });
       return;
-    }  
+    }
     res.status(200).json({ customer });
   }catch (err: unknown) {
     const errorMessage = err instanceof Error ? err.message : 'Something went wrong';
@@ -58,7 +104,13 @@ export const updateCustomer = async (req: Request, res: Response): Promise<void>
 
 export const deleteCustomer = async (req: Request, res: Response): Promise<void> => {
   try {
-    const customer = await Customer.findByIdAndDelete(req.params.id);
+    // Build filter based on user type
+    const filter: any = { _id: req.params.id };
+    if (req.user?.userType !== 'super_admin') {
+      filter.businessId = req.user?.businessId;
+    }
+
+    const customer = await Customer.findOneAndDelete(filter);
     if (!customer) {
       res.status(404).json({ message: 'Customer not found' });
       return;
