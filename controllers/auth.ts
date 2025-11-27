@@ -364,18 +364,9 @@ export const loginWithPassword = async (req: Request, res: Response): Promise<vo
       }
     }
 
-    const hashedPassword = await hashPassword(password);
+    const isPasswordValid = await bcrypt.compare(password, user.password);
 
-    console.log('Comparing password...');
-    console.log('Input password:', password);
-    console.log('Stored password hash:', user.password);
-    console.log('Password hash exists:', !!user.password);
-    console.log('Password hash length:', user.password ? user.password.length : 'N/A');
-    console.log('Password hash type:', user.password, hashedPassword, user.password === hashedPassword);
-
-    // Verify password
-    // const isPasswordValid = await bcrypt.compare(password, user.password);
-    const isPasswordValid = password === user.password
+    
     console.log('Password comparison result:', isPasswordValid);
 
     if (!isPasswordValid) {
