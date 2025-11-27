@@ -30,7 +30,7 @@ const QuotationSchema = new Schema<IQuotation>(
     },
     quotationType: {
       type: String,
-      enum: ['flight', 'train', 'hotel', 'activity'],
+      enum: ['flight', 'train', 'hotel', 'activity', 'travel', 'transport-land', 'transport-maritime', 'tickets', 'travel insurance', 'visas', 'others'],
       required: true,
     },
     channel: {

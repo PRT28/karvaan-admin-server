@@ -370,7 +370,7 @@ export const loginWithPassword = async (req: Request, res: Response): Promise<vo
     console.log('Password comparison result:', isPasswordValid);
 
     if (!isPasswordValid) {
-      res.status(401).json({ message: 'Invalid email or password' });
+      res.status(401).json({ message: 'Invalid email or password, please retry' });   
       return;
     }
 
