@@ -107,6 +107,7 @@ export const getAllQuotations = async (req: Request, res: Response) => {
 
     // Build business filter
     const businessFilter: any = {};
+    console.log(req.user);
     if (req.user?.userType !== 'super_admin') {
       businessFilter.businessId = req.user?.businessId;
     }

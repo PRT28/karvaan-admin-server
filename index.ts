@@ -27,7 +27,7 @@ app.use('/auth', authRoutes);
 app.use('/business', businessRoutes);
 app.use('/customer', checkKarvaanToken, customerRoutes);
 app.use('/vendor', checkKarvaanToken, vendorRoutes);
-app.use('/quotation', quotationRoutes);
+app.use('/quotation', checkKarvaanToken, quotationRoutes);
 app.use('/team', checkKarvaanToken, teamRoutes);
 app.use('/logs', checkKarvaanToken, logsRoutes);
 
