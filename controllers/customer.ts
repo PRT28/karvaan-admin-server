@@ -3,10 +3,9 @@ import Customer from '../models/Customer';
 
 export const createCustomer = async (req: Request, res: Response) => {
   try {
-    // Add businessId from authenticated user
     const customerData = {
       ...req.body,
-      businessId: req.user?.businessId || req.user?._id // Use businessId or fallback to user ID for super admin
+      businessId: req.user?.businessId || req.user?._id
     };
 
     const customer = await Customer.create(customerData);
