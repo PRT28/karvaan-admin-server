@@ -3,6 +3,13 @@ import Team from './Team';
 
 export type Status = 'Pending' | 'Completed' | 'On Hold' |'In Progress';
 
+interface ITaskLog {
+    heading: string,
+    description: string,
+    logBy: string,
+    logDate: Date
+}
+
 export interface ILogs extends Document {
     activity: string,
     userId: Schema.Types.ObjectId,
@@ -10,10 +17,15 @@ export interface ILogs extends Document {
     dateTime: Date,
     status: Status,
     assignedBy: Schema.Types.ObjectId
-    priority: 'Low' | 'Medium' | 'High'
+    priority: 'Low' | 'Medium' | 'High',
+    taskType: 'Documents' | 'Finance' | 'Follow up' | 'Feedback' | 'General',
     dueDate: Date,
     category: string,
     subCategory: string,
+    bookingId: Schema.Types.ObjectId,
+    assignedTo: Array<Schema.Types.ObjectId>,
+    isCompleted: boolean,
+    logs: Array<ITaskLog>,
 }
 
 const logSchema = new Schema<ILogs>({
@@ -28,7 +40,9 @@ const logSchema = new Schema<ILogs>({
     dateTime: {type: Date, required: true, default: new Date()},
     status: {type: String, enum: ['Pending', 'Completed', 'On Hold', 'In Progress'], default: 'Pending'},
     assignedBy: { type: Schema.Types.ObjectId, ref: 'Team', required: true },
+    assignedTo: { type: [Schema.Types.ObjectId], ref: 'Team', required: true },
     priority: {type: String, enum: ['Low', 'Medium', 'High'], default: 'Medium'},
+    taskType: {type: String, enum: ['Documents', 'Finance', 'Follow up', 'Feedback', 'General'], default: 'General'},
     dueDate: {type: Date, required: true, default: new Date()},
     category: { type: String, required: true },
     subCategory: { type: String, required: true },

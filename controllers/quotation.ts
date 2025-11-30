@@ -103,7 +103,7 @@ export const deleteQuotation = async (req: Request, res: Response): Promise<void
 
 export const getAllQuotations = async (req: Request, res: Response) => {
   try {
-    const { startDate, endDate, name, channel } = req.query;
+    const { bookingStartDate, bookingEndDate, name, channel, travelStartDate, travelEndDate, owner } = req.query;
 
     // Build business filter
     const businessFilter: any = {};
@@ -113,9 +113,14 @@ export const getAllQuotations = async (req: Request, res: Response) => {
     }
 
     // Build date filter
-    const dateFilter: any = {};
-    if (startDate) dateFilter.$gte = new Date(startDate as string);
-    if (endDate) dateFilter.$lte = new Date(endDate as string);
+    const bookingDateFilter: any = {};
+    if (bookingStartDate) bookingDateFilter.$gte = new Date(bookingStartDate as string);
+    if (bookingEndDate) bookingDateFilter.$lte = new Date(bookingEndDate as string);
+
+    const travelDateFilter: any = {};
+
+    if (travelStartDate) travelDateFilter.$gte = new Date(travelStartDate as string);
+    if (travelEndDate) travelDateFilter.$lte = new Date(travelEndDate as string);
 
     // Build name filter
     let nameFilter: any = {};
@@ -149,8 +154,11 @@ export const getAllQuotations = async (req: Request, res: Response) => {
 
     // Build final query
     const query: any = { ...businessFilter };
-    if (startDate || endDate) {
-      query.createdAt = dateFilter;
+    if (bookingStartDate || bookingEndDate) {
+      query.createdAt = bookingDateFilter;
+    }
+    if (travelStartDate || travelEndDate) {
+      query.travelDate = travelDateFilter;
     }
     if (nameFilter.partyId) {
       query.partyId = nameFilter.partyId;

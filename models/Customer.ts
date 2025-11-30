@@ -1,7 +1,7 @@
 import mongoose, { Schema, model, Document } from 'mongoose';
 import Team from './Team';
 
-export type Tiers = 'tier1' | 'tier2' | 'tier3';
+export type Tiers = 'tier1' | 'tier2' | 'tier3' | 'tier4' | 'tier5';
 
 export interface ICustomer extends Document {
   name: string;
@@ -18,6 +18,7 @@ export interface ICustomer extends Document {
   createdAt: Date;
   ownerId: mongoose.Types.ObjectId;
   tier?: Tiers;
+  isDeleted: boolean;
 }
 
 const customerSchema = new Schema<ICustomer>({
@@ -41,7 +42,7 @@ const customerSchema = new Schema<ICustomer>({
   ownerId: { type: Schema.Types.ObjectId, ref: 'Team', required: true },
   tier: {
     type: String,
-    enum: ['tier1', 'tier2', 'tier3'],
+    enum: ['tier1', 'tier2', 'tier3', 'tier4', 'tier5'],
   },
 });
 

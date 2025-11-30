@@ -10,14 +10,20 @@ export interface IQuotation extends Document {
   customId: string; // Custom ID like "KVN-001", "SYS-002"
   quotationType: QuotationType;
   channel: ChannelType;
-  partyId: mongoose.Types.ObjectId;
-  partyModel: 'Customer' | 'Vendor';
   businessId: mongoose.Types.ObjectId;
   formFields: Map<String, Object>,
   totalAmount: number;
   status: QuotationStatus;
   createdAt: Date;
   updatedAt: Date;
+  owner: Array<mongoose.Types.ObjectId>;
+  travelDate: Date;
+  customerId: mongoose.Types.ObjectId;
+  vendorId: mongoose.Types.ObjectId;
+  travelers: Array<mongoose.Types.ObjectId>;
+  adultTravlers: number;
+  childTravlers: number;
+  remarks: string;
 }
 
 const QuotationSchema = new Schema<IQuotation>(
@@ -38,16 +44,6 @@ const QuotationSchema = new Schema<IQuotation>(
       enum: ['B2B', 'B2C'],
       required: true,
     },
-    partyId: {
-      type: Schema.Types.ObjectId,
-      required: true,
-      refPath: 'partyModel',
-    },
-    partyModel: {
-      type: String,
-      required: true,
-      enum: ['Customer', 'Vendor'],
-    },
     businessId: {
       type: Schema.Types.ObjectId,
       ref: 'Business',
@@ -64,6 +60,18 @@ const QuotationSchema = new Schema<IQuotation>(
       enum: ['draft', 'confirmed', 'cancelled'],
       default: 'draft',
     },
+    owner: {
+      type: [Schema.Types.ObjectId],
+      ref: 'Team',
+      required: true,
+    },
+    travelDate: { type: Date, required: true },
+    customerId: { type: Schema.Types.ObjectId, ref: 'Customer', required: false },
+    vendorId: { type: Schema.Types.ObjectId, ref: 'Vendor', required: false },
+    travelers: { type: [Schema.Types.ObjectId], ref: 'Customer', required: false },
+    adultTravlers: { type: Number, required: false },
+    childTravlers: { type: Number, required: false },
+    remarks: { type: String, required: false },
   },
   { timestamps: true }
 );

@@ -364,6 +364,10 @@ export const loginWithPassword = async (req: Request, res: Response): Promise<vo
       }
     }
 
+    const hashedPassword = await hashPassword(password);
+
+    console.log(hashedPassword, password, user.password, 'passwordcompare');
+
     const isPasswordValid = await bcrypt.compare(password, user.password);
 
     

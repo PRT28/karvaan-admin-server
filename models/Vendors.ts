@@ -1,6 +1,8 @@
 import { Schema, model, Document } from 'mongoose';
 import mongoose from 'mongoose';
 
+export type Tiers = 'tier1' | 'tier2' | 'tier3' | 'tier4' | 'tier5';
+
 export interface IVendor extends Document {
   companyName: string;
   contactPerson: string;
@@ -14,6 +16,7 @@ export interface IVendor extends Document {
   address?: string;
   businessId: mongoose.Types.ObjectId;
   createdAt: Date;
+  tier?: Tiers;
 }
 
 const vendorSchema = new Schema<IVendor>({
@@ -34,6 +37,10 @@ const vendorSchema = new Schema<IVendor>({
     index: true
   },
   createdAt: { type: Date, default: Date.now },
+  tier: {
+    type: String,
+    enum: ['tier1', 'tier2', 'tier3', 'tier4', 'tier5'],
+  },
 });
 
 // Indexes for better performance

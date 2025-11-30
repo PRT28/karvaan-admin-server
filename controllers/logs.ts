@@ -4,15 +4,42 @@ import mongoose from 'mongoose';
 
 export const createLog = async (req: Request, res: Response) => {
   try {
-    const { activity, userId, status } = req.body;
+    const { 
+      activity, 
+      userId, 
+      status,
+      dateTime,
+      priority,
+      taskType,
+      dueDate,
+      category,
+      subCategory,
+      bookingId,
+      assignedTo 
+    } = req.body;
 
     const log = await Logs.create({
       activity,
       userId,
       status,
-      businessId: req.user?.businessId || req.user?._id, // Use businessId or fallback to user ID for super admin
+      businessId: req.user?.businessId || req.user?._id,
       assignedBy: req?.user?._id,
-      dateTime: new Date()
+      dateTime,
+      priority,
+      taskType,
+      dueDate,
+      category,
+      subCategory,
+      bookingId,
+      assignedTo,
+      logs: [
+        {
+          heading: 'Task Created',
+          description: 'Task created by ' + req.user?.name,
+          logBy: req.user?.name,
+          logDate: new Date()
+        }
+      ]
     });
 
     res.status(201).json({ success: true, log });
@@ -34,6 +61,14 @@ export const updateLog = async (req: Request, res: Response): Promise<void> => {
 
     // Don't allow updating businessId through this endpoint
     const updateData = { ...req.body };
+
+    updateData.logs.push({
+      heading: 'Task Updated',
+      description: 'Task updated by ' + req.user?.name,
+      logBy: req.user?.name,
+      logDate: new Date()
+    })
+
     delete updateData.businessId;
 
     const log = await Logs.findOneAndUpdate(filter, updateData, { new: true })
@@ -69,16 +104,21 @@ export const updateLogStatus = async (req: Request, res: Response): Promise<void
         filter.businessId = req.user?.businessId;
       }
 
-      const log = await Logs.findOneAndUpdate(filter, { status }, { new: true })
-        .populate('userId assignedBy')
-        .populate({
-          path: 'businessId',
-          select: 'businessName businessType',
-        });
+      const log = await Logs.findById(id);
 
       if (!log) {
       res.status(404).json({ success: false, message: 'Log not found' });
       } else {
+          log?.logs.push({
+          heading: 'Status Updated',
+          description: 'Status updated to ' + status + ' by ' + req.user?.name,
+          logBy: req.user?.name || 'Unknown',
+          logDate: new Date()
+        })
+
+        log.status = status;
+        log?.save();
+
         res.json({ success: true, log });
       }
 
