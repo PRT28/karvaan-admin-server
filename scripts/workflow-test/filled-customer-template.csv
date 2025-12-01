@@ -1,0 +1,5 @@
+name,email,phone,ownerId,alias,dateOfBirth,gstin,companyName,openingBalance,balanceType,address,tier
+Alice Johnson,alice.johnson@workflow-test.com,+1555000001,689000000000000000000001,Ali,1985-03-20,27AAAAA0000A1Z5,Johnson Consulting,5000,credit,"789 Business Ave, Suite 100",tier2
+Bob Wilson,bob.wilson@workflow-test.com,+1555000002,689000000000000000000001,,,,Wilson Industries,3500,debit,456 Industrial Blvd,tier3
+Carol Davis,carol.davis@workflow-test.com,+1555000003,689000000000000000000001,CD,1992-07-15,,,,credit,123 Residential St,tier1
+Invalid Customer,,+1555000004,689000000000000000000001,,,,,,credit,,tier1

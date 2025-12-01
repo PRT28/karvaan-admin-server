@@ -19,6 +19,7 @@ export interface ICustomer extends Document {
   ownerId: mongoose.Types.ObjectId;
   tier?: Tiers;
   isDeleted: boolean;
+  isDeletable: boolean;
 }
 
 const customerSchema = new Schema<ICustomer>({

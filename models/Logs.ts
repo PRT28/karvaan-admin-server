@@ -46,12 +46,20 @@ const logSchema = new Schema<ILogs>({
     dueDate: {type: Date, required: true, default: new Date()},
     category: { type: String, required: true },
     subCategory: { type: String, required: true },
+    bookingId: { type: Schema.Types.ObjectId, ref: 'Booking' },
+    logs: [{
+        heading: { type: String, required: true },
+        description: { type: String, required: true },
+        logBy: { type: String, required: true },
+        logDate: { type: Date, required: true, default: Date.now }
+    }]
 })
 
 // Indexes for better performance
 logSchema.index({ businessId: 1, dateTime: -1 });
 logSchema.index({ businessId: 1, status: 1 });
 logSchema.index({ businessId: 1, userId: 1 });
+logSchema.index({ businessId: 1, bookingId: 1 });
 
 // Static method to find logs by business
 logSchema.statics.findByBusiness = function(businessId: string) {

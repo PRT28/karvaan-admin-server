@@ -1,12 +1,13 @@
 import express from "express";
-import { 
+import {
     getAllLogs,
     getUserLogsDashboard,
     createLog,
     updateLog,
     updateLogStatus,
     deleteLog,
-    getUserLogsByMonth
+    getUserLogsByMonth,
+    getLogsByBookingId
 } from "../controllers/logs";
 
 const router = express.Router();
@@ -403,5 +404,110 @@ router.patch('/update-log-status/:logId', updateLogStatus);
  *               $ref: '#/components/schemas/ErrorResponse'
  */
 router.delete('/delete-log/:logId', deleteLog);
+
+/**
+ * @swagger
+ * /logs/booking/{bookingId}:
+ *   get:
+ *     summary: Get logs by booking ID
+ *     description: Retrieve all logs associated with a specific booking ID
+ *     tags: [Logs]
+ *     security:
+ *       - karvaanToken: []
+ *     parameters:
+ *       - in: path
+ *         name: bookingId
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Booking ID to get logs for
+ *     responses:
+ *       200:
+ *         description: Logs retrieved successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 bookingId:
+ *                   type: string
+ *                   description: The booking ID that was queried
+ *                 summary:
+ *                   type: object
+ *                   properties:
+ *                     totalLogs:
+ *                       type: integer
+ *                       description: Total number of logs for this booking
+ *                     completedCount:
+ *                       type: integer
+ *                       description: Number of completed tasks
+ *                     pendingCount:
+ *                       type: integer
+ *                       description: Number of pending tasks
+ *                     inProgressCount:
+ *                       type: integer
+ *                       description: Number of in-progress tasks
+ *                     onHoldCount:
+ *                       type: integer
+ *                       description: Number of on-hold tasks
+ *                     completionRate:
+ *                       type: integer
+ *                       description: Completion percentage (0-100)
+ *                 logs:
+ *                   type: array
+ *                   items:
+ *                     $ref: '#/components/schemas/Logs'
+ *                   description: All logs for the booking sorted by date (newest first)
+ *                 logsByStatus:
+ *                   type: object
+ *                   properties:
+ *                     Pending:
+ *                       type: array
+ *                       items:
+ *                         $ref: '#/components/schemas/Logs'
+ *                     'In Progress':
+ *                       type: array
+ *                       items:
+ *                         $ref: '#/components/schemas/Logs'
+ *                     Completed:
+ *                       type: array
+ *                       items:
+ *                         $ref: '#/components/schemas/Logs'
+ *                     'On Hold':
+ *                       type: array
+ *                       items:
+ *                         $ref: '#/components/schemas/Logs'
+ *       400:
+ *         description: Invalid booking ID
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ *       404:
+ *         description: No logs found for this booking ID
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: false
+ *                 message:
+ *                   type: string
+ *                   example: "No logs found for this booking ID"
+ *                 bookingId:
+ *                   type: string
+ *       500:
+ *         description: Failed to fetch logs for booking
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ */
+router.get('/booking/:bookingId', getLogsByBookingId);
 
 export default router;

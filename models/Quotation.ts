@@ -7,7 +7,7 @@ export type QuotationType = 'flight' | 'train' | 'hotel' | 'activity';
 export type QuotationStatus = 'draft' | 'confirmed' | 'cancelled';
 
 export interface IQuotation extends Document {
-  customId: string; // Custom ID like "KVN-001", "SYS-002"
+  customId: string;
   quotationType: QuotationType;
   channel: ChannelType;
   businessId: mongoose.Types.ObjectId;
@@ -68,7 +68,7 @@ const QuotationSchema = new Schema<IQuotation>(
     travelDate: { type: Date, required: true },
     customerId: { type: Schema.Types.ObjectId, ref: 'Customer', required: false },
     vendorId: { type: Schema.Types.ObjectId, ref: 'Vendor', required: false },
-    travelers: { type: [Schema.Types.ObjectId], ref: 'Customer', required: false },
+    travelers: { type: [Schema.Types.ObjectId], ref: 'Traveller', required: false },
     adultTravlers: { type: Number, required: false },
     childTravlers: { type: Number, required: false },
     remarks: { type: String, required: false },
@@ -81,6 +81,9 @@ QuotationSchema.index({ businessId: 1, createdAt: -1 });
 QuotationSchema.index({ businessId: 1, status: 1 });
 QuotationSchema.index({ businessId: 1, quotationType: 1 });
 QuotationSchema.index({ businessId: 1, channel: 1 });
+QuotationSchema.index({ businessId: 1, customerId: 1 });
+QuotationSchema.index({ businessId: 1, vendorId: 1 });
+QuotationSchema.index({ businessId: 1, travelers: 1 });
 
 // Pre-save hook to generate custom ID
 QuotationSchema.pre('save', async function(next) {

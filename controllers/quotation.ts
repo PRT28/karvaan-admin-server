@@ -2,6 +2,7 @@ import { Request, Response } from 'express';
 import Quotation from '../models/Quotation';
 import Customer from '../models/Customer';
 import Vendor from '../models/Vendors';
+import Traveller from '../models/Traveller';
 import mongoose from 'mongoose';
 
 export const createQuotation = async (req: Request, res: Response) => {
@@ -187,5 +188,389 @@ export const getQuotationsByParty = async (req: Request, res: Response): Promise
     res.status(200).json({ success: true, quotations });
   } catch (err) {
     res.status(500).json({ success: false, message: 'Failed to fetch quotations', error: (err as Error).message });
+  }
+};
+
+// Get booking history by customer ID
+export const getBookingHistoryByCustomer = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { customerId } = req.params;
+    const {
+      status,
+      quotationType,
+      startDate,
+      endDate,
+      travelStartDate,
+      travelEndDate,
+      sortBy = 'createdAt',
+      sortOrder = 'desc',
+      page = 1,
+      limit = 10
+    } = req.query;
+
+    // Validate customer ID
+    if (!mongoose.Types.ObjectId.isValid(customerId)) {
+      res.status(400).json({
+        success: false,
+        message: 'Invalid customer ID'
+      });
+      return;
+    }
+
+    // Verify customer exists and belongs to user's business
+    const customer = await Customer.findById(customerId);
+    if (!customer) {
+      res.status(404).json({
+        success: false,
+        message: 'Customer not found'
+      });
+      return;
+    }
+
+    // Check business access
+    if (req.user?.userType !== 'super_admin' && customer.businessId.toString() !== req.user?.businessId?.toString()) {
+      res.status(403).json({
+        success: false,
+        message: 'Forbidden: Cannot access customer from other business'
+      });
+      return;
+    }
+
+    // Build query filter
+    const filter: any = {
+      customerId: customerId,
+      businessId: customer.businessId
+    };
+
+    // Add optional filters
+    if (status) {
+      filter.status = status;
+    }
+
+    if (quotationType) {
+      filter.quotationType = quotationType;
+    }
+
+    // Date filters for booking date (createdAt)
+    if (startDate || endDate) {
+      filter.createdAt = {};
+      if (startDate) filter.createdAt.$gte = new Date(startDate as string);
+      if (endDate) filter.createdAt.$lte = new Date(endDate as string);
+    }
+
+    // Date filters for travel date
+    if (travelStartDate || travelEndDate) {
+      filter.travelDate = {};
+      if (travelStartDate) filter.travelDate.$gte = new Date(travelStartDate as string);
+      if (travelEndDate) filter.travelDate.$lte = new Date(travelEndDate as string);
+    }
+
+    // Pagination
+    const pageNum = parseInt(page as string);
+    const limitNum = parseInt(limit as string);
+    const skip = (pageNum - 1) * limitNum;
+
+    // Sort configuration
+    const sortConfig: any = {};
+    sortConfig[sortBy as string] = sortOrder === 'asc' ? 1 : -1;
+
+    // Get quotations with population
+    const quotations = await Quotation.find(filter)
+      .populate('customerId', 'name email phone companyName')
+      .populate('vendorId', 'companyName contactPerson email phone')
+      .populate('travelers', 'name email phone')
+      .populate('owner', 'name email')
+      .populate('businessId', 'businessName')
+      .sort(sortConfig)
+      .skip(skip)
+      .limit(limitNum);
+
+    // Get total count for pagination
+    const totalCount = await Quotation.countDocuments(filter);
+    const totalPages = Math.ceil(totalCount / limitNum);
+
+    res.status(200).json({
+      success: true,
+      data: {
+        quotations,
+        pagination: {
+          currentPage: pageNum,
+          totalPages,
+          totalCount,
+          hasNextPage: pageNum < totalPages,
+          hasPrevPage: pageNum > 1
+        },
+        customer: {
+          _id: customer._id,
+          name: customer.name,
+          email: customer.email,
+          companyName: customer.companyName
+        }
+      }
+    });
+
+  } catch (error) {
+    console.error('Error fetching booking history by customer:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Internal server error while fetching booking history',
+      error: error instanceof Error ? error.message : 'Unknown error'
+    });
+  }
+};
+
+// Get booking history by vendor ID
+export const getBookingHistoryByVendor = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { vendorId } = req.params;
+    const {
+      status,
+      quotationType,
+      startDate,
+      endDate,
+      travelStartDate,
+      travelEndDate,
+      sortBy = 'createdAt',
+      sortOrder = 'desc',
+      page = 1,
+      limit = 10
+    } = req.query;
+
+    // Validate vendor ID
+    if (!mongoose.Types.ObjectId.isValid(vendorId)) {
+      res.status(400).json({
+        success: false,
+        message: 'Invalid vendor ID'
+      });
+      return;
+    }
+
+    // Verify vendor exists and belongs to user's business
+    const vendor = await Vendor.findById(vendorId);
+    if (!vendor) {
+      res.status(404).json({
+        success: false,
+        message: 'Vendor not found'
+      });
+      return;
+    }
+
+    // Check business access
+    if (req.user?.userType !== 'super_admin' && vendor.businessId.toString() !== req.user?.businessId?.toString()) {
+      res.status(403).json({
+        success: false,
+        message: 'Forbidden: Cannot access vendor from other business'
+      });
+      return;
+    }
+
+    // Build query filter
+    const filter: any = {
+      vendorId: vendorId,
+      businessId: vendor.businessId
+    };
+
+    // Add optional filters
+    if (status) {
+      filter.status = status;
+    }
+
+    if (quotationType) {
+      filter.quotationType = quotationType;
+    }
+
+    // Date filters for booking date (createdAt)
+    if (startDate || endDate) {
+      filter.createdAt = {};
+      if (startDate) filter.createdAt.$gte = new Date(startDate as string);
+      if (endDate) filter.createdAt.$lte = new Date(endDate as string);
+    }
+
+    // Date filters for travel date
+    if (travelStartDate || travelEndDate) {
+      filter.travelDate = {};
+      if (travelStartDate) filter.travelDate.$gte = new Date(travelStartDate as string);
+      if (travelEndDate) filter.travelDate.$lte = new Date(travelEndDate as string);
+    }
+
+    // Pagination
+    const pageNum = parseInt(page as string);
+    const limitNum = parseInt(limit as string);
+    const skip = (pageNum - 1) * limitNum;
+
+    // Sort configuration
+    const sortConfig: any = {};
+    sortConfig[sortBy as string] = sortOrder === 'asc' ? 1 : -1;
+
+    // Get quotations with population
+    const quotations = await Quotation.find(filter)
+      .populate('customerId', 'name email phone companyName')
+      .populate('vendorId', 'companyName contactPerson email phone')
+      .populate('travelers', 'name email phone')
+      .populate('owner', 'name email')
+      .populate('businessId', 'businessName')
+      .sort(sortConfig)
+      .skip(skip)
+      .limit(limitNum);
+
+    // Get total count for pagination
+    const totalCount = await Quotation.countDocuments(filter);
+    const totalPages = Math.ceil(totalCount / limitNum);
+
+    res.status(200).json({
+      success: true,
+      data: {
+        quotations,
+        pagination: {
+          currentPage: pageNum,
+          totalPages,
+          totalCount,
+          hasNextPage: pageNum < totalPages,
+          hasPrevPage: pageNum > 1
+        },
+        vendor: {
+          _id: vendor._id,
+          companyName: vendor.companyName,
+          contactPerson: vendor.contactPerson,
+          email: vendor.email
+        }
+      }
+    });
+
+  } catch (error) {
+    console.error('Error fetching booking history by vendor:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Internal server error while fetching booking history',
+      error: error instanceof Error ? error.message : 'Unknown error'
+    });
+  }
+};
+
+// Get booking history by traveller ID
+export const getBookingHistoryByTraveller = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { travellerId } = req.params;
+    const {
+      status,
+      quotationType,
+      startDate,
+      endDate,
+      travelStartDate,
+      travelEndDate,
+      sortBy = 'createdAt',
+      sortOrder = 'desc',
+      page = 1,
+      limit = 10
+    } = req.query;
+
+    // Validate traveller ID
+    if (!mongoose.Types.ObjectId.isValid(travellerId)) {
+      res.status(400).json({
+        success: false,
+        message: 'Invalid traveller ID'
+      });
+      return;
+    }
+
+    // Verify traveller exists and belongs to user's business
+    const traveller = await Traveller.findById(travellerId);
+    if (!traveller) {
+      res.status(404).json({
+        success: false,
+        message: 'Traveller not found'
+      });
+      return;
+    }
+
+    // Check business access
+    if (req.user?.userType !== 'super_admin' && traveller.businessId.toString() !== req.user?.businessId?.toString()) {
+      res.status(403).json({
+        success: false,
+        message: 'Forbidden: Cannot access traveller from other business'
+      });
+      return;
+    }
+
+    // Build query filter - search in travelers array
+    const filter: any = {
+      travelers: { $in: [travellerId] },
+      businessId: traveller.businessId
+    };
+
+    // Add optional filters
+    if (status) {
+      filter.status = status;
+    }
+
+    if (quotationType) {
+      filter.quotationType = quotationType;
+    }
+
+    // Date filters for booking date (createdAt)
+    if (startDate || endDate) {
+      filter.createdAt = {};
+      if (startDate) filter.createdAt.$gte = new Date(startDate as string);
+      if (endDate) filter.createdAt.$lte = new Date(endDate as string);
+    }
+
+    // Date filters for travel date
+    if (travelStartDate || travelEndDate) {
+      filter.travelDate = {};
+      if (travelStartDate) filter.travelDate.$gte = new Date(travelStartDate as string);
+      if (travelEndDate) filter.travelDate.$lte = new Date(travelEndDate as string);
+    }
+
+    // Pagination
+    const pageNum = parseInt(page as string);
+    const limitNum = parseInt(limit as string);
+    const skip = (pageNum - 1) * limitNum;
+
+    // Sort configuration
+    const sortConfig: any = {};
+    sortConfig[sortBy as string] = sortOrder === 'asc' ? 1 : -1;
+
+    // Get quotations with population
+    const quotations = await Quotation.find(filter)
+      .populate('customerId', 'name email phone companyName')
+      .populate('vendorId', 'companyName contactPerson email phone')
+      .populate('travelers', 'name email phone')
+      .populate('owner', 'name email')
+      .populate('businessId', 'businessName')
+      .sort(sortConfig)
+      .skip(skip)
+      .limit(limitNum);
+
+    // Get total count for pagination
+    const totalCount = await Quotation.countDocuments(filter);
+    const totalPages = Math.ceil(totalCount / limitNum);
+
+    res.status(200).json({
+      success: true,
+      data: {
+        quotations,
+        pagination: {
+          currentPage: pageNum,
+          totalPages,
+          totalCount,
+          hasNextPage: pageNum < totalPages,
+          hasPrevPage: pageNum > 1
+        },
+        traveller: {
+          _id: traveller._id,
+          name: traveller.name,
+          email: traveller.email,
+          phone: traveller.phone
+        }
+      }
+    });
+
+  } catch (error) {
+    console.error('Error fetching booking history by traveller:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Internal server error while fetching booking history',
+      error: error instanceof Error ? error.message : 'Unknown error'
+    });
   }
 };

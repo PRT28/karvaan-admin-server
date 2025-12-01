@@ -387,3 +387,74 @@ export const getUserLogsByMonth = async (req: Request, res: Response): Promise<v
     res.status(500).json({ message: 'Internal server error', error });
   }
 };
+
+export const getLogsByBookingId = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { bookingId } = req.params;
+
+    // Validate ObjectId
+    if (!mongoose.Types.ObjectId.isValid(bookingId)) {
+      res.status(400).json({ success: false, message: 'Invalid booking ID' });
+      return;
+    }
+
+    // Build filter based on user type for multi-tenant access control
+    const filter: any = { bookingId: bookingId };
+    if (req.user?.userType !== 'super_admin') {
+      filter.businessId = req.user?.businessId;
+    }
+
+    const logs = await Logs.find(filter)
+      .populate('userId', 'name email')
+      .populate('assignedBy', 'name email')
+      .populate('assignedTo', 'name email')
+      .populate({
+        path: 'businessId',
+        select: 'businessName businessType',
+      })
+      .populate({
+        path: 'bookingId',
+        select: 'bookingNumber customerName status',
+      })
+      .sort({ dateTime: -1 });
+
+    if (!logs || logs.length === 0) {
+      res.status(404).json({
+        success: false,
+        message: 'No logs found for this booking ID',
+        bookingId: bookingId
+      });
+      return;
+    }
+
+    // Group logs by status for better organization
+    const logsByStatus = {
+      Pending: logs.filter(log => log.status === 'Pending'),
+      'In Progress': logs.filter(log => log.status === 'In Progress'),
+      Completed: logs.filter(log => log.status === 'Completed'),
+      'On Hold': logs.filter(log => log.status === 'On Hold')
+    };
+
+    // Calculate summary statistics
+    const summary = {
+      totalLogs: logs.length,
+      completedCount: logsByStatus.Completed.length,
+      pendingCount: logsByStatus.Pending.length,
+      inProgressCount: logsByStatus['In Progress'].length,
+      onHoldCount: logsByStatus['On Hold'].length,
+      completionRate: logs.length > 0 ? Math.round((logsByStatus.Completed.length / logs.length) * 100) : 0
+    };
+
+    res.json({
+      success: true,
+      bookingId: bookingId,
+      summary,
+      logs,
+      logsByStatus
+    });
+
+  } catch (error) {
+    console.error('Error fetching logs by booking ID:', error);
+    res.status(500).json({ success: false, message: 'Failed to fetch logs for booking' });
+  }
+};

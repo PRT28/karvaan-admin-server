@@ -25,11 +25,21 @@ export const getVendors = async (req: Request, res: Response) => {
     // Filter by business for business users, show all for super admin
     const filter = req.user?.userType === 'super_admin' ? {} : { businessId: req.user?.businessId };
 
-    const vendors = await Vendor.find({...filter, isDeleted: isDeleted === 'true' ? true : false})
+    let vendors;
+
+    if (isDeleted) {
+      vendors = await Vendor.find({...filter, isDeleted: isDeleted === 'true' ? true : false})
       .populate({
         path: 'businessId',
         select: 'businessName businessType',
       });
+    } else {
+      vendors = await Vendor.find({...filter})
+      .populate({
+        path: 'businessId',
+        select: 'businessName businessType',
+      });
+    }
     res.status(200).json({ vendors });
   } catch (err: unknown) {
     const errorMessage = err instanceof Error ? err.message : 'Something went wrong';

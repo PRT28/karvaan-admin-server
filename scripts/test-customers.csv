@@ -1,0 +1,7 @@
+name,email,phone,ownerId,alias,companyName,tier,address,openingBalance,balanceType,gstin,dateOfBirth
+"John Doe","john.doe@example.com","+1234567890","689000000000000000000001","Johnny","Doe Enterprises","tier1","123 Main St, City, State","1000","credit","",""
+"Jane Smith","jane.smith@example.com","+1234567891","689000000000000000000001","","","tier2","","","","22AAAAA0000A1Z5","1990-05-15"
+"Bob Johnson","bob.johnson@example.com","+1234567892","689000000000000000000001","","Johnson & Co","tier3","","2500","debit","",""
+"Alice Brown","alice.brown@example.com","+1234567893","689000000000000000000001","Ali","","tier1","456 Oak Ave, Town, State","","","",""
+"Invalid Customer","","+1234567894","689000000000000000000001","","","","","","","",""
+"Another Invalid","invalid.customer@example.com","+1234567895","invalid-object-id","","","","","","","",""

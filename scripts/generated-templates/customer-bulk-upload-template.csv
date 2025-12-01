@@ -1,0 +1,3 @@
+name,email,phone,ownerId,alias,dateOfBirth,gstin,companyName,openingBalance,balanceType,address,tier
+John Doe,john.doe@example.com,+1234567890,507f1f77bcf86cd799439011,Johnny,1990-05-15,22AAAAA0000A1Z5,Doe Enterprises,1000,credit,"123 Main St, City, State",tier1
+Jane Smith,jane.smith@example.com,+1234567891,507f1f77bcf86cd799439012,,,,Smith Corp,2500,debit,"456 Oak Ave, Town, State",tier2

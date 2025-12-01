@@ -16,6 +16,8 @@ export interface ITeam extends Document {
   businessId: mongoose.Types.ObjectId;
   createdAt: Date;
   roleId?: mongoose.Types.ObjectId;
+  remarks?: string;
+  status: 'Former' | 'Current';
 }
 
 const teamSchema = new Schema<ITeam>({
@@ -38,6 +40,12 @@ const teamSchema = new Schema<ITeam>({
   },
   createdAt: { type: Date, default: Date.now },
   roleId: { type: Schema.Types.ObjectId, ref: 'Role', required: true },
+  remarks: { type: String },
+  status: {
+    type: String,
+    enum: ['Former', 'Current'],
+    default: 'Current',
+  },
 });
 
 // Indexes for better performance

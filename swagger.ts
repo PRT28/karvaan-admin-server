@@ -43,7 +43,7 @@ const options = {
         // User Schema
         User: {
           type: 'object',
-          required: ['name', 'email', 'mobile', 'phoneCode', 'roleId', 'password'],
+          required: ['name', 'email', 'mobile', 'phoneCode', 'roleId', 'password', 'designation'],
           properties: {
             _id: {
               type: 'string',
@@ -61,10 +61,49 @@ const options = {
               description: 'User email address',
               example: 'john.doe@example.com',
             },
+            dateOfBirth: {
+              type: 'string',
+              format: 'date',
+              description: 'Date of birth',
+              example: '1990-01-15',
+            },
+            gender: {
+              type: 'string',
+              enum: ['male', 'female', 'other'],
+              description: 'Gender',
+              example: 'male',
+            },
+            emergencyContact: {
+              type: 'string',
+              description: 'Emergency contact number',
+              example: '+91-9876543210',
+            },
+            alias: {
+              type: 'string',
+              description: 'User alias or nickname',
+              example: 'JD',
+            },
             mobile: {
               type: 'string',
               description: 'User mobile number',
-              example: '+1234567890',
+              example: '+91-9876543210',
+            },
+            designation: {
+              type: 'string',
+              description: 'Job designation',
+              example: 'Travel Consultant',
+            },
+            dateOfJoining: {
+              type: 'string',
+              format: 'date',
+              description: 'Date of joining',
+              example: '2024-01-01',
+            },
+            dateOfLeaving: {
+              type: 'string',
+              format: 'date',
+              description: 'Date of leaving (if applicable)',
+              example: '2024-12-31',
             },
             agentId: {
               type: 'string',
@@ -75,7 +114,39 @@ const options = {
             phoneCode: {
               type: 'number',
               description: 'Country phone code',
-              example: 1,
+              example: 91,
+            },
+            roleId: {
+              type: 'string',
+              description: 'Reference to Role document',
+              example: '507f1f77bcf86cd799439012',
+            },
+            businessId: {
+              type: 'string',
+              description: 'Reference to Business (null for super admin)',
+              example: '507f1f77bcf86cd799439020',
+              nullable: true,
+            },
+            userType: {
+              type: 'string',
+              enum: ['super_admin', 'business_admin', 'business_user'],
+              description: 'User type in the system',
+              example: 'business_user',
+            },
+            isActive: {
+              type: 'boolean',
+              description: 'User active status',
+              example: true,
+            },
+            lastLogin: {
+              type: 'string',
+              format: 'date-time',
+              description: 'Last login timestamp',
+            },
+            superAdmin: {
+              type: 'boolean',
+              description: 'Legacy super admin flag',
+              example: false,
             },
             roleId: {
               type: 'string',
@@ -189,7 +260,7 @@ const options = {
         // Customer Schema
         Customer: {
           type: 'object',
-          required: ['name', 'email', 'phone', 'ownerId'],
+          required: ['name', 'email', 'phone', 'businessId', 'ownerId'],
           properties: {
             _id: {
               type: 'string',
@@ -210,17 +281,74 @@ const options = {
             phone: {
               type: 'string',
               description: 'Customer phone number',
-              example: '+1234567890',
+              example: '+91-9876543210',
+            },
+            alias: {
+              type: 'string',
+              description: 'Customer alias or nickname',
+              example: 'JS',
+            },
+            dateOfBirth: {
+              type: 'string',
+              format: 'date',
+              description: 'Date of birth',
+              example: '1985-03-20',
+            },
+            gstin: {
+              type: 'string',
+              description: 'GST Identification Number',
+              example: '22AAAAA0000A1Z5',
+            },
+            companyName: {
+              type: 'string',
+              description: 'Company name if business customer',
+              example: 'Smith Enterprises',
+            },
+            openingBalance: {
+              type: 'number',
+              description: 'Opening balance amount',
+              example: 5000.00,
+            },
+            balanceType: {
+              type: 'string',
+              enum: ['credit', 'debit'],
+              description: 'Type of opening balance',
+              example: 'credit',
             },
             address: {
               type: 'string',
               description: 'Customer address',
-              example: '123 Main St, City, State',
+              example: '123 Main St, Mumbai, Maharashtra, India',
+            },
+            businessId: {
+              type: 'string',
+              description: 'Reference to Business',
+              example: '507f1f77bcf86cd799439020',
             },
             ownerId: {
               type: 'string',
               description: 'Reference to Team member who owns this customer',
-              example: '507f1f77bcf86cd799439014',
+              example: '507f1f77bcf86cd799439016',
+            },
+            tier: {
+              type: 'string',
+              enum: ['tier1', 'tier2', 'tier3', 'tier4', 'tier5'],
+              description: 'Customer tier level',
+              example: 'tier1',
+            },
+            isDeleted: {
+              type: 'boolean',
+              description: 'Soft deletion flag',
+              example: false,
+            },
+            isDeletable: {
+              type: 'boolean',
+              description: 'Whether customer can be deleted',
+              example: true,
+            },
+            createdAt: {
+              type: 'string',
+              format: 'date-time',
             },
             tier: {
               type: 'string',
@@ -237,7 +365,7 @@ const options = {
         // Vendor Schema
         Vendor: {
           type: 'object',
-          required: ['companyName', 'contactPerson', 'email', 'phone'],
+          required: ['companyName', 'contactPerson', 'email', 'phone', 'businessId'],
           properties: {
             _id: {
               type: 'string',
@@ -254,6 +382,28 @@ const options = {
               description: 'Contact person name',
               example: 'Bob Johnson',
             },
+            alias: {
+              type: 'string',
+              description: 'Vendor alias or short name',
+              example: 'ATS',
+            },
+            dateOfBirth: {
+              type: 'string',
+              format: 'date',
+              description: 'Contact person date of birth',
+              example: '1980-07-10',
+            },
+            openingBalance: {
+              type: 'number',
+              description: 'Opening balance amount',
+              example: 10000.00,
+            },
+            balanceType: {
+              type: 'string',
+              enum: ['credit', 'debit'],
+              description: 'Type of opening balance',
+              example: 'debit',
+            },
             email: {
               type: 'string',
               format: 'email',
@@ -263,12 +413,33 @@ const options = {
             phone: {
               type: 'string',
               description: 'Vendor phone number',
-              example: '+1234567890',
+              example: '+91-9876543210',
             },
             GSTIN: {
               type: 'string',
               description: 'GST Identification Number',
               example: '22AAAAA0000A1Z5',
+            },
+            address: {
+              type: 'string',
+              description: 'Vendor address',
+              example: '456 Business Park, Delhi, India',
+            },
+            businessId: {
+              type: 'string',
+              description: 'Reference to Business',
+              example: '507f1f77bcf86cd799439020',
+            },
+            tier: {
+              type: 'string',
+              enum: ['tier1', 'tier2', 'tier3', 'tier4', 'tier5'],
+              description: 'Vendor tier level',
+              example: 'tier2',
+            },
+            isDeleted: {
+              type: 'boolean',
+              description: 'Soft deletion flag',
+              example: false,
             },
             address: {
               type: 'string',
@@ -285,7 +456,7 @@ const options = {
         // Team Schema
         Team: {
           type: 'object',
-          required: ['name', 'email', 'phone', 'roleId'],
+          required: ['name', 'email', 'phone', 'roleId', 'businessId'],
           properties: {
             _id: {
               type: 'string',
@@ -306,19 +477,231 @@ const options = {
             phone: {
               type: 'string',
               description: 'Team member phone',
-              example: '+1234567890',
+              example: '+91-9876543210',
             },
             address: {
               type: 'string',
               description: 'Team member address',
-              example: '789 Office St, City, State',
+              example: '789 Office St, Mumbai, Maharashtra, India',
             },
             roleId: {
               type: 'string',
               description: 'Reference to Role document',
               example: '507f1f77bcf86cd799439012',
             },
+            businessId: {
+              type: 'string',
+              description: 'Reference to Business',
+              example: '507f1f77bcf86cd799439020',
+            },
+            isDeleted: {
+              type: 'boolean',
+              description: 'Soft deletion flag',
+              example: false,
+            },
             createdAt: {
+              type: 'string',
+              format: 'date-time',
+            },
+            updatedAt: {
+              type: 'string',
+              format: 'date-time',
+            },
+          },
+        },
+
+        // Business Schema
+        Business: {
+          type: 'object',
+          required: ['businessName', 'businessType', 'email', 'phone', 'address'],
+          properties: {
+            _id: {
+              type: 'string',
+              description: 'Business ID',
+              example: '507f1f77bcf86cd799439020',
+            },
+            businessName: {
+              type: 'string',
+              description: 'Name of the business',
+              example: 'Karvaan Experiences',
+            },
+            businessType: {
+              type: 'string',
+              enum: ['travel_agency', 'tour_operator', 'hotel', 'restaurant', 'transport', 'event_management', 'consulting', 'other'],
+              description: 'Type of business',
+              example: 'travel_agency',
+            },
+            email: {
+              type: 'string',
+              format: 'email',
+              description: 'Business email address',
+              example: 'info@karvaanexperiences.com',
+            },
+            phone: {
+              type: 'string',
+              description: 'Business phone number',
+              example: '+91-9876543210',
+            },
+            address: {
+              type: 'object',
+              required: ['street', 'city', 'state', 'country', 'zipCode'],
+              properties: {
+                street: {
+                  type: 'string',
+                  example: '123 Business Street',
+                },
+                city: {
+                  type: 'string',
+                  example: 'Mumbai',
+                },
+                state: {
+                  type: 'string',
+                  example: 'Maharashtra',
+                },
+                country: {
+                  type: 'string',
+                  example: 'India',
+                },
+                zipCode: {
+                  type: 'string',
+                  example: '400001',
+                },
+              },
+            },
+            website: {
+              type: 'string',
+              description: 'Business website URL',
+              example: 'https://karvaanexperiences.com',
+            },
+            description: {
+              type: 'string',
+              description: 'Business description',
+              example: 'Premium travel and tour operator',
+            },
+            logo: {
+              type: 'string',
+              description: 'Business logo URL',
+              example: 'https://example.com/logo.png',
+            },
+            gstin: {
+              type: 'string',
+              description: 'GST Identification Number',
+              example: '22AAAAA0000A1Z5',
+            },
+            panNumber: {
+              type: 'string',
+              description: 'PAN Number',
+              example: 'ABCDE1234F',
+            },
+            registrationNumber: {
+              type: 'string',
+              description: 'Business registration number',
+              example: 'REG123456789',
+            },
+            isActive: {
+              type: 'boolean',
+              description: 'Business active status',
+              example: true,
+            },
+            subscriptionPlan: {
+              type: 'string',
+              enum: ['basic', 'premium', 'enterprise'],
+              description: 'Subscription plan',
+              example: 'premium',
+            },
+            subscriptionExpiry: {
+              type: 'string',
+              format: 'date-time',
+              description: 'Subscription expiry date',
+            },
+            adminUserId: {
+              type: 'string',
+              description: 'Reference to admin user',
+              example: '507f1f77bcf86cd799439021',
+            },
+            settings: {
+              type: 'object',
+              properties: {
+                allowUserRegistration: {
+                  type: 'boolean',
+                  example: true,
+                },
+                maxUsers: {
+                  type: 'integer',
+                  example: 10,
+                },
+                features: {
+                  type: 'array',
+                  items: {
+                    type: 'string',
+                  },
+                  example: ['quotations', 'customers', 'vendors'],
+                },
+              },
+            },
+            createdAt: {
+              type: 'string',
+              format: 'date-time',
+            },
+            updatedAt: {
+              type: 'string',
+              format: 'date-time',
+            },
+          },
+        },
+
+        // Traveller Schema
+        Traveller: {
+          type: 'object',
+          required: ['name', 'businessId', 'ownerId'],
+          properties: {
+            _id: {
+              type: 'string',
+              description: 'Traveller ID',
+              example: '507f1f77bcf86cd799439022',
+            },
+            name: {
+              type: 'string',
+              description: 'Traveller full name',
+              example: 'John Smith',
+            },
+            email: {
+              type: 'string',
+              format: 'email',
+              description: 'Traveller email address',
+              example: 'john.smith@example.com',
+            },
+            phone: {
+              type: 'string',
+              description: 'Traveller phone number',
+              example: '+91-9876543210',
+            },
+            dateOfBirth: {
+              type: 'string',
+              format: 'date',
+              description: 'Date of birth',
+              example: '1990-05-15',
+            },
+            businessId: {
+              type: 'string',
+              description: 'Reference to Business',
+              example: '507f1f77bcf86cd799439020',
+            },
+            ownerId: {
+              type: 'string',
+              description: 'Reference to Team member who owns this traveller',
+              example: '507f1f77bcf86cd799439016',
+            },
+            isDeleted: {
+              type: 'boolean',
+              description: 'Soft deletion flag',
+              example: false,
+            },
+            createdAt: {
+              type: 'string',
+              format: 'date-time',
+            },
+            updatedAt: {
               type: 'string',
               format: 'date-time',
             },
@@ -328,16 +711,21 @@ const options = {
         // Quotation Schema
         Quotation: {
           type: 'object',
-          required: ['quotationType', 'channel', 'partyId', 'formFields', 'totalAmount'],
+          required: ['quotationType', 'channel', 'formFields', 'totalAmount', 'businessId', 'owner', 'travelDate'],
           properties: {
             _id: {
               type: 'string',
               description: 'Quotation ID',
               example: '507f1f77bcf86cd799439017',
             },
+            customId: {
+              type: 'string',
+              description: 'Auto-generated custom ID with business prefix',
+              example: 'KVN-001',
+            },
             quotationType: {
               type: 'string',
-              enum: ['flight', 'train', 'hotel', 'activity'],
+              enum: ['flight', 'train', 'hotel', 'activity', 'travel', 'transport-land', 'transport-maritime', 'tickets', 'travel insurance', 'visas', 'others'],
               description: 'Type of quotation',
               example: 'flight',
             },
@@ -347,15 +735,32 @@ const options = {
               description: 'Sales channel',
               example: 'B2C',
             },
-            partyId: {
+            businessId: {
               type: 'string',
-              description: 'Reference to Customer or Vendor based on channel',
+              description: 'Reference to Business',
+              example: '507f1f77bcf86cd799439020',
+            },
+            customerId: {
+              type: 'string',
+              description: 'Reference to Customer',
               example: '507f1f77bcf86cd799439013',
+            },
+            vendorId: {
+              type: 'string',
+              description: 'Reference to Vendor',
+              example: '507f1f77bcf86cd799439015',
+            },
+            travelers: {
+              type: 'array',
+              items: {
+                type: 'string',
+              },
+              description: 'Array of Traveller IDs',
+              example: ['507f1f77bcf86cd799439022'],
             },
             formFields: {
               type: 'object',
-              description: 'Dynamic form fields for quotation details',
-              additionalProperties: true,
+              description: 'Dynamic form fields based on quotation type',
               example: {
                 departure: 'New York',
                 destination: 'London',
@@ -372,7 +777,36 @@ const options = {
               type: 'string',
               enum: ['draft', 'confirmed', 'cancelled'],
               description: 'Quotation status',
-              default: 'draft',
+              example: 'confirmed',
+            },
+            owner: {
+              type: 'array',
+              items: {
+                type: 'string',
+              },
+              description: 'Array of Team member IDs who own this quotation',
+              example: ['507f1f77bcf86cd799439016'],
+            },
+            travelDate: {
+              type: 'string',
+              format: 'date',
+              description: 'Travel date',
+              example: '2024-06-15',
+            },
+            adultTravlers: {
+              type: 'integer',
+              description: 'Number of adult travellers',
+              example: 2,
+            },
+            childTravlers: {
+              type: 'integer',
+              description: 'Number of child travellers',
+              example: 1,
+            },
+            remarks: {
+              type: 'string',
+              description: 'Additional remarks or notes',
+              example: 'Business trip with special requirements',
             },
             createdAt: {
               type: 'string',
@@ -388,7 +822,7 @@ const options = {
         // Logs Schema
         Logs: {
           type: 'object',
-          required: ['activity', 'userId', 'assignedBy'],
+          required: ['activity', 'userId', 'assignedBy', 'businessId'],
           properties: {
             _id: {
               type: 'string',
@@ -420,6 +854,35 @@ const options = {
               type: 'string',
               description: 'Reference to Team member who assigned this task',
               example: '507f1f77bcf86cd799439016',
+            },
+            businessId: {
+              type: 'string',
+              description: 'Reference to Business',
+              example: '507f1f77bcf86cd799439020',
+            },
+            bookingId: {
+              type: 'string',
+              description: 'Reference to Quotation/Booking',
+              example: '507f1f77bcf86cd799439017',
+            },
+            priority: {
+              type: 'string',
+              enum: ['Low', 'Medium', 'High', 'Urgent'],
+              description: 'Task priority level',
+              example: 'Medium',
+            },
+            description: {
+              type: 'string',
+              description: 'Detailed task description',
+              example: 'Follow up with customer regarding travel preferences',
+            },
+            createdAt: {
+              type: 'string',
+              format: 'date-time',
+            },
+            updatedAt: {
+              type: 'string',
+              format: 'date-time',
             },
           },
         },
@@ -453,6 +916,64 @@ const options = {
             error: {
               type: 'string',
               description: 'Detailed error message',
+            },
+          },
+        },
+
+        // Booking History Response Schema
+        BookingHistoryResponse: {
+          type: 'object',
+          properties: {
+            success: {
+              type: 'boolean',
+              example: true,
+            },
+            data: {
+              type: 'object',
+              properties: {
+                quotations: {
+                  type: 'array',
+                  items: {
+                    $ref: '#/components/schemas/Quotation',
+                  },
+                },
+                pagination: {
+                  $ref: '#/components/schemas/Pagination',
+                },
+                customer: {
+                  $ref: '#/components/schemas/Customer',
+                },
+                vendor: {
+                  $ref: '#/components/schemas/Vendor',
+                },
+                traveller: {
+                  $ref: '#/components/schemas/Traveller',
+                },
+              },
+            },
+          },
+        },
+
+        // List Response Schema (Generic)
+        ListResponse: {
+          type: 'object',
+          properties: {
+            success: {
+              type: 'boolean',
+              example: true,
+            },
+            data: {
+              type: 'array',
+              items: {
+                type: 'object',
+              },
+            },
+            count: {
+              type: 'integer',
+              example: 25,
+            },
+            pagination: {
+              $ref: '#/components/schemas/Pagination',
             },
           },
         },
@@ -531,6 +1052,166 @@ const options = {
               type: 'string',
               description: 'JWT authentication token',
               example: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...',
+            },
+          },
+        },
+
+        // Pagination Schema
+        Pagination: {
+          type: 'object',
+          properties: {
+            currentPage: {
+              type: 'integer',
+              example: 1,
+            },
+            totalPages: {
+              type: 'integer',
+              example: 5,
+            },
+            totalCount: {
+              type: 'integer',
+              example: 47,
+            },
+            hasNextPage: {
+              type: 'boolean',
+              example: true,
+            },
+            hasPrevPage: {
+              type: 'boolean',
+              example: false,
+            },
+          },
+        },
+
+        // Bulk Upload Response Schema
+        BulkUploadResponse: {
+          type: 'object',
+          properties: {
+            success: {
+              type: 'boolean',
+              example: true,
+            },
+            message: {
+              type: 'string',
+              example: 'Bulk upload completed',
+            },
+            summary: {
+              type: 'object',
+              properties: {
+                totalRecords: {
+                  type: 'integer',
+                  example: 10,
+                },
+                successfulRecords: {
+                  type: 'integer',
+                  example: 8,
+                },
+                failedRecords: {
+                  type: 'integer',
+                  example: 2,
+                },
+                successRate: {
+                  type: 'string',
+                  example: '80%',
+                },
+              },
+            },
+            results: {
+              type: 'array',
+              items: {
+                type: 'object',
+                properties: {
+                  row: {
+                    type: 'integer',
+                    example: 1,
+                  },
+                  success: {
+                    type: 'boolean',
+                    example: true,
+                  },
+                  data: {
+                    type: 'object',
+                    description: 'Created record data if successful',
+                  },
+                  errors: {
+                    type: 'array',
+                    items: {
+                      type: 'string',
+                    },
+                    description: 'Error messages if failed',
+                  },
+                },
+              },
+            },
+          },
+        },
+
+        // Dashboard Response Schema
+        DashboardResponse: {
+          type: 'object',
+          properties: {
+            success: {
+              type: 'boolean',
+              example: true,
+            },
+            data: {
+              type: 'object',
+              properties: {
+                taskOverDue: {
+                  type: 'integer',
+                  example: 5,
+                },
+                taskDueToday: {
+                  type: 'integer',
+                  example: 3,
+                },
+                upcomingTasks: {
+                  type: 'integer',
+                  example: 12,
+                },
+                totalTasks: {
+                  type: 'integer',
+                  example: 20,
+                },
+                tasksByPriority: {
+                  type: 'object',
+                  properties: {
+                    High: {
+                      type: 'integer',
+                      example: 2,
+                    },
+                    Medium: {
+                      type: 'integer',
+                      example: 8,
+                    },
+                    Low: {
+                      type: 'integer',
+                      example: 10,
+                    },
+                  },
+                },
+                tasksByStatus: {
+                  type: 'object',
+                  properties: {
+                    Pending: {
+                      type: 'integer',
+                      example: 10,
+                    },
+                    'In Progress': {
+                      type: 'integer',
+                      example: 5,
+                    },
+                    Completed: {
+                      type: 'integer',
+                      example: 3,
+                    },
+                    'On Hold': {
+                      type: 'integer',
+                      example: 2,
+                    },
+                  },
+                },
+              },
             },
           },
         },
