@@ -103,13 +103,9 @@ export const updateVendor = async (req: Request, res: Response): Promise<void> =
 
 export const deleteVendor = async (req: Request, res: Response): Promise<void> => {
   try {
-    // Build filter based on user type
-    const filter: any = { _id: req.params.id };
-    if (req.user?.userType !== 'super_admin') {
-      filter.businessId = req.user?.businessId;
-    }
+    const id = req.params.id;
 
-    const vendor = await Vendor.findByIdAndUpdate(filter, { isDeleted: true }, { new: true });
+    const vendor = await Vendor.findByIdAndUpdate(id, { isDeleted: true }, { new: true, runValidators: true });
      if (!vendor) {
       res.status(404).json({ message: 'Vendor not found' });
       return;

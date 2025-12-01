@@ -112,7 +112,9 @@ export const deleteTeam = async (req: Request, res: Response): Promise<void> => 
       filter.businessId = req.user?.businessId;
     }
 
-    const team = await Team.findOneAndDelete(filter);
+    const id = req.params.id;
+
+    const team = await Team.findByIdAndUpdate(id, {isDeleted: true}, { new: true, runValidators: true });
     if (!team) {
       res.status(404).json({ message: 'Team not found' });
       return;

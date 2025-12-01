@@ -222,14 +222,9 @@ export const deleteTraveller = async (req: Request, res: Response): Promise<void
       return;
     }
 
-    // Build filter based on user type
-    const filter: any = { _id: id };
-    if (req.user?.userType !== 'super_admin') {
-      filter.businessId = req.user?.businessId;
-    }
 
-    const traveller = await Traveller.findOneAndUpdate(
-      filter,
+    const traveller = await Traveller.findByIdAndUpdate(
+      id,
       { isDeleted: true },
       { new: true }
     );
