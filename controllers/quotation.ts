@@ -227,8 +227,10 @@ export const getBookingHistoryByCustomer = async (req: Request, res: Response): 
       return;
     }
 
+    console.log(req.user, 'User')
+
     // Check business access
-    if (req.user?.userType !== 'super_admin' && customer.businessId.toString() !== req.user?.businessId?.toString()) {
+    if (req.user?.userType !== 'super_admin' && customer.businessId.toString() !== req.user?.businessInfo?.businessId?.toString()) {
       res.status(403).json({
         success: false,
         message: 'Forbidden: Cannot access customer from other business'

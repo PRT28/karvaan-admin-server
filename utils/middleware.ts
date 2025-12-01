@@ -5,7 +5,7 @@ import Business from '../models/Business';
 
 declare module 'express-serve-static-core' {
   interface Request {
-    user?: IUser;
+    user?: any;
   }
 }
 

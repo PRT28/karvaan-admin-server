@@ -25,7 +25,9 @@
     "test-template-download": "npx ts-node scripts/test-template-download.ts",
     "test-complete-workflow": "npx ts-node scripts/test-complete-workflow.ts",
     "test-booking-history": "npx ts-node scripts/test-booking-history-apis.ts",
-    "test-swagger-docs": "npx ts-node scripts/test-swagger-documentation.ts"
+    "test-swagger-docs": "npx ts-node scripts/test-swagger-documentation.ts",
+    "create-quotation-dummy-data": "npx ts-node scripts/create-quotation-dummy-data.ts",
+    "verify-quotation-data": "npx ts-node scripts/verify-quotation-data.ts"
   },
   "author": "Google LLC",
   "license": "Apache-2.0",
