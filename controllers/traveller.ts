@@ -1,5 +1,6 @@
 import { Request, Response } from 'express';
 import Traveller from '../models/Traveller';
+import Quotation from '../models/Quotation';
 import mongoose from 'mongoose';
 
 // Get all travellers with isDeleted filter
@@ -29,10 +30,26 @@ export const getTravellers = async (req: Request, res: Response) => {
       })
       .sort({ createdAt: -1 });
 
-    res.status(200).json({ 
+    // Add isDeletable field to each traveller
+    const travellersWithDeletable = await Promise.all(
+      travellers.map(async (traveller) => {
+        // Check if traveller is referenced in any quotations
+        const quotationCount = await Quotation.countDocuments({
+          travelers: traveller._id,
+          businessId: traveller.businessId
+        });
+
+        return {
+          ...traveller.toObject(),
+          isDeletable: quotationCount === 0
+        };
+      })
+    );
+
+    res.status(200).json({
       success: true,
-      count: travellers.length,
-      travellers 
+      count: travellersWithDeletable.length,
+      travellers: travellersWithDeletable
     });
   } catch (err: unknown) {
     const errorMessage = err instanceof Error ? err.message : 'Something went wrong';

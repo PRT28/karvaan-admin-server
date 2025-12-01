@@ -1,5 +1,6 @@
 import { Request, Response } from 'express';
 import Vendor from '../models/Vendors';
+import Quotation from '../models/Quotation';
 
 export const createVendor = async (req: Request, res: Response) => {
   try {
@@ -40,7 +41,24 @@ export const getVendors = async (req: Request, res: Response) => {
         select: 'businessName businessType',
       });
     }
-    res.status(200).json({ vendors });
+
+    // Add isDeletable field to each vendor
+    const vendorsWithDeletable = await Promise.all(
+      vendors.map(async (vendor) => {
+        // Check if vendor is referenced in any quotations
+        const quotationCount = await Quotation.countDocuments({
+          vendorId: vendor._id,
+          businessId: vendor.businessId
+        });
+
+        return {
+          ...vendor.toObject(),
+          isDeletable: quotationCount === 0
+        };
+      })
+    );
+
+    res.status(200).json({ vendors: vendorsWithDeletable });
   } catch (err: unknown) {
     const errorMessage = err instanceof Error ? err.message : 'Something went wrong';
     res.status(500).json({ error: 'Failed to fetch vendors', message: errorMessage });

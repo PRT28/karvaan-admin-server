@@ -52,8 +52,25 @@ export const getCustomers = async (req: Request, res: Response) => {
         path: 'businessId',
         select: 'businessName businessType',
       });
-    }   
-    res.status(200).json({ customers });
+    }
+
+    // Add isDeletable field to each customer
+    const customersWithDeletable = await Promise.all(
+      customers.map(async (customer) => {
+        // Check if customer is referenced in any quotations
+        const quotationCount = await Quotation.countDocuments({
+          customerId: customer._id,
+          businessId: customer.businessId
+        });
+
+        return {
+          ...customer.toObject(),
+          isDeletable: quotationCount === 0
+        };
+      })
+    );
+
+    res.status(200).json({ customers: customersWithDeletable });
   } catch (err: unknown) {
         const errorMessage = err instanceof Error ? err.message : 'Something went wrong';
         res.status(500).json({ error: 'Failed to fetch customer', message: errorMessage });
