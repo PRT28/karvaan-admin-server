@@ -17,7 +17,8 @@
     "create-test-logs": "npx ts-node scripts/create-test-logs.ts",
     "update-business-prefixes": "npx ts-node scripts/update-business-prefixes.ts",
     "test-quotation-custom-id": "npx ts-node scripts/test-quotation-custom-id.ts",
-    "create-test-business-with-prefix": "npx ts-node scripts/create-test-business-with-prefix.ts"
+    "create-test-business-with-prefix": "npx ts-node scripts/create-test-business-with-prefix.ts",
+    "test-traveller-api": "npx ts-node scripts/test-traveller-api.ts"
   },
   "author": "Google LLC",
   "license": "Apache-2.0",

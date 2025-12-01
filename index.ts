@@ -13,6 +13,7 @@ import vendorRoutes from './routes/vendor';
 import quotationRoutes from './routes/quotation';
 import teamRoutes from './routes/team';
 import logsRoutes from './routes/logs';
+import travellerRoutes from './routes/traveller';
 
 configDotenv();
 
@@ -30,6 +31,7 @@ app.use('/vendor', checkKarvaanToken, vendorRoutes);
 app.use('/quotation', checkKarvaanToken, quotationRoutes);
 app.use('/team', checkKarvaanToken, teamRoutes);
 app.use('/logs', checkKarvaanToken, logsRoutes);
+app.use('/traveller', checkKarvaanToken, travellerRoutes);
 
 /**
  * @swagger

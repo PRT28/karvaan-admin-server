@@ -17,6 +17,7 @@ export interface IVendor extends Document {
   businessId: mongoose.Types.ObjectId;
   createdAt: Date;
   tier?: Tiers;
+  isDeleted: boolean;
 }
 
 const vendorSchema = new Schema<IVendor>({
@@ -41,6 +42,10 @@ const vendorSchema = new Schema<IVendor>({
     type: String,
     enum: ['tier1', 'tier2', 'tier3', 'tier4', 'tier5'],
   },
+  isDeleted: {
+    type: Boolean,
+    default: false
+  }
 });
 
 // Indexes for better performance

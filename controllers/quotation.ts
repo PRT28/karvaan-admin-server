@@ -18,9 +18,9 @@ export const createQuotation = async (req: Request, res: Response) => {
     // Get party to determine businessId
     let party: any;
     if (quotationData.partyModel === 'Customer') {
-      party = await Customer.findById(quotationData.partyId);
+      party = await Customer.findById(quotationData.businessId);
     } else {
-      party = await Vendor.findById(quotationData.partyId);
+      party = await Vendor.findById(quotationData.businessId);
     }
 
     if (!party) {
@@ -64,7 +64,7 @@ export const updateQuotation = async (req: Request, res: Response): Promise<void
     delete updateData.businessId;
 
     const updated = await Quotation.findOneAndUpdate(filter, updateData, { new: true })
-      .populate('partyId')
+      .populate('businessId')
       .populate({
         path: 'businessId',
         select: 'businessName businessType',
@@ -136,7 +136,6 @@ export const getAllQuotations = async (req: Request, res: Response) => {
 
     // Get quotations with population
     const quotations = await Quotation.find(query)
-      .populate('partyId')
       .populate({
         path: 'businessId',
         select: 'businessName businessType',
@@ -158,7 +157,7 @@ export const getQuotationById = async (req: Request, res: Response) => {
       return;
     }
 
-    const quotation = await Quotation.findById(id).populate('partyId');
+    const quotation = await Quotation.findById(id).populate('businessId');
 
     if (!quotation) {
       res.status(404).json({ success: false, message: 'Quotation not found' });
@@ -182,8 +181,8 @@ export const getQuotationsByParty = async (req: Request, res: Response): Promise
       return;
     }
 
-    // Query by partyId, not id
-    const quotations = await Quotation.find({ partyId: id }).populate('partyId').sort({ createdAt: -1 });
+    // Query by businessId, not id
+    const quotations = await Quotation.find({ businessId: id }).populate('businessId').sort({ createdAt: -1 });
 
     res.status(200).json({ success: true, quotations });
   } catch (err) {

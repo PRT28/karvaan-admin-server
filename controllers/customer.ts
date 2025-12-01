@@ -18,10 +18,13 @@ export const createCustomer = async (req: Request, res: Response) => {
 
 export const getCustomers = async (req: Request, res: Response) => {
   try {
+
+    const { isDeleted } = req.query;
+
     // Filter by business for business users, show all for super admin
     const filter = req.user?.userType === 'super_admin' ? {} : { businessId: req.user?.businessId };
 
-    const customers = await Customer.find(filter)
+    const customers = await Customer.find({...filter, isDeleted: isDeleted === 'true' ? true : false})
       .populate({
         path: 'ownerId',
         select: 'name email phone',

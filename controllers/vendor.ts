@@ -19,10 +19,13 @@ export const createVendor = async (req: Request, res: Response) => {
 
 export const getVendors = async (req: Request, res: Response) => {
   try {
+
+    const { isDeleted } = req.query;
+
     // Filter by business for business users, show all for super admin
     const filter = req.user?.userType === 'super_admin' ? {} : { businessId: req.user?.businessId };
 
-    const vendors = await Vendor.find(filter)
+    const vendors = await Vendor.find({...filter, isDeleted: isDeleted === 'true' ? true : false})
       .populate({
         path: 'businessId',
         select: 'businessName businessType',
