@@ -34,7 +34,7 @@ const router = express.Router();
  *         schema:
  *           type: string
  *           enum: [true, false]
- *         description: Filter by deleted status (default: false)
+ *         description: Filter by deleted status (default false)
  *       - in: query
  *         name: customerId
  *         schema:

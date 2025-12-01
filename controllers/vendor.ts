@@ -109,7 +109,7 @@ export const deleteVendor = async (req: Request, res: Response): Promise<void> =
       filter.businessId = req.user?.businessId;
     }
 
-    const vendor = await Vendor.findOneAndDelete(filter);
+    const vendor = await Vendor.findByIdAndUpdate(filter, { isDeleted: true }, { new: true });
      if (!vendor) {
       res.status(404).json({ message: 'Vendor not found' });
       return;
