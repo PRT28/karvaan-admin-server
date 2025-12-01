@@ -19,7 +19,6 @@ export interface ICustomer extends Document {
   ownerId: mongoose.Types.ObjectId;
   tier?: Tiers;
   isDeleted: boolean;
-  isDeletable: boolean;
 }
 
 const customerSchema = new Schema<ICustomer>({
@@ -45,6 +44,10 @@ const customerSchema = new Schema<ICustomer>({
     type: String,
     enum: ['tier1', 'tier2', 'tier3', 'tier4', 'tier5'],
   },
+  isDeleted: {
+    type: Boolean,
+    default: false
+  }
 });
 
 // Indexes for better performance

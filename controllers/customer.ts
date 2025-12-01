@@ -126,18 +126,17 @@ export const updateCustomer = async (req: Request, res: Response): Promise<void>
 
 export const deleteCustomer = async (req: Request, res: Response): Promise<void> => {
   try {
-    // Build filter based on user type
-    const filter: any = { _id: req.params.id };
-    if (req.user?.userType !== 'super_admin') {
-      filter.businessId = req.user?.businessId;
-    }
 
-    const customer = await Customer.findByIdAndUpdate(filter, { isDeleted: true }, { new: true });
+    const id = req.params.id
+
+    console.log("Deleting customer:", id);
+
+    const customer = await Customer.findByIdAndUpdate(id, { isDeleted: true }, { new: true, runValidators: true });
     if (!customer) {
       res.status(404).json({ message: 'Customer not found' });
       return;
     }
-    res.status(200).json({ message: 'Customer deleted' });
+    res.status(200).json({ message: 'Customer deleted', customer });
   }catch (err: unknown) {
     const errorMessage = err instanceof Error ? err.message : 'Something went wrong';
     res.status(500).json({ error: 'Failed to delete customer', message: errorMessage });
