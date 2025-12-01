@@ -1,5 +1,8 @@
 import { Request, Response } from 'express';
 import Team from '../models/Team';
+import Quotation from '../models/Quotation';
+import Logs from '../models/Logs';
+import mongoose from 'mongoose';
 
 export const createTeam = async (req: Request, res: Response) => {
   try {
@@ -34,7 +37,33 @@ export const getTeams = async (req: Request, res: Response) => {
         select: 'businessName businessType',
       });
 
-    res.status(200).json(teams);
+    // Add isDeletable field to each team member
+    const teamsWithDeletable = await Promise.all(
+      teams.map(async (team) => {
+        // Check if team member is referenced in any quotations (owner field)
+        const quotationCount = await Quotation.countDocuments({
+          owner: team._id,
+          businessId: team.businessId
+        });
+
+        // Check if team member is referenced in any logs (userId, assignedBy, or assignedTo fields)
+        const logCount = await Logs.countDocuments({
+          $or: [
+            { userId: team._id },
+            { assignedBy: team._id },
+            { assignedTo: team._id }
+          ],
+          businessId: team.businessId
+        });
+
+        return {
+          ...team.toObject(),
+          isDeletable: quotationCount === 0 && logCount === 0
+        };
+      })
+    );
+
+    res.status(200).json(teamsWithDeletable);
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : 'Something went wrong';
     console.error('Error fetching teams:', error);
