@@ -145,16 +145,6 @@ const options = {
             },
             superAdmin: {
               type: 'boolean',
-              description: 'Legacy super admin flag',
-              example: false,
-            },
-            roleId: {
-              type: 'string',
-              description: 'Reference to Role document',
-              example: '507f1f77bcf86cd799439012',
-            },
-            superAdmin: {
-              type: 'boolean',
               description: 'Whether user is a super admin',
               default: false,
             },
@@ -350,15 +340,6 @@ const options = {
               type: 'string',
               format: 'date-time',
             },
-            tier: {
-              type: 'string',
-              enum: ['tier1', 'tier2', 'tier3'],
-              description: 'Customer tier level',
-            },
-            createdAt: {
-              type: 'string',
-              format: 'date-time',
-            },
           },
         },
 
@@ -440,11 +421,6 @@ const options = {
               type: 'boolean',
               description: 'Soft deletion flag',
               example: false,
-            },
-            address: {
-              type: 'string',
-              description: 'Vendor address',
-              example: '456 Business Ave, City, State',
             },
             createdAt: {
               type: 'string',

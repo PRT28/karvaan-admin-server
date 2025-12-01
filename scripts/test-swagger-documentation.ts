@@ -5,40 +5,26 @@
  * This script checks if all schemas and endpoints are properly documented
  */
 
-import swaggerJsdoc from 'swagger-jsdoc';
 import fs from 'fs';
 import path from 'path';
 
-// Import swagger configuration
-const swaggerOptions = {
-  definition: {
-    openapi: '3.0.0',
-    info: {
-      title: 'Cooncierge Admin API',
-      version: '1.0.0',
-      description: 'Comprehensive API documentation for Cooncierge Admin Server',
-    },
-  },
-  apis: [
-    './routes/*.ts',
-    './swagger.ts'
-  ],
-};
+// Import swagger configuration directly
+import swaggerSpecs from '../swagger';
 
 async function testSwaggerDocumentation() {
   console.log('🔍 Testing Swagger Documentation Completeness...\n');
 
   try {
-    // Generate swagger specification
-    const swaggerSpec = swaggerJsdoc(swaggerOptions);
-    
+    // Use the swagger specs directly
+    const swaggerSpec: any = swaggerSpecs;
+
     console.log('✅ Swagger specification generated successfully');
     console.log(`📊 Total schemas defined: ${Object.keys(swaggerSpec.components?.schemas || {}).length}`);
     console.log(`🛣️  Total paths documented: ${Object.keys(swaggerSpec.paths || {}).length}\n`);
 
     // Check for required schemas
     const requiredSchemas = [
-      'User', 'Business', 'Customer', 'Vendor', 'Team', 'Quotation', 
+      'User', 'Business', 'Customer', 'Vendor', 'Team', 'Quotation',
       'Logs', 'Traveller', 'SuccessResponse', 'ErrorResponse',
       'Pagination', 'BulkUploadResponse', 'DashboardResponse',
       'BookingHistoryResponse', 'LoginRequest', 'LoginResponse'
@@ -46,7 +32,7 @@ async function testSwaggerDocumentation() {
 
     console.log('🔍 Checking required schemas:');
     const schemas = swaggerSpec.components?.schemas || {};
-    
+
     for (const schema of requiredSchemas) {
       if (schemas[schema]) {
         console.log(`  ✅ ${schema} - Found`);
@@ -58,13 +44,13 @@ async function testSwaggerDocumentation() {
     // Check for security schemes
     console.log('\n🔒 Checking security schemes:');
     const securitySchemes = swaggerSpec.components?.securitySchemes || {};
-    
+
     if (securitySchemes.bearerAuth) {
       console.log('  ✅ bearerAuth - Found');
     } else {
       console.log('  ❌ bearerAuth - Missing');
     }
-    
+
     if (securitySchemes.karvaanToken) {
       console.log('  ✅ karvaanToken - Found');
     } else {

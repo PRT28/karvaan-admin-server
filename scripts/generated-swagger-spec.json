@@ -1,0 +1,4716 @@
+{
+  "openapi": "3.0.0",
+  "info": {
+    "title": "Cooncierge Admin API",
+    "version": "1.0.0",
+    "description": "Comprehensive API documentation for Cooncierge Admin Server"
+  },
+  "paths": {
+    "/auth/login": {
+      "post": {
+        "summary": "Login with email and password",
+        "description": "Authenticate user with email/password and send 2FA code to email",
+        "tags": [
+          "Authentication"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LoginRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "2FA code sent successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LoginResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Email and password are required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Invalid email or password",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "User not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/auth/verify-2fa": {
+      "post": {
+        "summary": "Verify 2FA code and complete login",
+        "description": "Verify the 2FA code sent to email and receive JWT token",
+        "tags": [
+          "Authentication"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Verify2FARequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "2FA verified successfully, login complete",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Email and 2FA code are required or invalid 2FA code",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "User not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/auth/forgot-password": {
+      "post": {
+        "summary": "Request password reset",
+        "description": "Send password reset notification to business administrator for the user",
+        "tags": [
+          "Authentication"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "email"
+                ],
+                "properties": {
+                  "email": {
+                    "type": "string",
+                    "format": "email",
+                    "description": "Email address of the user requesting password reset",
+                    "example": "user@example.com"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Password reset notification sent successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "example": true
+                    },
+                    "message": {
+                      "type": "string",
+                      "example": "Password reset notification has been sent to your business administrator. They will contact you shortly to assist with password recovery."
+                    },
+                    "adminNotified": {
+                      "type": "object",
+                      "properties": {
+                        "adminName": {
+                          "type": "string",
+                          "example": "John Admin"
+                        },
+                        "businessName": {
+                          "type": "string",
+                          "example": "Test Travel Agency"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Email is required or user/business validation errors",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "example": false
+                    },
+                    "message": {
+                      "type": "string",
+                      "example": "Email is required"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error or email sending failure",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "example": false
+                    },
+                    "message": {
+                      "type": "string",
+                      "example": "Failed to send password reset notification. Please try again later."
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/auth/insert": {
+      "post": {
+        "summary": "Create a new user (Test endpoint)",
+        "description": "Create a new user with encrypted password",
+        "tags": [
+          "Authentication"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "name",
+                  "email",
+                  "mobile",
+                  "phoneCode",
+                  "roleId",
+                  "password"
+                ],
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "example": "John Doe"
+                  },
+                  "email": {
+                    "type": "string",
+                    "format": "email",
+                    "example": "john.doe@example.com"
+                  },
+                  "mobile": {
+                    "type": "string",
+                    "example": "+1234567890"
+                  },
+                  "agentId": {
+                    "type": "string",
+                    "example": "AGENT001"
+                  },
+                  "phoneCode": {
+                    "type": "number",
+                    "example": 1
+                  },
+                  "roleId": {
+                    "type": "string",
+                    "example": "507f1f77bcf86cd799439012"
+                  },
+                  "superAdmin": {
+                    "type": "boolean",
+                    "default": false
+                  },
+                  "password": {
+                    "type": "string",
+                    "example": "securePassword123"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "User created successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "example": "User created successfully"
+                    },
+                    "user": {
+                      "$ref": "#/components/schemas/User"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Password is required"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        }
+      }
+    },
+    "/auth/create-or-update-user": {
+      "post": {
+        "summary": "Create or update user",
+        "description": "Create a new user or update existing user (requires authentication)",
+        "tags": [
+          "Authentication"
+        ],
+        "security": [
+          {
+            "karvaanToken": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "mobile",
+                  "email",
+                  "roleId",
+                  "gender",
+                  "phoneCode"
+                ],
+                "properties": {
+                  "mobile": {
+                    "type": "string"
+                  },
+                  "email": {
+                    "type": "string",
+                    "format": "email"
+                  },
+                  "roleId": {
+                    "type": "string"
+                  },
+                  "gender": {
+                    "type": "string"
+                  },
+                  "phoneCode": {
+                    "type": "number"
+                  },
+                  "userId": {
+                    "type": "string",
+                    "description": "Required for update, omit for create"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "User updated successfully"
+          },
+          "201": {
+            "description": "User created successfully"
+          },
+          "400": {
+            "description": "Missing required fields or user not found"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        }
+      }
+    },
+    "/auth/create-new-role": {
+      "post": {
+        "summary": "Create a new role",
+        "description": "Create a new role with permissions",
+        "tags": [
+          "Authentication"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "roleName",
+                  "permission"
+                ],
+                "properties": {
+                  "roleName": {
+                    "type": "string",
+                    "example": "Manager"
+                  },
+                  "permission": {
+                    "$ref": "#/components/schemas/Permissions"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Role created successfully"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        }
+      }
+    },
+    "/auth/delete-user/{id}": {
+      "delete": {
+        "summary": "Delete a user",
+        "description": "Delete a user by ID (requires authentication)",
+        "tags": [
+          "Authentication"
+        ],
+        "security": [
+          {
+            "karvaanToken": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "User ID to delete"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "User deleted successfully"
+          },
+          "400": {
+            "description": "User ID is required"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "404": {
+            "description": "User not found"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        }
+      }
+    },
+    "/auth/get-all-users": {
+      "get": {
+        "summary": "Get all users",
+        "description": "Retrieve all users with populated role information (requires authentication)",
+        "tags": [
+          "Authentication"
+        ],
+        "security": [
+          {
+            "karvaanToken": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Users retrieved successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "example": "Users retrieved successfully"
+                    },
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/User"
+                      }
+                    },
+                    "success": {
+                      "type": "boolean",
+                      "example": true
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        }
+      }
+    },
+    "/auth/get-user/{id}": {
+      "get": {
+        "summary": "Get user by ID",
+        "description": "Retrieve a specific user by ID with populated role information (requires authentication)",
+        "tags": [
+          "Authentication"
+        ],
+        "security": [
+          {
+            "karvaanToken": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "User ID to retrieve"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "User retrieved successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "example": "User retrieved successfully"
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/User"
+                    },
+                    "success": {
+                      "type": "boolean",
+                      "example": true
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "User ID is required"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "404": {
+            "description": "User not found"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        }
+      }
+    },
+    "/auth/register-business-user": {
+      "post": {
+        "summary": "Register a new user under a business",
+        "description": "Register a new user under an existing business (Business Admin only)",
+        "tags": [
+          "Authentication"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "name",
+                  "email",
+                  "mobile",
+                  "phoneCode",
+                  "roleId",
+                  "password",
+                  "businessId"
+                ],
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "description": "User's full name",
+                    "example": "John Doe"
+                  },
+                  "email": {
+                    "type": "string",
+                    "format": "email",
+                    "description": "User's email address",
+                    "example": "john.doe@example.com"
+                  },
+                  "mobile": {
+                    "type": "string",
+                    "description": "User's mobile number",
+                    "example": "9876543210"
+                  },
+                  "phoneCode": {
+                    "type": "number",
+                    "description": "Country phone code",
+                    "example": 91
+                  },
+                  "roleId": {
+                    "type": "string",
+                    "description": "Role ID for the user",
+                    "example": "60d5ecb74b24a1234567890a"
+                  },
+                  "password": {
+                    "type": "string",
+                    "format": "password",
+                    "description": "User's password",
+                    "example": "SecurePassword123!"
+                  },
+                  "businessId": {
+                    "type": "string",
+                    "description": "Business ID the user belongs to",
+                    "example": "60d5ecb74b24a1234567890b"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Business user registered successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "example": true
+                    },
+                    "message": {
+                      "type": "string",
+                      "example": "Business user registered successfully"
+                    },
+                    "user": {
+                      "$ref": "#/components/schemas/User"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation error or business limit reached"
+          },
+          "404": {
+            "description": "Business not found"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        }
+      }
+    },
+    "/business/register": {
+      "post": {
+        "summary": "Register a new business with admin user",
+        "tags": [
+          "Business"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BusinessRegistration"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Business and admin user registered successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "business": {
+                          "type": "object"
+                        },
+                        "adminUser": {
+                          "type": "object"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation error or business/user already exists"
+          },
+          "500": {
+            "description": "Server error"
+          }
+        }
+      }
+    },
+    "/business/{businessId}": {
+      "get": {
+        "summary": "Get business details by ID",
+        "tags": [
+          "Business"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "businessId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Business ID"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Business details retrieved successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "business": {
+                      "$ref": "#/components/schemas/Business"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid business ID"
+          },
+          "404": {
+            "description": "Business not found"
+          },
+          "500": {
+            "description": "Server error"
+          }
+        }
+      },
+      "put": {
+        "summary": "Update business details",
+        "tags": [
+          "Business"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "businessId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Business ID"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "businessName": {
+                    "type": "string"
+                  },
+                  "businessType": {
+                    "type": "string"
+                  },
+                  "phone": {
+                    "type": "string"
+                  },
+                  "address": {
+                    "type": "object"
+                  },
+                  "website": {
+                    "type": "string"
+                  },
+                  "description": {
+                    "type": "string"
+                  },
+                  "gstin": {
+                    "type": "string"
+                  },
+                  "panNumber": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Business updated successfully"
+          },
+          "400": {
+            "description": "Invalid business ID"
+          },
+          "404": {
+            "description": "Business not found"
+          },
+          "500": {
+            "description": "Server error"
+          }
+        }
+      }
+    },
+    "/business": {
+      "get": {
+        "summary": "Get all businesses (Super Admin only)",
+        "tags": [
+          "Business"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "query",
+            "name": "page",
+            "schema": {
+              "type": "integer",
+              "default": 1
+            },
+            "description": "Page number"
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "schema": {
+              "type": "integer",
+              "default": 10
+            },
+            "description": "Number of businesses per page"
+          },
+          {
+            "in": "query",
+            "name": "search",
+            "schema": {
+              "type": "string"
+            },
+            "description": "Search by business name or email"
+          },
+          {
+            "in": "query",
+            "name": "businessType",
+            "schema": {
+              "type": "string"
+            },
+            "description": "Filter by business type"
+          },
+          {
+            "in": "query",
+            "name": "isActive",
+            "schema": {
+              "type": "boolean"
+            },
+            "description": "Filter by active status"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Businesses retrieved successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "businesses": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Business"
+                      }
+                    },
+                    "pagination": {
+                      "type": "object"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Server error"
+          }
+        }
+      }
+    },
+    "/business/{businessId}/toggle-status": {
+      "patch": {
+        "summary": "Activate or deactivate a business",
+        "tags": [
+          "Business"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "businessId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Business ID"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "isActive"
+                ],
+                "properties": {
+                  "isActive": {
+                    "type": "boolean",
+                    "description": "New active status"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Business status updated successfully"
+          },
+          "400": {
+            "description": "Invalid business ID"
+          },
+          "404": {
+            "description": "Business not found"
+          },
+          "500": {
+            "description": "Server error"
+          }
+        }
+      }
+    },
+    "/customer/get-all-customers": {
+      "get": {
+        "summary": "Get all customers",
+        "description": "Retrieve all customers with populated owner information.\n\n**Features:**\n- Business-based filtering (users see only their business customers)\n- Soft deletion filtering\n- Owner information population\n- Multi-tenant architecture support\n",
+        "tags": [
+          "Customers"
+        ],
+        "security": [
+          {
+            "karvaanToken": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "query",
+            "name": "isDeleted",
+            "schema": {
+              "type": "boolean",
+              "default": false
+            },
+            "description": "Filter by deletion status (true for deleted, false for active)"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Customers retrieved successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "example": true
+                    },
+                    "customers": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Customer"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Failed to fetch customers",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/customer/get-customer/{id}": {
+      "get": {
+        "summary": "Get customer by ID",
+        "description": "Retrieve a specific customer by ID with populated owner information",
+        "tags": [
+          "Customers"
+        ],
+        "security": [
+          {
+            "karvaanToken": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Customer ID"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Customer retrieved successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "customer": {
+                      "$ref": "#/components/schemas/Customer"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Customer not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Failed to get customer",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/customer/create-customer": {
+      "post": {
+        "summary": "Create a new customer",
+        "description": "Create a new customer record",
+        "tags": [
+          "Customers"
+        ],
+        "security": [
+          {
+            "karvaanToken": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "name",
+                  "email",
+                  "phone",
+                  "ownerId"
+                ],
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "example": "Jane Smith"
+                  },
+                  "email": {
+                    "type": "string",
+                    "format": "email",
+                    "example": "jane.smith@example.com"
+                  },
+                  "phone": {
+                    "type": "string",
+                    "example": "+1234567890"
+                  },
+                  "address": {
+                    "type": "string",
+                    "example": "123 Main St, City, State"
+                  },
+                  "ownerId": {
+                    "type": "string",
+                    "example": "507f1f77bcf86cd799439014"
+                  },
+                  "tier": {
+                    "type": "string",
+                    "enum": [
+                      "tier1",
+                      "tier2",
+                      "tier3"
+                    ],
+                    "example": "tier1"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Customer created successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "customer": {
+                      "$ref": "#/components/schemas/Customer"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Failed to create customer",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/customer/update-customer/{id}": {
+      "put": {
+        "summary": "Update a customer",
+        "description": "Update an existing customer by ID",
+        "tags": [
+          "Customers"
+        ],
+        "security": [
+          {
+            "karvaanToken": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Customer ID to update"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string"
+                  },
+                  "email": {
+                    "type": "string",
+                    "format": "email"
+                  },
+                  "phone": {
+                    "type": "string"
+                  },
+                  "address": {
+                    "type": "string"
+                  },
+                  "ownerId": {
+                    "type": "string"
+                  },
+                  "tier": {
+                    "type": "string",
+                    "enum": [
+                      "tier1",
+                      "tier2",
+                      "tier3"
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Customer updated successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "customer": {
+                      "$ref": "#/components/schemas/Customer"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Customer not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Failed to update customer",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/customer/delete-customer/{id}": {
+      "delete": {
+        "summary": "Delete a customer",
+        "description": "Delete a customer by ID",
+        "tags": [
+          "Customers"
+        ],
+        "security": [
+          {
+            "karvaanToken": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Customer ID to delete"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Customer deleted successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "example": "Customer deleted"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Customer not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Failed to delete customer",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/customer/bulk-upload": {
+      "post": {
+        "summary": "Bulk upload customers from CSV or XLSX file",
+        "description": "Upload a CSV or XLSX file to create multiple customers at once.\n\n**Required columns in the file:**\n- name (string): Customer name\n- email (string): Customer email (must be unique per business)\n- phone (string): Customer phone number\n- ownerId (string): Valid ObjectId of team member who owns this customer\n\n**Optional columns:**\n- alias (string): Customer alias/nickname\n- dateOfBirth (date): Customer date of birth (YYYY-MM-DD format)\n- gstin (string): GST identification number\n- companyName (string): Company name if business customer\n- openingBalance (number): Opening balance amount\n- balanceType (string): Either 'credit' or 'debit'\n- address (string): Customer address\n- tier (string): Customer tier (tier1, tier2, tier3, tier4, tier5)\n\n**File Requirements:**\n- Maximum file size: 10MB\n- Supported formats: CSV (.csv), Excel (.xls, .xlsx)\n- Use 'file' as the form field name\n",
+        "tags": [
+          "Customers"
+        ],
+        "security": [
+          {
+            "karvaanToken": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "file": {
+                    "type": "string",
+                    "format": "binary",
+                    "description": "CSV or XLSX file containing customer data"
+                  }
+                },
+                "required": [
+                  "file"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Bulk upload completed successfully (some or all records processed)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "example": true
+                    },
+                    "message": {
+                      "type": "string",
+                      "example": "Bulk upload completed. 8 customers created successfully, 2 failed."
+                    },
+                    "totalRecords": {
+                      "type": "integer",
+                      "example": 10,
+                      "description": "Total number of records in the file"
+                    },
+                    "successfulRecords": {
+                      "type": "integer",
+                      "example": 8,
+                      "description": "Number of customers created successfully"
+                    },
+                    "failedRecords": {
+                      "type": "integer",
+                      "example": 2,
+                      "description": "Number of records that failed to process"
+                    },
+                    "errors": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "row": {
+                            "type": "integer",
+                            "example": 3,
+                            "description": "Row number where error occurred"
+                          },
+                          "data": {
+                            "type": "object",
+                            "description": "The data that failed to process"
+                          },
+                          "error": {
+                            "type": "string",
+                            "example": "Email already exists for this business",
+                            "description": "Error message explaining why the record failed"
+                          }
+                        }
+                      }
+                    },
+                    "createdCustomers": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Customer"
+                      },
+                      "description": "Array of successfully created customer objects"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request - file validation errors or no successful records",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "example": false
+                    },
+                    "message": {
+                      "type": "string",
+                      "examples": {
+                        "no_file": {
+                          "value": "No file uploaded. Please upload a CSV or XLSX file."
+                        },
+                        "invalid_type": {
+                          "value": "Invalid file type. Please upload a CSV or XLSX file."
+                        },
+                        "no_data": {
+                          "value": "No data found in the uploaded file."
+                        },
+                        "parse_error": {
+                          "value": "Failed to parse file. Please check file format and try again."
+                        },
+                        "file_too_large": {
+                          "value": "File too large. Maximum size allowed is 10MB."
+                        }
+                      }
+                    },
+                    "error": {
+                      "type": "string",
+                      "description": "Additional error details (when applicable)"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "example": false
+                    },
+                    "message": {
+                      "type": "string",
+                      "example": "Internal server error during bulk upload"
+                    },
+                    "error": {
+                      "type": "string",
+                      "description": "Error details"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/customer/bulk-upload-template/{format}": {
+      "get": {
+        "summary": "Download bulk upload template file",
+        "description": "Download a template file for bulk customer upload in the specified format.\nThe template includes sample data and all available columns with proper formatting.\n\n**Supported formats:**\n- csv: Comma-separated values format\n- xlsx: Microsoft Excel format\n\n**Template includes:**\n- All required columns: name, email, phone, ownerId\n- All optional columns: alias, dateOfBirth, gstin, companyName, openingBalance, balanceType, address, tier\n- Sample data rows showing proper formatting\n- Column headers for easy identification\n\n**Usage:**\n1. Download the template in your preferred format\n2. Fill in your customer data following the sample format\n3. Upload the completed file using POST /customer/bulk-upload\n\n**Important Notes:**\n- Replace sample ownerId values with actual team member IDs from your business\n- Ensure email addresses are unique within your business\n- Use proper date format (YYYY-MM-DD) for dateOfBirth\n- Use valid tier values: tier1, tier2, tier3, tier4, tier5\n- Use valid balanceType values: credit, debit\n",
+        "tags": [
+          "Customers"
+        ],
+        "security": [
+          {
+            "karvaanToken": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "format",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "csv",
+                "xlsx"
+              ]
+            },
+            "description": "Template file format (csv or xlsx)",
+            "example": "csv"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Template file downloaded successfully",
+            "content": {
+              "text/csv": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary",
+                  "description": "CSV template file with sample customer data"
+                }
+              },
+              "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary",
+                  "description": "Excel template file with sample customer data"
+                }
+              }
+            },
+            "headers": {
+              "Content-Disposition": {
+                "description": "Attachment filename",
+                "schema": {
+                  "type": "string",
+                  "example": "attachment; filename=\"customer-bulk-upload-template.csv\""
+                }
+              },
+              "Content-Type": {
+                "description": "File MIME type",
+                "schema": {
+                  "type": "string",
+                  "examples": {
+                    "csv": {
+                      "value": "text/csv"
+                    },
+                    "xlsx": {
+                      "value": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid format parameter",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "example": false
+                    },
+                    "message": {
+                      "type": "string",
+                      "example": "Invalid format. Supported formats are: csv, xlsx"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "example": false
+                    },
+                    "message": {
+                      "type": "string",
+                      "example": "Internal server error during template download"
+                    },
+                    "error": {
+                      "type": "string",
+                      "description": "Error details"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/logs/get-all-logs": {
+      "get": {
+        "summary": "Get all logs",
+        "description": "Retrieve all logs with populated user and assignedBy information",
+        "tags": [
+          "Logs"
+        ],
+        "security": [
+          {
+            "karvaanToken": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Logs retrieved successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "example": true
+                    },
+                    "logs": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Logs"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Failed to fetch logs",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/logs/monthly-summary/{userId}": {
+      "get": {
+        "summary": "Get user logs by month",
+        "description": "Retrieve logs for a specific user grouped by day for a given month",
+        "tags": [
+          "Logs"
+        ],
+        "security": [
+          {
+            "karvaanToken": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "userId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "User ID"
+          },
+          {
+            "in": "query",
+            "name": "month",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 12
+            },
+            "description": "Month (1-12)"
+          },
+          {
+            "in": "query",
+            "name": "year",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            },
+            "description": "Year (e.g., 2024)"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Monthly logs retrieved successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "userId": {
+                      "type": "string"
+                    },
+                    "month": {
+                      "type": "integer"
+                    },
+                    "year": {
+                      "type": "integer"
+                    },
+                    "logsByDay": {
+                      "type": "object",
+                      "additionalProperties": {
+                        "type": "array",
+                        "items": {
+                          "$ref": "#/components/schemas/Logs"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "userId, month, and year are required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/logs/get-user-logs/{userId}": {
+      "get": {
+        "summary": "Get user dashboard logs",
+        "description": "Retrieve comprehensive dashboard data for a user including date-wise logs, status counts, recent logs, and team performance",
+        "tags": [
+          "Logs"
+        ],
+        "security": [
+          {
+            "karvaanToken": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "userId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "User ID"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "User dashboard data retrieved successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "dateWiseLogs": {
+                      "type": "object",
+                      "additionalProperties": {
+                        "type": "array",
+                        "items": {
+                          "$ref": "#/components/schemas/Logs"
+                        }
+                      }
+                    },
+                    "percentageLogs": {
+                      "type": "object",
+                      "properties": {
+                        "completedCount": {
+                          "type": "integer"
+                        },
+                        "completedPercent": {
+                          "type": "string"
+                        },
+                        "inProgressCount": {
+                          "type": "integer"
+                        },
+                        "pendingCount": {
+                          "type": "integer"
+                        }
+                      }
+                    },
+                    "recentLogs": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "activity": {
+                            "type": "string"
+                          },
+                          "dateTime": {
+                            "type": "string",
+                            "format": "date-time"
+                          }
+                        }
+                      }
+                    },
+                    "teamPercentCompleteLogs": {
+                      "type": "object",
+                      "additionalProperties": {
+                        "type": "string"
+                      }
+                    },
+                    "currentUserPendingTaskCount": {
+                      "type": "integer"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid user ID",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Failed to fetch user logs",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/logs/create-log": {
+      "post": {
+        "summary": "Create a new log",
+        "description": "Create a new task log entry",
+        "tags": [
+          "Logs"
+        ],
+        "security": [
+          {
+            "karvaanToken": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "activity",
+                  "userId",
+                  "status"
+                ],
+                "properties": {
+                  "activity": {
+                    "type": "string",
+                    "example": "Complete customer onboarding"
+                  },
+                  "userId": {
+                    "type": "string",
+                    "example": "507f1f77bcf86cd799439016"
+                  },
+                  "status": {
+                    "type": "string",
+                    "enum": [
+                      "Pending",
+                      "Completed",
+                      "On Hold",
+                      "In Progress"
+                    ],
+                    "example": "Pending"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Log created successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "example": true
+                    },
+                    "log": {
+                      "$ref": "#/components/schemas/Logs"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Failed to create log",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/logs/update-log/{logId}": {
+      "put": {
+        "summary": "Update a log",
+        "description": "Update an existing log entry",
+        "tags": [
+          "Logs"
+        ],
+        "security": [
+          {
+            "karvaanToken": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "logId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Log ID to update"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "activity": {
+                    "type": "string"
+                  },
+                  "userId": {
+                    "type": "string"
+                  },
+                  "status": {
+                    "type": "string",
+                    "enum": [
+                      "Pending",
+                      "Completed",
+                      "On Hold",
+                      "In Progress"
+                    ]
+                  },
+                  "assignedBy": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Log updated successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "example": true
+                    },
+                    "log": {
+                      "$ref": "#/components/schemas/Logs"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Log not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Failed to update log",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/logs/update-log-status/{logId}": {
+      "patch": {
+        "summary": "Update log status",
+        "description": "Update only the status of an existing log entry",
+        "tags": [
+          "Logs"
+        ],
+        "security": [
+          {
+            "karvaanToken": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "logId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Log ID to update"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "status"
+                ],
+                "properties": {
+                  "status": {
+                    "type": "string",
+                    "enum": [
+                      "Pending",
+                      "Completed",
+                      "On Hold",
+                      "In Progress"
+                    ],
+                    "example": "Completed"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Log status updated successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "example": true
+                    },
+                    "log": {
+                      "$ref": "#/components/schemas/Logs"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid status",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Log not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Failed to update status",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/logs/delete-log/{logId}": {
+      "delete": {
+        "summary": "Delete a log",
+        "description": "Delete a log entry by ID",
+        "tags": [
+          "Logs"
+        ],
+        "security": [
+          {
+            "karvaanToken": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "logId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Log ID to delete"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Log deleted successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "example": true
+                    },
+                    "message": {
+                      "type": "string",
+                      "example": "Log deleted successfully"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Log not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Failed to delete log",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/logs/booking/{bookingId}": {
+      "get": {
+        "summary": "Get logs by booking ID",
+        "description": "Retrieve all logs associated with a specific booking ID",
+        "tags": [
+          "Logs"
+        ],
+        "security": [
+          {
+            "karvaanToken": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "bookingId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Booking ID to get logs for"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Logs retrieved successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "example": true
+                    },
+                    "bookingId": {
+                      "type": "string",
+                      "description": "The booking ID that was queried"
+                    },
+                    "summary": {
+                      "type": "object",
+                      "properties": {
+                        "totalLogs": {
+                          "type": "integer",
+                          "description": "Total number of logs for this booking"
+                        },
+                        "completedCount": {
+                          "type": "integer",
+                          "description": "Number of completed tasks"
+                        },
+                        "pendingCount": {
+                          "type": "integer",
+                          "description": "Number of pending tasks"
+                        },
+                        "inProgressCount": {
+                          "type": "integer",
+                          "description": "Number of in-progress tasks"
+                        },
+                        "onHoldCount": {
+                          "type": "integer",
+                          "description": "Number of on-hold tasks"
+                        },
+                        "completionRate": {
+                          "type": "integer",
+                          "description": "Completion percentage (0-100)"
+                        }
+                      }
+                    },
+                    "logs": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Logs"
+                      },
+                      "description": "All logs for the booking sorted by date (newest first)"
+                    },
+                    "logsByStatus": {
+                      "type": "object",
+                      "properties": {
+                        "Pending": {
+                          "type": "array",
+                          "items": {
+                            "$ref": "#/components/schemas/Logs"
+                          }
+                        },
+                        "In Progress": {
+                          "type": "array",
+                          "items": {
+                            "$ref": "#/components/schemas/Logs"
+                          }
+                        },
+                        "Completed": {
+                          "type": "array",
+                          "items": {
+                            "$ref": "#/components/schemas/Logs"
+                          }
+                        },
+                        "On Hold": {
+                          "type": "array",
+                          "items": {
+                            "$ref": "#/components/schemas/Logs"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid booking ID",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No logs found for this booking ID",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "example": false
+                    },
+                    "message": {
+                      "type": "string",
+                      "example": "No logs found for this booking ID"
+                    },
+                    "bookingId": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Failed to fetch logs for booking",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/quotation/get-all-quotations": {
+      "get": {
+        "summary": "Get all quotations",
+        "description": "Retrieve all quotations",
+        "tags": [
+          "Quotations"
+        ],
+        "security": [
+          {
+            "karvaanToken": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Quotations retrieved successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "example": true
+                    },
+                    "quotations": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Quotation"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Failed to fetch quotations",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/quotation/get-quotation/{id}": {
+      "get": {
+        "summary": "Get quotation by ID",
+        "description": "Retrieve a specific quotation by ID",
+        "tags": [
+          "Quotations"
+        ],
+        "security": [
+          {
+            "karvaanToken": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Quotation ID"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Quotation retrieved successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "example": true
+                    },
+                    "quotation": {
+                      "$ref": "#/components/schemas/Quotation"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Quotation not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Failed to fetch quotation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/quotation/get-quotations-by-party/{id}": {
+      "get": {
+        "summary": "Get quotations by party ID",
+        "description": "Retrieve all quotations for a specific party (customer or vendor)",
+        "tags": [
+          "Quotations"
+        ],
+        "security": [
+          {
+            "karvaanToken": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Party ID (Customer or Vendor ID)"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Quotations retrieved successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "example": true
+                    },
+                    "quotations": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Quotation"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Failed to fetch quotations by party",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/quotation/create-quotation": {
+      "post": {
+        "summary": "Create a new quotation",
+        "description": "Create a new quotation record",
+        "tags": [
+          "Quotations"
+        ],
+        "security": [
+          {
+            "karvaanToken": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "quotationType",
+                  "channel",
+                  "partyId",
+                  "formFields",
+                  "totalAmount"
+                ],
+                "properties": {
+                  "quotationType": {
+                    "type": "string",
+                    "enum": [
+                      "flight",
+                      "train",
+                      "hotel",
+                      "activity"
+                    ],
+                    "example": "flight"
+                  },
+                  "channel": {
+                    "type": "string",
+                    "enum": [
+                      "B2B",
+                      "B2C"
+                    ],
+                    "example": "B2C"
+                  },
+                  "partyId": {
+                    "type": "string",
+                    "example": "507f1f77bcf86cd799439013"
+                  },
+                  "formFields": {
+                    "type": "object",
+                    "additionalProperties": true,
+                    "example": {
+                      "departure": "New York",
+                      "destination": "London",
+                      "date": "2024-12-25",
+                      "passengers": 2
+                    }
+                  },
+                  "totalAmount": {
+                    "type": "number",
+                    "example": 1500
+                  },
+                  "status": {
+                    "type": "string",
+                    "enum": [
+                      "draft",
+                      "confirmed",
+                      "cancelled"
+                    ],
+                    "default": "draft"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Quotation created successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "example": true
+                    },
+                    "quotation": {
+                      "$ref": "#/components/schemas/Quotation"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Failed to create quotation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/quotation/update-quotation/{id}": {
+      "put": {
+        "summary": "Update a quotation",
+        "description": "Update an existing quotation by ID",
+        "tags": [
+          "Quotations"
+        ],
+        "security": [
+          {
+            "karvaanToken": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Quotation ID to update"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "quotationType": {
+                    "type": "string",
+                    "enum": [
+                      "flight",
+                      "train",
+                      "hotel",
+                      "activity"
+                    ]
+                  },
+                  "channel": {
+                    "type": "string",
+                    "enum": [
+                      "B2B",
+                      "B2C"
+                    ]
+                  },
+                  "partyId": {
+                    "type": "string"
+                  },
+                  "formFields": {
+                    "type": "object",
+                    "additionalProperties": true
+                  },
+                  "totalAmount": {
+                    "type": "number"
+                  },
+                  "status": {
+                    "type": "string",
+                    "enum": [
+                      "draft",
+                      "confirmed",
+                      "cancelled"
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Quotation updated successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "example": true
+                    },
+                    "quotation": {
+                      "$ref": "#/components/schemas/Quotation"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Quotation not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Failed to update quotation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/quotation/delete-quotation/{id}": {
+      "delete": {
+        "summary": "Delete a quotation",
+        "description": "Delete a quotation by ID",
+        "tags": [
+          "Quotations"
+        ],
+        "security": [
+          {
+            "karvaanToken": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Quotation ID to delete"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Quotation deleted successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "example": true
+                    },
+                    "message": {
+                      "type": "string",
+                      "example": "Quotation deleted successfully"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Quotation not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Failed to delete quotation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/quotation/booking-history/customer/{customerId}": {
+      "get": {
+        "summary": "Get booking history by customer",
+        "description": "Retrieve booking history (quotations) for a specific customer with filtering and pagination options.\n\n**Features:**\n- Filter by status, quotation type, and date ranges\n- Pagination support\n- Sorting options\n- Populated customer, vendor, traveller, and owner details\n\n**Query Parameters:**\n- status: Filter by quotation status (draft, confirmed, cancelled)\n- quotationType: Filter by type (flight, train, hotel, activity, etc.)\n- startDate/endDate: Filter by booking date range\n- travelStartDate/travelEndDate: Filter by travel date range\n- sortBy: Sort field (default: createdAt)\n- sortOrder: Sort direction (asc/desc, default: desc)\n- page: Page number (default: 1)\n- limit: Items per page (default: 10)\n",
+        "tags": [
+          "Quotations"
+        ],
+        "security": [
+          {
+            "karvaanToken": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "customerId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Customer ID to get booking history for"
+          },
+          {
+            "in": "query",
+            "name": "status",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "draft",
+                "confirmed",
+                "cancelled"
+              ]
+            },
+            "description": "Filter by quotation status"
+          },
+          {
+            "in": "query",
+            "name": "quotationType",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "flight",
+                "train",
+                "hotel",
+                "activity",
+                "travel",
+                "transport-land",
+                "transport-maritime",
+                "tickets",
+                "travel insurance",
+                "visas",
+                "others"
+              ]
+            },
+            "description": "Filter by quotation type"
+          },
+          {
+            "in": "query",
+            "name": "startDate",
+            "schema": {
+              "type": "string",
+              "format": "date"
+            },
+            "description": "Start date for booking date filter (YYYY-MM-DD)"
+          },
+          {
+            "in": "query",
+            "name": "endDate",
+            "schema": {
+              "type": "string",
+              "format": "date"
+            },
+            "description": "End date for booking date filter (YYYY-MM-DD)"
+          },
+          {
+            "in": "query",
+            "name": "travelStartDate",
+            "schema": {
+              "type": "string",
+              "format": "date"
+            },
+            "description": "Start date for travel date filter (YYYY-MM-DD)"
+          },
+          {
+            "in": "query",
+            "name": "travelEndDate",
+            "schema": {
+              "type": "string",
+              "format": "date"
+            },
+            "description": "End date for travel date filter (YYYY-MM-DD)"
+          },
+          {
+            "in": "query",
+            "name": "sortBy",
+            "schema": {
+              "type": "string",
+              "default": "createdAt"
+            },
+            "description": "Field to sort by"
+          },
+          {
+            "in": "query",
+            "name": "sortOrder",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "default": "desc"
+            },
+            "description": "Sort order"
+          },
+          {
+            "in": "query",
+            "name": "page",
+            "schema": {
+              "type": "integer",
+              "default": 1
+            },
+            "description": "Page number"
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "schema": {
+              "type": "integer",
+              "default": 10
+            },
+            "description": "Items per page"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Booking history retrieved successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "example": true
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "quotations": {
+                          "type": "array",
+                          "items": {
+                            "$ref": "#/components/schemas/Quotation"
+                          }
+                        },
+                        "pagination": {
+                          "type": "object",
+                          "properties": {
+                            "currentPage": {
+                              "type": "integer",
+                              "example": 1
+                            },
+                            "totalPages": {
+                              "type": "integer",
+                              "example": 5
+                            },
+                            "totalCount": {
+                              "type": "integer",
+                              "example": 47
+                            },
+                            "hasNextPage": {
+                              "type": "boolean",
+                              "example": true
+                            },
+                            "hasPrevPage": {
+                              "type": "boolean",
+                              "example": false
+                            }
+                          }
+                        },
+                        "customer": {
+                          "type": "object",
+                          "properties": {
+                            "_id": {
+                              "type": "string"
+                            },
+                            "name": {
+                              "type": "string"
+                            },
+                            "email": {
+                              "type": "string"
+                            },
+                            "companyName": {
+                              "type": "string"
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid customer ID"
+          },
+          "403": {
+            "description": "Forbidden - cannot access customer from other business"
+          },
+          "404": {
+            "description": "Customer not found"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        }
+      }
+    },
+    "/quotation/booking-history/vendor/{vendorId}": {
+      "get": {
+        "summary": "Get booking history by vendor",
+        "description": "Retrieve booking history (quotations) for a specific vendor with filtering and pagination options.\n\n**Features:**\n- Filter by status, quotation type, and date ranges\n- Pagination support\n- Sorting options\n- Populated customer, vendor, traveller, and owner details\n\n**Query Parameters:**\n- status: Filter by quotation status (draft, confirmed, cancelled)\n- quotationType: Filter by type (flight, train, hotel, activity, etc.)\n- startDate/endDate: Filter by booking date range\n- travelStartDate/travelEndDate: Filter by travel date range\n- sortBy: Sort field (default: createdAt)\n- sortOrder: Sort direction (asc/desc, default: desc)\n- page: Page number (default: 1)\n- limit: Items per page (default: 10)\n",
+        "tags": [
+          "Quotations"
+        ],
+        "security": [
+          {
+            "karvaanToken": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "vendorId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Vendor ID to get booking history for"
+          },
+          {
+            "in": "query",
+            "name": "status",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "draft",
+                "confirmed",
+                "cancelled"
+              ]
+            },
+            "description": "Filter by quotation status"
+          },
+          {
+            "in": "query",
+            "name": "quotationType",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "flight",
+                "train",
+                "hotel",
+                "activity",
+                "travel",
+                "transport-land",
+                "transport-maritime",
+                "tickets",
+                "travel insurance",
+                "visas",
+                "others"
+              ]
+            },
+            "description": "Filter by quotation type"
+          },
+          {
+            "in": "query",
+            "name": "startDate",
+            "schema": {
+              "type": "string",
+              "format": "date"
+            },
+            "description": "Start date for booking date filter (YYYY-MM-DD)"
+          },
+          {
+            "in": "query",
+            "name": "endDate",
+            "schema": {
+              "type": "string",
+              "format": "date"
+            },
+            "description": "End date for booking date filter (YYYY-MM-DD)"
+          },
+          {
+            "in": "query",
+            "name": "travelStartDate",
+            "schema": {
+              "type": "string",
+              "format": "date"
+            },
+            "description": "Start date for travel date filter (YYYY-MM-DD)"
+          },
+          {
+            "in": "query",
+            "name": "travelEndDate",
+            "schema": {
+              "type": "string",
+              "format": "date"
+            },
+            "description": "End date for travel date filter (YYYY-MM-DD)"
+          },
+          {
+            "in": "query",
+            "name": "sortBy",
+            "schema": {
+              "type": "string",
+              "default": "createdAt"
+            },
+            "description": "Field to sort by"
+          },
+          {
+            "in": "query",
+            "name": "sortOrder",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "default": "desc"
+            },
+            "description": "Sort order"
+          },
+          {
+            "in": "query",
+            "name": "page",
+            "schema": {
+              "type": "integer",
+              "default": 1
+            },
+            "description": "Page number"
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "schema": {
+              "type": "integer",
+              "default": 10
+            },
+            "description": "Items per page"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Booking history retrieved successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "example": true
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "quotations": {
+                          "type": "array",
+                          "items": {
+                            "$ref": "#/components/schemas/Quotation"
+                          }
+                        },
+                        "pagination": {
+                          "type": "object",
+                          "properties": {
+                            "currentPage": {
+                              "type": "integer",
+                              "example": 1
+                            },
+                            "totalPages": {
+                              "type": "integer",
+                              "example": 5
+                            },
+                            "totalCount": {
+                              "type": "integer",
+                              "example": 47
+                            },
+                            "hasNextPage": {
+                              "type": "boolean",
+                              "example": true
+                            },
+                            "hasPrevPage": {
+                              "type": "boolean",
+                              "example": false
+                            }
+                          }
+                        },
+                        "vendor": {
+                          "type": "object",
+                          "properties": {
+                            "_id": {
+                              "type": "string"
+                            },
+                            "companyName": {
+                              "type": "string"
+                            },
+                            "contactPerson": {
+                              "type": "string"
+                            },
+                            "email": {
+                              "type": "string"
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid vendor ID"
+          },
+          "403": {
+            "description": "Forbidden - cannot access vendor from other business"
+          },
+          "404": {
+            "description": "Vendor not found"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        }
+      }
+    },
+    "/quotation/booking-history/traveller/{travellerId}": {
+      "get": {
+        "summary": "Get booking history by traveller",
+        "description": "Retrieve booking history (quotations) for a specific traveller with filtering and pagination options.\nThis endpoint searches for quotations where the traveller is included in the travelers array.\n\n**Features:**\n- Filter by status, quotation type, and date ranges\n- Pagination support\n- Sorting options\n- Populated customer, vendor, traveller, and owner details\n\n**Query Parameters:**\n- status: Filter by quotation status (draft, confirmed, cancelled)\n- quotationType: Filter by type (flight, train, hotel, activity, etc.)\n- startDate/endDate: Filter by booking date range\n- travelStartDate/travelEndDate: Filter by travel date range\n- sortBy: Sort field (default: createdAt)\n- sortOrder: Sort direction (asc/desc, default: desc)\n- page: Page number (default: 1)\n- limit: Items per page (default: 10)\n",
+        "tags": [
+          "Quotations"
+        ],
+        "security": [
+          {
+            "karvaanToken": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "travellerId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Traveller ID to get booking history for"
+          },
+          {
+            "in": "query",
+            "name": "status",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "draft",
+                "confirmed",
+                "cancelled"
+              ]
+            },
+            "description": "Filter by quotation status"
+          },
+          {
+            "in": "query",
+            "name": "quotationType",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "flight",
+                "train",
+                "hotel",
+                "activity",
+                "travel",
+                "transport-land",
+                "transport-maritime",
+                "tickets",
+                "travel insurance",
+                "visas",
+                "others"
+              ]
+            },
+            "description": "Filter by quotation type"
+          },
+          {
+            "in": "query",
+            "name": "startDate",
+            "schema": {
+              "type": "string",
+              "format": "date"
+            },
+            "description": "Start date for booking date filter (YYYY-MM-DD)"
+          },
+          {
+            "in": "query",
+            "name": "endDate",
+            "schema": {
+              "type": "string",
+              "format": "date"
+            },
+            "description": "End date for booking date filter (YYYY-MM-DD)"
+          },
+          {
+            "in": "query",
+            "name": "travelStartDate",
+            "schema": {
+              "type": "string",
+              "format": "date"
+            },
+            "description": "Start date for travel date filter (YYYY-MM-DD)"
+          },
+          {
+            "in": "query",
+            "name": "travelEndDate",
+            "schema": {
+              "type": "string",
+              "format": "date"
+            },
+            "description": "End date for travel date filter (YYYY-MM-DD)"
+          },
+          {
+            "in": "query",
+            "name": "sortBy",
+            "schema": {
+              "type": "string",
+              "default": "createdAt"
+            },
+            "description": "Field to sort by"
+          },
+          {
+            "in": "query",
+            "name": "sortOrder",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "default": "desc"
+            },
+            "description": "Sort order"
+          },
+          {
+            "in": "query",
+            "name": "page",
+            "schema": {
+              "type": "integer",
+              "default": 1
+            },
+            "description": "Page number"
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "schema": {
+              "type": "integer",
+              "default": 10
+            },
+            "description": "Items per page"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Booking history retrieved successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "example": true
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "quotations": {
+                          "type": "array",
+                          "items": {
+                            "$ref": "#/components/schemas/Quotation"
+                          }
+                        },
+                        "pagination": {
+                          "type": "object",
+                          "properties": {
+                            "currentPage": {
+                              "type": "integer",
+                              "example": 1
+                            },
+                            "totalPages": {
+                              "type": "integer",
+                              "example": 5
+                            },
+                            "totalCount": {
+                              "type": "integer",
+                              "example": 47
+                            },
+                            "hasNextPage": {
+                              "type": "boolean",
+                              "example": true
+                            },
+                            "hasPrevPage": {
+                              "type": "boolean",
+                              "example": false
+                            }
+                          }
+                        },
+                        "traveller": {
+                          "type": "object",
+                          "properties": {
+                            "_id": {
+                              "type": "string"
+                            },
+                            "name": {
+                              "type": "string"
+                            },
+                            "email": {
+                              "type": "string"
+                            },
+                            "phone": {
+                              "type": "string"
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid traveller ID"
+          },
+          "403": {
+            "description": "Forbidden - cannot access traveller from other business"
+          },
+          "404": {
+            "description": "Traveller not found"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        }
+      }
+    },
+    "/team/get-all-teams": {
+      "get": {
+        "summary": "Get all team members",
+        "description": "Retrieve all team members with populated role information",
+        "tags": [
+          "Teams"
+        ],
+        "security": [
+          {
+            "karvaanToken": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Teams retrieved successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Team"
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Failed to fetch teams",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/team/get-team/{id}": {
+      "get": {
+        "summary": "Get team member by ID",
+        "description": "Retrieve a specific team member by ID with populated role information",
+        "tags": [
+          "Teams"
+        ],
+        "security": [
+          {
+            "karvaanToken": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Team member ID"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Team member retrieved successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "team": {
+                      "$ref": "#/components/schemas/Team"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Team member not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Failed to fetch team member by ID",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/team/create-team": {
+      "post": {
+        "summary": "Create a new team member",
+        "description": "Create a new team member record",
+        "tags": [
+          "Teams"
+        ],
+        "security": [
+          {
+            "karvaanToken": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "name",
+                  "email",
+                  "phone",
+                  "roleId"
+                ],
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "example": "Alice Brown"
+                  },
+                  "email": {
+                    "type": "string",
+                    "format": "email",
+                    "example": "alice.brown@cooncierge.com"
+                  },
+                  "phone": {
+                    "type": "string",
+                    "example": "+1234567890"
+                  },
+                  "address": {
+                    "type": "string",
+                    "example": "789 Office St, City, State"
+                  },
+                  "roleId": {
+                    "type": "string",
+                    "example": "507f1f77bcf86cd799439012"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Team member created successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "team": {
+                      "$ref": "#/components/schemas/Team"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Failed to create team member",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/team/update-team/{id}": {
+      "put": {
+        "summary": "Update a team member",
+        "description": "Update an existing team member by ID",
+        "tags": [
+          "Teams"
+        ],
+        "security": [
+          {
+            "karvaanToken": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Team member ID to update"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string"
+                  },
+                  "email": {
+                    "type": "string",
+                    "format": "email"
+                  },
+                  "phone": {
+                    "type": "string"
+                  },
+                  "address": {
+                    "type": "string"
+                  },
+                  "roleId": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Team member updated successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "team": {
+                      "$ref": "#/components/schemas/Team"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Team member not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Failed to update team member",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/team/delete-team/{id}": {
+      "delete": {
+        "summary": "Delete a team member",
+        "description": "Delete a team member by ID",
+        "tags": [
+          "Teams"
+        ],
+        "security": [
+          {
+            "karvaanToken": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Team member ID to delete"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Team member deleted successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "example": "Team deleted"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Team member not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Failed to delete team member",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/traveller/get-traveller/{id}": {
+      "get": {
+        "summary": "Get traveller by ID",
+        "description": "Retrieve a specific traveller by their ID",
+        "tags": [
+          "Travellers"
+        ],
+        "security": [
+          {
+            "karvaanToken": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Traveller ID"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Traveller retrieved successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TravellerResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Traveller not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Failed to fetch traveller",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/traveller/create-traveller": {
+      "post": {
+        "summary": "Create a new traveller",
+        "description": "Create a new traveller record",
+        "tags": [
+          "Travellers"
+        ],
+        "security": [
+          {
+            "karvaanToken": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "name"
+                ],
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "description": "Full name of the traveller"
+                  },
+                  "email": {
+                    "type": "string",
+                    "format": "email",
+                    "description": "Email address"
+                  },
+                  "phone": {
+                    "type": "string",
+                    "description": "Phone number"
+                  },
+                  "passportNumber": {
+                    "type": "string",
+                    "description": "Passport number"
+                  },
+                  "passportExpiry": {
+                    "type": "string",
+                    "format": "date",
+                    "description": "Passport expiry date"
+                  },
+                  "nationality": {
+                    "type": "string",
+                    "description": "Nationality"
+                  },
+                  "dateOfBirth": {
+                    "type": "string",
+                    "format": "date",
+                    "description": "Date of birth"
+                  },
+                  "gender": {
+                    "type": "string",
+                    "enum": [
+                      "male",
+                      "female",
+                      "other"
+                    ],
+                    "description": "Gender"
+                  },
+                  "address": {
+                    "type": "string",
+                    "description": "Address"
+                  },
+                  "emergencyContact": {
+                    "type": "object",
+                    "properties": {
+                      "name": {
+                        "type": "string",
+                        "description": "Emergency contact name"
+                      },
+                      "phone": {
+                        "type": "string",
+                        "description": "Emergency contact phone"
+                      },
+                      "relationship": {
+                        "type": "string",
+                        "description": "Relationship to traveller"
+                      }
+                    }
+                  },
+                  "customerId": {
+                    "type": "string",
+                    "description": "Associated customer ID"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Traveller created successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TravellerResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid input data",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Failed to create traveller",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/traveller/update-traveller/{id}": {
+      "put": {
+        "summary": "Update traveller",
+        "description": "Update an existing traveller record",
+        "tags": [
+          "Travellers"
+        ],
+        "security": [
+          {
+            "karvaanToken": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Traveller ID"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "description": "Full name of the traveller"
+                  },
+                  "email": {
+                    "type": "string",
+                    "format": "email",
+                    "description": "Email address"
+                  },
+                  "phone": {
+                    "type": "string",
+                    "description": "Phone number"
+                  },
+                  "passportNumber": {
+                    "type": "string",
+                    "description": "Passport number"
+                  },
+                  "passportExpiry": {
+                    "type": "string",
+                    "format": "date",
+                    "description": "Passport expiry date"
+                  },
+                  "nationality": {
+                    "type": "string",
+                    "description": "Nationality"
+                  },
+                  "dateOfBirth": {
+                    "type": "string",
+                    "format": "date",
+                    "description": "Date of birth"
+                  },
+                  "gender": {
+                    "type": "string",
+                    "enum": [
+                      "male",
+                      "female",
+                      "other"
+                    ],
+                    "description": "Gender"
+                  },
+                  "address": {
+                    "type": "string",
+                    "description": "Address"
+                  },
+                  "emergencyContact": {
+                    "type": "object",
+                    "properties": {
+                      "name": {
+                        "type": "string",
+                        "description": "Emergency contact name"
+                      },
+                      "phone": {
+                        "type": "string",
+                        "description": "Emergency contact phone"
+                      },
+                      "relationship": {
+                        "type": "string",
+                        "description": "Relationship to traveller"
+                      }
+                    }
+                  },
+                  "customerId": {
+                    "type": "string",
+                    "description": "Associated customer ID"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Traveller updated successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TravellerResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Traveller not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Failed to update traveller",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/traveller/delete-traveller/{id}": {
+      "delete": {
+        "summary": "Delete traveller (soft delete)",
+        "description": "Soft delete a traveller by setting isDeleted to true",
+        "tags": [
+          "Travellers"
+        ],
+        "security": [
+          {
+            "karvaanToken": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Traveller ID"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Traveller deleted successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "traveller": {
+                      "type": "object",
+                      "properties": {
+                        "_id": {
+                          "type": "string"
+                        },
+                        "name": {
+                          "type": "string"
+                        },
+                        "isDeleted": {
+                          "type": "boolean"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Traveller not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Failed to delete traveller",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/traveller/restore-traveller/{id}": {
+      "patch": {
+        "summary": "Restore traveller",
+        "description": "Restore a soft-deleted traveller by setting isDeleted to false",
+        "tags": [
+          "Travellers"
+        ],
+        "security": [
+          {
+            "karvaanToken": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Traveller ID"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Traveller restored successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TravellerResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Traveller not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Failed to restore traveller",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/vendor/get-all-vendors": {
+      "get": {
+        "summary": "Get all vendors",
+        "description": "Retrieve all vendors",
+        "tags": [
+          "Vendors"
+        ],
+        "security": [
+          {
+            "karvaanToken": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Vendors retrieved successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "vendors": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Vendor"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Failed to fetch vendors",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/vendor/get-vendor/{id}": {
+      "get": {
+        "summary": "Get vendor by ID",
+        "description": "Retrieve a specific vendor by ID",
+        "tags": [
+          "Vendors"
+        ],
+        "security": [
+          {
+            "karvaanToken": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Vendor ID"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Vendor retrieved successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "vendor": {
+                      "$ref": "#/components/schemas/Vendor"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Vendor not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Failed to fetch vendor by ID",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/vendor/create-vendor": {
+      "post": {
+        "summary": "Create a new vendor",
+        "description": "Create a new vendor record",
+        "tags": [
+          "Vendors"
+        ],
+        "security": [
+          {
+            "karvaanToken": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "companyName",
+                  "contactPerson",
+                  "email",
+                  "phone"
+                ],
+                "properties": {
+                  "companyName": {
+                    "type": "string",
+                    "example": "ABC Travel Services"
+                  },
+                  "contactPerson": {
+                    "type": "string",
+                    "example": "Bob Johnson"
+                  },
+                  "email": {
+                    "type": "string",
+                    "format": "email",
+                    "example": "contact@abctravel.com"
+                  },
+                  "phone": {
+                    "type": "string",
+                    "example": "+1234567890"
+                  },
+                  "GSTIN": {
+                    "type": "string",
+                    "example": "22AAAAA0000A1Z5"
+                  },
+                  "address": {
+                    "type": "string",
+                    "example": "456 Business Ave, City, State"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Vendor created successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "vendor": {
+                      "$ref": "#/components/schemas/Vendor"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Failed to create vendor",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/vendor/update-vendor/{id}": {
+      "put": {
+        "summary": "Update a vendor",
+        "description": "Update an existing vendor by ID",
+        "tags": [
+          "Vendors"
+        ],
+        "security": [
+          {
+            "karvaanToken": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Vendor ID to update"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "companyName": {
+                    "type": "string"
+                  },
+                  "contactPerson": {
+                    "type": "string"
+                  },
+                  "email": {
+                    "type": "string",
+                    "format": "email"
+                  },
+                  "phone": {
+                    "type": "string"
+                  },
+                  "GSTIN": {
+                    "type": "string"
+                  },
+                  "address": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Vendor updated successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "vendor": {
+                      "$ref": "#/components/schemas/Vendor"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Vendor not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Failed to update vendor",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/vendor/delete-vendor/{id}": {
+      "delete": {
+        "summary": "Delete a vendor",
+        "description": "Delete a vendor by ID",
+        "tags": [
+          "Vendors"
+        ],
+        "security": [
+          {
+            "karvaanToken": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Vendor ID to delete"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Vendor deleted successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "example": "Vendor deleted"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Vendor not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Failed to delete vendor",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {},
+  "tags": [
+    {
+      "name": "Authentication",
+      "description": "User authentication and authorization endpoints"
+    },
+    {
+      "name": "Business",
+      "description": "Business management endpoints"
+    },
+    {
+      "name": "Customers",
+      "description": "Customer management endpoints"
+    },
+    {
+      "name": "Logs",
+      "description": "Task logging and dashboard endpoints"
+    },
+    {
+      "name": "Quotations",
+      "description": "Quotation management endpoints"
+    },
+    {
+      "name": "Teams",
+      "description": "Team management endpoints"
+    },
+    {
+      "name": "Travellers",
+      "description": "Traveller management endpoints"
+    },
+    {
+      "name": "Vendors",
+      "description": "Vendor management endpoints"
+    }
+  ]
+}

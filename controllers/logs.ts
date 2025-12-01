@@ -51,13 +51,7 @@ export const createLog = async (req: Request, res: Response) => {
 
 export const updateLog = async (req: Request, res: Response): Promise<void> => {
   try {
-    const { id } = req.params;
-
-    // Build filter based on user type
-    const filter: any = { _id: id };
-    if (req.user?.userType !== 'super_admin') {
-      filter.businessId = req.user?.businessId;
-    }
+    const { logId } = req.params;
 
     // Don't allow updating businessId through this endpoint
     const updateData = { ...req.body };
@@ -71,12 +65,14 @@ export const updateLog = async (req: Request, res: Response): Promise<void> => {
 
     delete updateData.businessId;
 
-    const log = await Logs.findOneAndUpdate(filter, updateData, { new: true })
+    const log = await Logs.findByIdAndUpdate(logId, updateData, { new: true })
       .populate('userId assignedBy')
       .populate({
         path: 'businessId',
         select: 'businessName businessType',
       });
+
+    console.log('Log updated:', log);
 
     if (!log) {
      res.status(404).json({ success: false, message: 'Log not found' });
