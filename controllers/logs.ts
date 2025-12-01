@@ -408,10 +408,7 @@ export const getLogsByBookingId = async (req: Request, res: Response): Promise<v
         path: 'businessId',
         select: 'businessName businessType',
       })
-      .populate({
-        path: 'bookingId',
-        select: 'bookingNumber customerName status',
-      })
+      // Skipping bookingId populate as Booking model is not registered
       .sort({ dateTime: -1 });
 
     if (!logs || logs.length === 0) {
