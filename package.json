@@ -28,7 +28,9 @@
     "test-swagger-docs": "npx ts-node scripts/test-swagger-documentation.ts",
     "create-quotation-dummy-data": "npx ts-node scripts/create-quotation-dummy-data.ts",
     "verify-quotation-data": "npx ts-node scripts/verify-quotation-data.ts",
-    "test-is-deletable": "npx ts-node scripts/test-is-deletable-database.ts"
+    "test-is-deletable": "npx ts-node scripts/test-is-deletable-database.ts",
+    "test-team-booking-history": "npx ts-node scripts/test-team-member-booking-history.ts",
+    "test-team-booking-api": "npx ts-node scripts/test-team-member-booking-api.ts"
   },
   "author": "Google LLC",
   "license": "Apache-2.0",

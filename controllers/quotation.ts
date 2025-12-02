@@ -3,9 +3,10 @@ import Quotation from '../models/Quotation';
 import Customer from '../models/Customer';
 import Vendor from '../models/Vendors';
 import Traveller from '../models/Traveller';
+import Team from '../models/Team';
 import mongoose from 'mongoose';
 
-export const createQuotation = async (req: Request, res: Response) => {
+export const createQuotation = async (req: Request, res: Response): Promise<void> => {
   try {
     const quotationData = { ...req.body };
 
@@ -25,7 +26,7 @@ export const createQuotation = async (req: Request, res: Response) => {
     }
 
     if (!party) {
-      return res.status(404).json({
+      res.status(404).json({
         success: false,
         message: `${quotationData.partyModel} not found`
       });
@@ -33,7 +34,7 @@ export const createQuotation = async (req: Request, res: Response) => {
 
     // Verify user can access this party's business
     if (req.user?.userType !== 'super_admin' && party.businessId.toString() !== req.user?.businessId?.toString()) {
-      return res.status(403).json({
+      res.status(403).json({
         success: false,
         message: 'Forbidden: Cannot create quotation for other business'
       });
@@ -569,6 +570,134 @@ export const getBookingHistoryByTraveller = async (req: Request, res: Response):
 
   } catch (error) {
     console.error('Error fetching booking history by traveller:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Internal server error while fetching booking history',
+      error: error instanceof Error ? error.message : 'Unknown error'
+    });
+  }
+};
+
+// Get booking history by team member ID (owner)
+export const getBookingHistoryByTeamMember = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { teamMemberId } = req.params;
+    const {
+      status,
+      quotationType,
+      startDate,
+      endDate,
+      travelStartDate,
+      travelEndDate,
+      sortBy = 'createdAt',
+      sortOrder = 'desc',
+      page = 1,
+      limit = 10
+    } = req.query;
+
+    // Validate team member ID
+    if (!mongoose.Types.ObjectId.isValid(teamMemberId)) {
+      res.status(400).json({
+        success: false,
+        message: 'Invalid team member ID'
+      });
+      return;
+    }
+
+    // Verify team member exists and belongs to user's business
+    const teamMember = await Team.findById(teamMemberId);
+    if (!teamMember) {
+      res.status(404).json({
+        success: false,
+        message: 'Team member not found'
+      });
+      return;
+    }
+
+    // Check business access
+    if (req.user?.userType !== 'super_admin' && teamMember.businessId.toString() !== req.user?.businessInfo?.businessId?.toString()) {
+      res.status(403).json({
+        success: false,
+        message: 'Forbidden: Cannot access team member from other business'
+      });
+      return;
+    }
+
+    // Build query filter - search for quotations where this team member is in the owner array
+    const filter: any = {
+      owner: teamMemberId,
+      businessId: teamMember.businessId
+    };
+
+    // Add optional filters
+    if (status) {
+      filter.status = status;
+    }
+
+    if (quotationType) {
+      filter.quotationType = quotationType;
+    }
+
+    // Date filters for booking date (createdAt)
+    if (startDate || endDate) {
+      filter.createdAt = {};
+      if (startDate) filter.createdAt.$gte = new Date(startDate as string);
+      if (endDate) filter.createdAt.$lte = new Date(endDate as string);
+    }
+
+    // Date filters for travel date
+    if (travelStartDate || travelEndDate) {
+      filter.travelDate = {};
+      if (travelStartDate) filter.travelDate.$gte = new Date(travelStartDate as string);
+      if (travelEndDate) filter.travelDate.$lte = new Date(travelEndDate as string);
+    }
+
+    // Pagination
+    const pageNum = parseInt(page as string);
+    const limitNum = parseInt(limit as string);
+    const skip = (pageNum - 1) * limitNum;
+
+    // Sort configuration
+    const sortConfig: any = {};
+    sortConfig[sortBy as string] = sortOrder === 'asc' ? 1 : -1;
+
+    // Get quotations with population
+    const quotations = await Quotation.find(filter)
+      .populate('customerId', 'name email phone companyName')
+      .populate('vendorId', 'companyName contactPerson email phone')
+      .populate('travelers', 'name email phone')
+      .populate('owner', 'name email')
+      .populate('businessId', 'businessName')
+      .sort(sortConfig)
+      .skip(skip)
+      .limit(limitNum);
+
+    // Get total count for pagination
+    const totalCount = await Quotation.countDocuments(filter);
+    const totalPages = Math.ceil(totalCount / limitNum);
+
+    res.status(200).json({
+      success: true,
+      data: {
+        quotations,
+        pagination: {
+          currentPage: pageNum,
+          totalPages,
+          totalCount,
+          hasNextPage: pageNum < totalPages,
+          hasPrevPage: pageNum > 1
+        },
+        teamMember: {
+          _id: teamMember._id,
+          name: teamMember.name,
+          email: teamMember.email,
+          phone: teamMember.phone
+        }
+      }
+    });
+
+  } catch (error) {
+    console.error('Error fetching booking history by team member:', error);
     res.status(500).json({
       success: false,
       message: 'Internal server error while fetching booking history',

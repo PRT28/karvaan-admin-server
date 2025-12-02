@@ -7,7 +7,8 @@ import {
     getQuotationById,
     getBookingHistoryByCustomer,
     getBookingHistoryByVendor,
-    getBookingHistoryByTraveller
+    getBookingHistoryByTraveller,
+    getBookingHistoryByTeamMember
 } from '../controllers/quotation';
 
 import express from 'express';
@@ -202,7 +203,7 @@ router.get('/get-quotations-by-party/:id', getQuotationsByParty);
  *               $ref: '#/components/schemas/ErrorResponse'
  */
 // TODO: Fix TypeScript issue with createQuotation function
-// router.post('/create-quotation', createQuotation);
+router.post('/create-quotation', createQuotation);
 
 /**
  * @swagger
@@ -772,5 +773,147 @@ router.get('/booking-history/vendor/:vendorId', getBookingHistoryByVendor);
  *         description: Internal server error
  */
 router.get('/booking-history/traveller/:travellerId', getBookingHistoryByTraveller);
+
+/**
+ * @swagger
+ * /quotation/booking-history/team-member/{teamMemberId}:
+ *   get:
+ *     summary: Get booking history by team member
+ *     description: |
+ *       Retrieve booking history (quotations) for a specific team member based on their ownership.
+ *       This endpoint searches for quotations where the team member is included in the owner array.
+ *
+ *       **Features:**
+ *       - Business-scoped access control
+ *       - Advanced filtering by status, quotation type, and date ranges
+ *       - Pagination support with configurable page size
+ *       - Flexible sorting options
+ *       - Complete data population for related entities
+ *
+ *       **Query Parameters:**
+ *       - `status`: Filter by quotation status (draft, confirmed, cancelled)
+ *       - `quotationType`: Filter by quotation type (flight, hotel, train, etc.)
+ *       - `startDate` & `endDate`: Filter by booking date range (createdAt)
+ *       - `travelStartDate` & `travelEndDate`: Filter by travel date range
+ *       - `sortBy`: Sort field (default: createdAt)
+ *       - `sortOrder`: Sort direction - asc or desc (default: desc)
+ *       - `page`: Page number for pagination (default: 1)
+ *       - `limit`: Number of records per page (default: 10)
+ *     tags: [Quotation]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: teamMemberId
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: objectId
+ *         description: The ID of the team member to get booking history for
+ *       - in: query
+ *         name: status
+ *         schema:
+ *           type: string
+ *           enum: [draft, confirmed, cancelled]
+ *         description: Filter quotations by status
+ *       - in: query
+ *         name: quotationType
+ *         schema:
+ *           type: string
+ *           enum: [flight, train, hotel, activity, travel, transport-land, transport-maritime, tickets, travel insurance, visas, others]
+ *         description: Filter quotations by type
+ *       - in: query
+ *         name: startDate
+ *         schema:
+ *           type: string
+ *           format: date
+ *         description: Filter quotations created on or after this date
+ *       - in: query
+ *         name: endDate
+ *         schema:
+ *           type: string
+ *           format: date
+ *         description: Filter quotations created on or before this date
+ *       - in: query
+ *         name: travelStartDate
+ *         schema:
+ *           type: string
+ *           format: date
+ *         description: Filter quotations with travel date on or after this date
+ *       - in: query
+ *         name: travelEndDate
+ *         schema:
+ *           type: string
+ *           format: date
+ *         description: Filter quotations with travel date on or before this date
+ *       - in: query
+ *         name: sortBy
+ *         schema:
+ *           type: string
+ *           default: createdAt
+ *         description: Field to sort by
+ *       - in: query
+ *         name: sortOrder
+ *         schema:
+ *           type: string
+ *           enum: [asc, desc]
+ *           default: desc
+ *         description: Sort order
+ *       - in: query
+ *         name: page
+ *         schema:
+ *           type: integer
+ *           minimum: 1
+ *           default: 1
+ *         description: Page number for pagination
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *           minimum: 1
+ *           maximum: 100
+ *           default: 10
+ *         description: Number of records per page
+ *     responses:
+ *       200:
+ *         description: Team member booking history retrieved successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     quotations:
+ *                       type: array
+ *                       items:
+ *                         $ref: '#/components/schemas/Quotation'
+ *                     pagination:
+ *                       $ref: '#/components/schemas/PaginationResponse'
+ *                     teamMember:
+ *                       type: object
+ *                       properties:
+ *                         _id:
+ *                           type: string
+ *                         name:
+ *                           type: string
+ *                         email:
+ *                           type: string
+ *                         phone:
+ *                           type: string
+ *       400:
+ *         description: Invalid team member ID
+ *       403:
+ *         description: Forbidden - Cannot access team member from other business
+ *       404:
+ *         description: Team member not found
+ *       500:
+ *         description: Internal server error
+ */
+router.get('/booking-history/team-member/:teamMemberId', getBookingHistoryByTeamMember);
 
 export default router;
