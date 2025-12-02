@@ -359,7 +359,7 @@ export const getBookingHistoryByVendor = async (req: Request, res: Response): Pr
     }
 
     // Check business access
-    if (req.user?.userType !== 'super_admin' && vendor.businessId.toString() !== req.user?.businessId?.toString()) {
+    if (req.user?.userType !== 'super_admin' && vendor.businessId.toString() !== req.user?.businessInfo?.businessId?.toString()) {
       res.status(403).json({
         success: false,
         message: 'Forbidden: Cannot access vendor from other business'
@@ -487,7 +487,7 @@ export const getBookingHistoryByTraveller = async (req: Request, res: Response):
     }
 
     // Check business access
-    if (req.user?.userType !== 'super_admin' && traveller.businessId.toString() !== req.user?.businessId?.toString()) {
+    if (req.user?.userType !== 'super_admin' && traveller.businessId.toString() !== req.user?.businessInfo?.businessId?.toString()) {
       res.status(403).json({
         success: false,
         message: 'Forbidden: Cannot access traveller from other business'

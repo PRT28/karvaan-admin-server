@@ -88,7 +88,9 @@ export const updateLog = async (req: Request, res: Response): Promise<void> => {
 
 export const updateLogStatus = async (req: Request, res: Response): Promise<void> => {
   try {
-    const { id } = req.params;
+    // Support both :logId (route) and legacy :id without changing other logic
+    const { id, logId } = req.params as { id?: string; logId?: string };
+    const targetId = logId || id; // prefer logId from current route definition
     const { status } = req.body;
 
     if (!['Pending', 'Completed', 'On Hold', 'In Progress'].includes(status)) {
@@ -96,11 +98,12 @@ export const updateLogStatus = async (req: Request, res: Response): Promise<void
     } else {
       // Build filter based on user type
       const filter: any = { _id: id };
+      if (targetId) filter._id = targetId; // ensure we use correct id
       if (req.user?.userType !== 'super_admin') {
         filter.businessId = req.user?.businessId;
       }
 
-      const log = await Logs.findById(id);
+      const log = await Logs.findById(targetId);
 
       if (!log) {
       res.status(404).json({ success: false, message: 'Log not found' });
