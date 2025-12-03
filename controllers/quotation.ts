@@ -291,6 +291,10 @@ export const getAllQuotations = async (req: Request, res: Response) => {
         path: 'businessId',
         select: 'businessName businessType',
       })
+      .populate('customerId', 'name email phone companyName')
+      .populate('vendorId', 'companyName contactPerson email phone')
+      .populate('travelers', 'name email phone')
+      .populate('owner', 'name email')
       .sort({ createdAt: -1 });
 
     res.status(200).json({ success: true, quotations });
