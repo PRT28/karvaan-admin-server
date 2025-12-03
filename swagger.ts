@@ -751,7 +751,7 @@ const options = {
             },
             status: {
               type: 'string',
-              enum: ['draft', 'confirmed', 'cancelled'],
+              enum: ['pending', 'confirmed', 'cancelled'],
               description: 'Quotation status',
               example: 'confirmed',
             },
@@ -783,6 +783,11 @@ const options = {
               type: 'string',
               description: 'Additional remarks or notes',
               example: 'Business trip with special requirements',
+            },
+            isDeleted: {
+              type: 'boolean',
+              description: 'Soft delete flag',
+              example: false,
             },
             createdAt: {
               type: 'string',

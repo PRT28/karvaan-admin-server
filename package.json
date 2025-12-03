@@ -30,7 +30,8 @@
     "verify-quotation-data": "npx ts-node scripts/verify-quotation-data.ts",
     "test-is-deletable": "npx ts-node scripts/test-is-deletable-database.ts",
     "test-team-booking-history": "npx ts-node scripts/test-team-member-booking-history.ts",
-    "test-team-booking-api": "npx ts-node scripts/test-team-member-booking-api.ts"
+    "test-team-booking-api": "npx ts-node scripts/test-team-member-booking-api.ts",
+    "test-create-quotation": "npx ts-node scripts/test-create-quotation-fix.ts"
   },
   "author": "Google LLC",
   "license": "Apache-2.0",

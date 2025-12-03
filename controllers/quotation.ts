@@ -10,44 +10,183 @@ export const createQuotation = async (req: Request, res: Response): Promise<void
   try {
     const quotationData = { ...req.body };
 
-    // Set partyModel based on channel
-    if (quotationData.channel === 'B2B') {
-      quotationData.partyModel = 'Vendor';
-    } else if (quotationData.channel === 'B2C') {
-      quotationData.partyModel = 'Customer';
+    console.log('📝 Creating quotation with payload:', JSON.stringify(quotationData, null, 2));
+
+    // Validate required fields
+    if (!quotationData.quotationType || !quotationData.channel) {
+      res.status(400).json({
+        success: false,
+        message: 'Missing required fields: quotationType and channel are required'
+      });
+      return;
     }
+
+    if (!quotationData.formFields) {
+      res.status(400).json({
+        success: false,
+        message: 'formFields is required'
+      });
+      return;
+    }
+
+    if (quotationData.totalAmount === undefined || quotationData.totalAmount === null) {
+      res.status(400).json({
+        success: false,
+        message: 'totalAmount is required'
+      });
+      return;
+    }
+
+    if (!quotationData.owner || !Array.isArray(quotationData.owner) || quotationData.owner.length === 0) {
+      res.status(400).json({
+        success: false,
+        message: 'owner array with at least one team member ID is required'
+      });
+      return;
+    }
+
+    if (!quotationData.travelDate) {
+      res.status(400).json({
+        success: false,
+        message: 'travelDate is required'
+      });
+      return;
+    }
+
+    // Determine party ID and model based on channel
+    let partyId: string;
+    let partyModel: string;
+
+    if (quotationData.channel === 'B2B') {
+      partyModel = 'Vendor';
+      partyId = quotationData.vendorId;
+      if (!partyId) {
+        res.status(400).json({
+          success: false,
+          message: 'vendorId is required for B2B quotations'
+        });
+        return;
+      }
+    } else if (quotationData.channel === 'B2C') {
+      partyModel = 'Customer';
+      partyId = quotationData.customerId;
+      if (!partyId) {
+        res.status(400).json({
+          success: false,
+          message: 'customerId is required for B2C quotations'
+        });
+        return;
+      }
+    } else {
+      res.status(400).json({
+        success: false,
+        message: 'Invalid channel. Must be B2B or B2C'
+      });
+      return;
+    }
+
+    console.log(`🔍 Looking up ${partyModel} with ID: ${partyId}`);
 
     // Get party to determine businessId
     let party: any;
-    if (quotationData.partyModel === 'Customer') {
-      party = await Customer.findById(quotationData.businessId);
+    if (partyModel === 'Customer') {
+      party = await Customer.findById(partyId);
     } else {
-      party = await Vendor.findById(quotationData.businessId);
+      party = await Vendor.findById(partyId);
     }
 
     if (!party) {
       res.status(404).json({
         success: false,
-        message: `${quotationData.partyModel} not found`
+        message: `${partyModel} not found with ID: ${partyId}`
       });
+      return;
     }
 
+    console.log(`✅ Found ${partyModel}:`, party.name || party.companyName, 'Business:', party.businessId);
+
     // Verify user can access this party's business
-    if (req.user?.userType !== 'super_admin' && party.businessId.toString() !== req.user?.businessId?.toString()) {
+    if (req.user?.userType !== 'super_admin' && party.businessId.toString() !== req.user?.businessInfo?.businessId?.toString()) {
       res.status(403).json({
         success: false,
         message: 'Forbidden: Cannot create quotation for other business'
       });
+      return;
     }
 
     // Add businessId to quotation data
     quotationData.businessId = party.businessId;
 
+    // Validate and convert travelDate if provided as string
+    if (typeof quotationData.travelDate === 'string') {
+      const travelDate = new Date(quotationData.travelDate);
+      if (isNaN(travelDate.getTime())) {
+        res.status(400).json({
+          success: false,
+          message: 'Invalid travelDate format. Please provide a valid date.'
+        });
+        return;
+      }
+      quotationData.travelDate = travelDate;
+    }
+
+    // Ensure totalAmount is a number
+    quotationData.totalAmount = Number(quotationData.totalAmount);
+    if (isNaN(quotationData.totalAmount)) {
+      res.status(400).json({
+        success: false,
+        message: 'totalAmount must be a valid number'
+      });
+      return;
+    }
+
+    // Validate owner array (team members)
+    if (quotationData.owner && quotationData.owner.length > 0) {
+      const validOwners = await Team.find({
+        _id: { $in: quotationData.owner },
+        businessId: party.businessId
+      });
+
+      if (validOwners.length !== quotationData.owner.length) {
+        res.status(400).json({
+          success: false,
+          message: 'One or more owner team member IDs are invalid or from different business'
+        });
+        return;
+      }
+    }
+
+    // Validate travelers array if provided
+    if (quotationData.travelers && quotationData.travelers.length > 0) {
+      const validTravelers = await Traveller.find({
+        _id: { $in: quotationData.travelers },
+        businessId: party.businessId
+      });
+
+      if (validTravelers.length !== quotationData.travelers.length) {
+        res.status(400).json({
+          success: false,
+          message: 'One or more traveler IDs are invalid or from different business'
+        });
+        return;
+      }
+    }
+
+    console.log('💾 Creating quotation with validated data...');
+
     const newQuotation = new Quotation(quotationData);
     await newQuotation.save();
+
+    console.log('✅ Quotation created successfully:', newQuotation.customId);
+
     res.status(201).json({ success: true, quotation: newQuotation });
   } catch (err) {
-    res.status(500).json({ success: false, message: 'Failed to create quotation', error: (err as Error).message });
+    console.error('❌ Error creating quotation:', err);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to create quotation',
+      error: (err as Error).message
+    });
   }
 };
 
@@ -58,7 +197,7 @@ export const updateQuotation = async (req: Request, res: Response): Promise<void
     // Build filter based on user type
     const filter: any = { _id: id };
     if (req.user?.userType !== 'super_admin') {
-      filter.businessId = req.user?.businessId;
+      filter.businessId = req.user?.businessInfo?.businessId;
     }
 
     // Don't allow updating businessId through this endpoint
@@ -87,15 +226,21 @@ export const deleteQuotation = async (req: Request, res: Response): Promise<void
     const { id } = req.params;
 
     // Build filter based on user type
-    const filter: any = { _id: id };
+    const filter: any = { _id: id, isDeleted: false };
     if (req.user?.userType !== 'super_admin') {
-      filter.businessId = req.user?.businessId;
+      filter.businessId = req.user?.businessInfo?.businessId;
     }
 
-    const deleted = await Quotation.findOneAndDelete(filter);
+    // Soft delete - set isDeleted to true instead of removing the document
+    const deleted = await Quotation.findOneAndUpdate(
+      filter,
+      { isDeleted: true },
+      { new: true }
+    );
+
     if (!deleted) {
       res.status(404).json({ success: false, message: 'Quotation not found' });
-      return
+      return;
     }
     res.status(200).json({ success: true, message: 'Quotation deleted successfully' });
   } catch (err) {
@@ -105,13 +250,17 @@ export const deleteQuotation = async (req: Request, res: Response): Promise<void
 
 export const getAllQuotations = async (req: Request, res: Response) => {
   try {
-    const { bookingStartDate, bookingEndDate, travelStartDate, travelEndDate, owner } = req.query;
+    const { bookingStartDate, bookingEndDate, travelStartDate, travelEndDate, owner, includeDeleted } = req.query;
 
-    // Build business filter
+    // Build business filter - exclude deleted quotations by default
     const businessFilter: any = {};
+    if (includeDeleted !== 'true') {
+      businessFilter.isDeleted = { $ne: true };
+    }
+
     console.log(req.user);
     if (req.user?.userType !== 'super_admin') {
-      businessFilter.businessId = req.user?.businessId;
+      businessFilter.businessId = req.user?.businessInfo?.businessId;
     }
 
     // Build date filter
@@ -159,7 +308,8 @@ export const getQuotationById = async (req: Request, res: Response) => {
       return;
     }
 
-    const quotation = await Quotation.findById(id).populate('businessId');
+    // Exclude deleted quotations
+    const quotation = await Quotation.findOne({ _id: id, isDeleted: { $ne: true } }).populate('businessId');
 
     if (!quotation) {
       res.status(404).json({ success: false, message: 'Quotation not found' });
@@ -239,10 +389,11 @@ export const getBookingHistoryByCustomer = async (req: Request, res: Response): 
       return;
     }
 
-    // Build query filter
+    // Build query filter - exclude deleted quotations
     const filter: any = {
       customerId: customerId,
-      businessId: customer.businessId
+      businessId: customer.businessId,
+      isDeleted: { $ne: true }
     };
 
     // Add optional filters
@@ -367,10 +518,11 @@ export const getBookingHistoryByVendor = async (req: Request, res: Response): Pr
       return;
     }
 
-    // Build query filter
+    // Build query filter - exclude deleted quotations
     const filter: any = {
       vendorId: vendorId,
-      businessId: vendor.businessId
+      businessId: vendor.businessId,
+      isDeleted: { $ne: true }
     };
 
     // Add optional filters
@@ -495,10 +647,11 @@ export const getBookingHistoryByTraveller = async (req: Request, res: Response):
       return;
     }
 
-    // Build query filter - search in travelers array
+    // Build query filter - search in travelers array, exclude deleted quotations
     const filter: any = {
       travelers: { $in: [travellerId] },
-      businessId: traveller.businessId
+      businessId: traveller.businessId,
+      isDeleted: { $ne: true }
     };
 
     // Add optional filters
@@ -623,10 +776,11 @@ export const getBookingHistoryByTeamMember = async (req: Request, res: Response)
       return;
     }
 
-    // Build query filter - search for quotations where this team member is in the owner array
+    // Build query filter - search for quotations where this team member is in the owner array, exclude deleted
     const filter: any = {
       owner: teamMemberId,
-      businessId: teamMember.businessId
+      businessId: teamMember.businessId,
+      isDeleted: { $ne: true }
     };
 
     // Add optional filters

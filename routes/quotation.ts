@@ -180,8 +180,8 @@ router.get('/get-quotations-by-party/:id', getQuotationsByParty);
  *                 example: 1500.00
  *               status:
  *                 type: string
- *                 enum: [draft, confirmed, cancelled]
- *                 default: "draft"
+ *                 enum: [pending, confirmed, cancelled]
+ *                 default: "pending"
  *     responses:
  *       201:
  *         description: Quotation created successfully
@@ -243,7 +243,7 @@ router.post('/create-quotation', createQuotation);
  *                 type: number
  *               status:
  *                 type: string
- *                 enum: [draft, confirmed, cancelled]
+ *                 enum: [pending, confirmed, cancelled]
  *     responses:
  *       200:
  *         description: Quotation updated successfully
@@ -354,7 +354,7 @@ router.delete('/delete-quotation/:id', deleteQuotation);
  *         name: status
  *         schema:
  *           type: string
- *           enum: [draft, confirmed, cancelled]
+ *           enum: [pending, confirmed, cancelled]
  *         description: Filter by quotation status
  *       - in: query
  *         name: quotationType
@@ -506,7 +506,7 @@ router.get('/booking-history/customer/:customerId', getBookingHistoryByCustomer)
  *         name: status
  *         schema:
  *           type: string
- *           enum: [draft, confirmed, cancelled]
+ *           enum: [pending, confirmed, cancelled]
  *         description: Filter by quotation status
  *       - in: query
  *         name: quotationType
@@ -659,7 +659,7 @@ router.get('/booking-history/vendor/:vendorId', getBookingHistoryByVendor);
  *         name: status
  *         schema:
  *           type: string
- *           enum: [draft, confirmed, cancelled]
+ *           enum: [pending, confirmed, cancelled]
  *         description: Filter by quotation status
  *       - in: query
  *         name: quotationType
@@ -814,7 +814,7 @@ router.get('/booking-history/traveller/:travellerId', getBookingHistoryByTravell
  *         name: status
  *         schema:
  *           type: string
- *           enum: [draft, confirmed, cancelled]
+ *           enum: [pending, confirmed, cancelled]
  *         description: Filter quotations by status
  *       - in: query
  *         name: quotationType

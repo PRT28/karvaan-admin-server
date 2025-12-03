@@ -4,7 +4,7 @@ import Counter from './Counter';
 
 export type ChannelType = 'B2B' | 'B2C';
 export type QuotationType = 'flight' | 'train' | 'hotel' | 'activity';
-export type QuotationStatus = 'draft' | 'confirmed' | 'cancelled';
+export type QuotationStatus = 'pending' | 'confirmed' | 'cancelled';
 
 export interface IQuotation extends Document {
   customId: string;
@@ -24,6 +24,7 @@ export interface IQuotation extends Document {
   adultTravlers: number;
   childTravlers: number;
   remarks: string;
+  isDeleted: boolean;
 }
 
 const QuotationSchema = new Schema<IQuotation>(
@@ -57,8 +58,8 @@ const QuotationSchema = new Schema<IQuotation>(
     totalAmount: { type: Number, required: true },
     status: {
       type: String,
-      enum: ['draft', 'confirmed', 'cancelled'],
-      default: 'draft',
+      enum: ['pending', 'confirmed', 'cancelled'],
+      default: 'pending',
     },
     owner: {
       type: [Schema.Types.ObjectId],
@@ -72,6 +73,7 @@ const QuotationSchema = new Schema<IQuotation>(
     adultTravlers: { type: Number, required: false },
     childTravlers: { type: Number, required: false },
     remarks: { type: String, required: false },
+    isDeleted: { type: Boolean, default: false },
   },
   { timestamps: true }
 );
