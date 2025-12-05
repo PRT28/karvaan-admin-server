@@ -250,13 +250,10 @@ export const deleteQuotation = async (req: Request, res: Response): Promise<void
 
 export const getAllQuotations = async (req: Request, res: Response) => {
   try {
-    const { bookingStartDate, bookingEndDate, travelStartDate, travelEndDate, owner, includeDeleted } = req.query;
+    const { bookingStartDate, bookingEndDate, travelStartDate, travelEndDate, owner, isDeleted, serviceStatus } = req.query;
 
     // Build business filter - exclude deleted quotations by default
     const businessFilter: any = {};
-    if (includeDeleted !== 'true') {
-      businessFilter.isDeleted = { $ne: true };
-    }
 
     console.log(req.user);
     if (req.user?.userType !== 'super_admin') {
@@ -286,7 +283,7 @@ export const getAllQuotations = async (req: Request, res: Response) => {
     }
 
     // Get quotations with population
-    const quotations = await Quotation.find(query)
+    const quotations = await Quotation.find({...query, isDeleted: isDeleted === 'true' ? true : false})
       .populate({
         path: 'businessId',
         select: 'businessName businessType',

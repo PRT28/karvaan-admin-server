@@ -18,9 +18,15 @@ export interface IVendor extends Document {
   createdAt: Date;
   tier?: Tiers;
   isDeleted: boolean;
+  customId: string;
 }
 
 const vendorSchema = new Schema<IVendor>({
+  customId: {
+    type: String,
+    unique: true,
+    index: true,
+  },
   companyName: { type: String, required: true },
   contactPerson: { type: String, required: true },
   alias: { type: String },

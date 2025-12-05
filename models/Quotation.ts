@@ -2,14 +2,14 @@ import mongoose, { Document, Schema } from 'mongoose';
 import Business from './Business';
 import Counter from './Counter';
 
-export type ChannelType = 'B2B' | 'B2C';
-export type QuotationType = 'flight' | 'train' | 'hotel' | 'activity';
-export type QuotationStatus = 'pending' | 'confirmed' | 'cancelled';
+export type QuotationType = 'flight' | 'accomodation' | 'land-transport' | 'maritime-transport' | 'visa' | 'activity' | 'tickets';
+export type QuotationStatus = 'confirmed' | 'cancelled';
+
+export type ServiceStatus = 'pending' | 'denied' | 'draft' | 'approved';
 
 export interface IQuotation extends Document {
   customId: string;
   quotationType: QuotationType;
-  channel: ChannelType;
   businessId: mongoose.Types.ObjectId;
   formFields: Map<String, Object>,
   totalAmount: number;
@@ -25,6 +25,7 @@ export interface IQuotation extends Document {
   childTravlers: number;
   remarks: string;
   isDeleted: boolean;
+  serviceStatus: string;
 }
 
 const QuotationSchema = new Schema<IQuotation>(
@@ -40,11 +41,6 @@ const QuotationSchema = new Schema<IQuotation>(
       enum: ['flight', 'train', 'hotel', 'activity', 'travel', 'transport-land', 'transport-maritime', 'tickets', 'travel insurance', 'visas', 'others'],
       required: true,
     },
-    channel: {
-      type: String,
-      enum: ['B2B', 'B2C'],
-      required: true,
-    },
     businessId: {
       type: Schema.Types.ObjectId,
       ref: 'Business',
@@ -58,13 +54,18 @@ const QuotationSchema = new Schema<IQuotation>(
     totalAmount: { type: Number, required: true },
     status: {
       type: String,
-      enum: ['pending', 'confirmed', 'cancelled'],
-      default: 'pending',
+      enum: [ 'confirmed', 'cancelled'],
+      default: 'confirmed',
     },
     owner: {
       type: [Schema.Types.ObjectId],
       ref: 'Team',
       required: true,
+    },
+    serviceStatus: {
+      type: String,
+      enum: ['pending', 'denied', 'draft', 'approved'],
+      default: 'approved',
     },
     travelDate: { type: Date, required: true },
     customerId: { type: Schema.Types.ObjectId, ref: 'Customer', required: false },
@@ -86,35 +87,6 @@ QuotationSchema.index({ businessId: 1, channel: 1 });
 QuotationSchema.index({ businessId: 1, customerId: 1 });
 QuotationSchema.index({ businessId: 1, vendorId: 1 });
 QuotationSchema.index({ businessId: 1, travelers: 1 });
-
-// Pre-save hook to generate custom ID
-QuotationSchema.pre('save', async function(next) {
-  // Only generate customId for new documents
-  if (this.isNew && !this.customId) {
-    try {
-      // Get the business to fetch the prefix
-      const business = await Business.findById(this.businessId);
-      if (!business) {
-        throw new Error('Business not found');
-      }
-
-      // Get the next quotation number for this business
-      const nextNumber = await Counter.getNextQuotationNumber(this.businessId.toString());
-
-      // Format the number with leading zeros (3 digits)
-      const formattedNumber = nextNumber.toString().padStart(3, '0');
-
-      // Generate the custom ID
-      this.customId = `OS-${formattedNumber}`;
-
-      next();
-    } catch (error) {
-      next(error as Error);
-    }
-  } else {
-    next();
-  }
-});
 
 // Static method to find quotations by business
 QuotationSchema.statics.findByBusiness = function(businessId: string) {

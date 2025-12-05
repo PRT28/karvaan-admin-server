@@ -19,9 +19,15 @@ export interface ICustomer extends Document {
   ownerId: mongoose.Types.ObjectId;
   tier?: Tiers;
   isDeleted: boolean;
+  customId: string;
 }
 
 const customerSchema = new Schema<ICustomer>({
+  customId: {
+    type: String,
+    unique: true,
+    index: true,
+  },
   name: { type: String, required: true },
   email: { type: String, required: true },
   phone: { type: String, required: true },

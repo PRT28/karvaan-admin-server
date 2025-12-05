@@ -10,19 +10,19 @@ export interface ITraveller extends Document {
   createdAt: Date;
   updatedAt: Date;
   isDeleted: boolean;
+  customId: string;
 }
-
-const emergencyContactSchema = new Schema({
-  name: { type: String, required: true },
-  phone: { type: String, required: true },
-  relationship: { type: String, required: true }
-}, { _id: false });
 
 const travellerSchema = new Schema<ITraveller>({
   name: {
     type: String,
     required: true,
     trim: true
+  },
+  customId: {
+    type: String,
+    unique: true,
+    index: true,
   },
   email: {
     type: String,
