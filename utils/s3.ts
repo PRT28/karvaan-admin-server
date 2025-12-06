@@ -1,16 +1,25 @@
 import { S3Client, PutObjectCommand, DeleteObjectCommand } from '@aws-sdk/client-s3';
 import { v4 as uuidv4 } from 'uuid';
 
-// Initialize S3 Client
-const s3Client = new S3Client({
-  region: process.env.AWS_REGION || '',
-  credentials: {
-    accessKeyId: process.env.AWS_ACCESS_KEY_ID || '',
-    secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY || '',
-  },
-});
+// Lazy initialization of S3 Client to ensure env vars are loaded
+let s3Client: S3Client | null = null;
 
-const BUCKET_NAME = process.env.AWS_S3_BUCKET_NAME || '';
+const getS3Client = (): S3Client => {
+  if (!s3Client) {
+    s3Client = new S3Client({
+      region: process.env.AWS_REGION || '',
+      credentials: {
+        accessKeyId: process.env.AWS_ACCESS_KEY_ID || '',
+        secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY || '',
+      },
+    });
+  }
+  return s3Client;
+};
+
+const getBucketName = (): string => {
+  return process.env.AWS_S3_BUCKET_NAME || '';
+};
 
 export interface UploadedDocument {
   originalName: string;
@@ -34,10 +43,12 @@ export const uploadToS3 = async (
 ): Promise<UploadedDocument> => {
   const fileExtension = file.originalname.split('.').pop();
   const uniqueFileName = `${uuidv4()}.${fileExtension}`;
-  const key = `${folder}/${uniqueFileName}`;
+  const key = folder ? `${folder}/${uniqueFileName}` : uniqueFileName;
+  const bucketName = getBucketName();
+  const region = process.env.AWS_REGION || '';
 
   const command = new PutObjectCommand({
-    Bucket: BUCKET_NAME,
+    Bucket: bucketName,
     Key: key,
     Body: file.buffer,
     ContentType: file.mimetype,
@@ -45,10 +56,10 @@ export const uploadToS3 = async (
     ACL: 'public-read',
   });
 
-  await s3Client.send(command);
+  await getS3Client().send(command);
 
   // Construct the public URL
-  const url = `https://${BUCKET_NAME}.s3.${process.env.AWS_REGION || 'ap-south-1'}.amazonaws.com/${key}`;
+  const url = `https://${bucketName}.s3.${region}.amazonaws.com/${key}`;
 
   return {
     originalName: file.originalname,
@@ -81,11 +92,11 @@ export const uploadMultipleToS3 = async (
  */
 export const deleteFromS3 = async (key: string): Promise<void> => {
   const command = new DeleteObjectCommand({
-    Bucket: BUCKET_NAME,
+    Bucket: getBucketName(),
     Key: key,
   });
 
-  await s3Client.send(command);
+  await getS3Client().send(command);
 };
 
 /**
@@ -97,5 +108,5 @@ export const deleteMultipleFromS3 = async (keys: string[]): Promise<void> => {
   await Promise.all(deletePromises);
 };
 
-export { s3Client, BUCKET_NAME };
+export { getS3Client, getBucketName };
 

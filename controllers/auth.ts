@@ -259,26 +259,31 @@ export const createOrUpdateUser = async (req: Request, res: Response): Promise<v
 
 export const getUserById = async (req: Request, res: Response): Promise<void> => {
   try {
-    const { userId } = req.params;
-    if (!userId) {
-      res.status(400).json({ message: 'User ID is required' });
+    const { id } = req.params;
+    if (!id) {
+      res.status(400).json({ message: 'User ID is required', success: false });
       return;
     }
 
-    const user = await User.findById(userId).populate('roleId');
+    const user = await User.findById(id)
+      .populate('roleId')
+      .populate('businessId')
+      .select('-password');
+
     if (!user) {
-      res.status(404).json({ message: 'User not found' });
+      res.status(404).json({ message: 'User not found', success: false });
       return;
     }
+
     res.status(200).json({
       message: 'User retrieved successfully',
       data: user,
       success: true,
     });
-    } catch (error: any) {
+  } catch (error: any) {
     console.error(error);
     res.status(500).json({ message: 'Internal server error', error: error.message, success: false });
-    }
+  }
 }
 export const getAllUsers = async (req: Request, res: Response): Promise<void> => {
   try {
