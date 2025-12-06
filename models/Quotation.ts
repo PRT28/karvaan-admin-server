@@ -2,7 +2,7 @@ import mongoose, { Document, Schema } from 'mongoose';
 import Business from './Business';
 import Counter from './Counter';
 
-export type QuotationType = 'flight' | 'accomodation' | 'land-transport' | 'maritime-transport' | 'visa' | 'activity' | 'tickets';
+export type QuotationType = 'flight' | 'accommodation' | 'land-transport' | 'maritime-transport' | 'visa' | 'activity' | 'tickets';
 export type QuotationStatus = 'confirmed' | 'cancelled';
 
 export type ServiceStatus = 'pending' | 'denied' | 'draft' | 'approved';
