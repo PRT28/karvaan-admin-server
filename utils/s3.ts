@@ -30,7 +30,7 @@ export interface UploadedDocument {
  */
 export const uploadToS3 = async (
   file: Express.Multer.File,
-  folder: string = 'quotation-documents'
+  folder: string = ''
 ): Promise<UploadedDocument> => {
   const fileExtension = file.originalname.split('.').pop();
   const uniqueFileName = `${uuidv4()}.${fileExtension}`;
@@ -69,7 +69,7 @@ export const uploadToS3 = async (
  */
 export const uploadMultipleToS3 = async (
   files: Express.Multer.File[],
-  folder: string = 'quotation-documents'
+  folder: string = ''
 ): Promise<UploadedDocument[]> => {
   const uploadPromises = files.map((file) => uploadToS3(file, folder));
   return Promise.all(uploadPromises);
