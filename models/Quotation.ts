@@ -7,6 +7,16 @@ export type QuotationStatus = 'confirmed' | 'cancelled';
 
 export type ServiceStatus = 'pending' | 'denied' | 'draft' | 'approved';
 
+export interface IQuotationDocument {
+  originalName: string;
+  fileName: string;
+  url: string;
+  key: string;
+  size: number;
+  mimeType: string;
+  uploadedAt: Date;
+}
+
 export interface IQuotation extends Document {
   customId: string;
   quotationType: QuotationType;
@@ -26,6 +36,7 @@ export interface IQuotation extends Document {
   remarks: string;
   isDeleted: boolean;
   serviceStatus: string;
+  documents: IQuotationDocument[];
 }
 
 const QuotationSchema = new Schema<IQuotation>(
@@ -39,19 +50,19 @@ const QuotationSchema = new Schema<IQuotation>(
     quotationType: {
       type: String,
       enum: ['flight', 'train', 'hotel', 'activity', 'travel', 'transport-land', 'transport-maritime', 'tickets', 'travel insurance', 'visas', 'others'],
-      required: true,
+      required: false,
     },
     businessId: {
       type: Schema.Types.ObjectId,
       ref: 'Business',
-      required: true,
+      required: false,
       index: true
     },
     formFields: {
       type: Map,
-      required: true
+      required: false
     },
-    totalAmount: { type: Number, required: true },
+    totalAmount: { type: Number },
     status: {
       type: String,
       enum: [ 'confirmed', 'cancelled'],
@@ -60,14 +71,13 @@ const QuotationSchema = new Schema<IQuotation>(
     owner: {
       type: [Schema.Types.ObjectId],
       ref: 'Team',
-      required: true,
     },
     serviceStatus: {
       type: String,
       enum: ['pending', 'denied', 'draft', 'approved'],
       default: 'approved',
     },
-    travelDate: { type: Date, required: true },
+    travelDate: { type: Date, required: false },
     customerId: { type: Schema.Types.ObjectId, ref: 'Customer', required: false },
     vendorId: { type: Schema.Types.ObjectId, ref: 'Vendor', required: false },
     travelers: { type: [Schema.Types.ObjectId], ref: 'Traveller', required: false },
@@ -75,6 +85,24 @@ const QuotationSchema = new Schema<IQuotation>(
     childTravlers: { type: Number, required: false },
     remarks: { type: String, required: false },
     isDeleted: { type: Boolean, default: false },
+    documents: {
+      type: [{
+        originalName: { type: String, required: false },
+        fileName: { type: String, required: false },
+        url: { type: String, required: false },
+        key: { type: String, required: false },
+        size: { type: Number, required: false },
+        mimeType: { type: String, required: false },
+        uploadedAt: { type: Date, default: Date.now },
+      }],
+      default: [],
+      validate: {
+        validator: function(docs: any[]) {
+          return docs.length <= 3;
+        },
+        message: 'Maximum 3 documents are allowed per quotation'
+      }
+    },
   },
   { timestamps: true }
 );

@@ -12,6 +12,7 @@ import {
 } from '../controllers/quotation';
 
 import express from 'express';
+import { handleDocumentUploadError } from '../middleware/documentUpload';
 
 const router = express.Router();
 
@@ -143,45 +144,71 @@ router.get('/get-quotations-by-party/:id', getQuotationsByParty);
  * @swagger
  * /quotation/create-quotation:
  *   post:
- *     summary: Create a new quotation
- *     description: Create a new quotation record
+ *     summary: Create a new quotation with optional documents
+ *     description: Create a new quotation record with up to 3 document uploads (PDF, images, DOC, XLS, TXT)
  *     tags: [Quotations]
  *     security:
  *       - karvaanToken: []
  *     requestBody:
  *       required: true
  *       content:
- *         application/json:
+ *         multipart/form-data:
  *           schema:
  *             type: object
- *             required: [quotationType, channel, partyId, formFields, totalAmount]
+ *             required: [quotationType, channel, formFields, totalAmount, owner, travelDate]
  *             properties:
  *               quotationType:
  *                 type: string
- *                 enum: [flight, train, hotel, activity]
+ *                 enum: [flight, train, hotel, activity, travel, transport-land, transport-maritime, tickets, travel insurance, visas, others]
  *                 example: "flight"
  *               channel:
  *                 type: string
  *                 enum: [B2B, B2C]
  *                 example: "B2C"
- *               partyId:
+ *               customerId:
  *                 type: string
+ *                 description: Required for B2C channel
  *                 example: "507f1f77bcf86cd799439013"
+ *               vendorId:
+ *                 type: string
+ *                 description: Required for B2B channel
+ *                 example: "507f1f77bcf86cd799439014"
  *               formFields:
- *                 type: object
- *                 additionalProperties: true
- *                 example:
- *                   departure: "New York"
- *                   destination: "London"
- *                   date: "2024-12-25"
- *                   passengers: 2
+ *                 type: string
+ *                 description: JSON stringified form fields object
+ *                 example: '{"departure": "New York", "destination": "London"}'
  *               totalAmount:
  *                 type: number
  *                 example: 1500.00
- *               status:
+ *               owner:
+ *                 type: array
+ *                 items:
+ *                   type: string
+ *                 description: Array of team member IDs
+ *               travelDate:
  *                 type: string
- *                 enum: [pending, confirmed, cancelled]
- *                 default: "pending"
+ *                 format: date
+ *                 example: "2024-12-25"
+ *               travelers:
+ *                 type: array
+ *                 items:
+ *                   type: string
+ *                 description: Array of traveller IDs
+ *               adultTravlers:
+ *                 type: integer
+ *                 example: 2
+ *               childTravlers:
+ *                 type: integer
+ *                 example: 1
+ *               remarks:
+ *                 type: string
+ *                 example: "Special requirements noted"
+ *               documents:
+ *                 type: array
+ *                 items:
+ *                   type: string
+ *                   format: binary
+ *                 description: Up to 3 documents (max 5MB each). Allowed types - PDF, JPG, PNG, GIF, WEBP, DOC, DOCX, XLS, XLSX, TXT
  *     responses:
  *       201:
  *         description: Quotation created successfully
@@ -195,6 +222,12 @@ router.get('/get-quotations-by-party/:id', getQuotationsByParty);
  *                   example: true
  *                 quotation:
  *                   $ref: '#/components/schemas/Quotation'
+ *       400:
+ *         description: Invalid request or too many documents
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
  *       500:
  *         description: Failed to create quotation
  *         content:
@@ -202,8 +235,7 @@ router.get('/get-quotations-by-party/:id', getQuotationsByParty);
  *             schema:
  *               $ref: '#/components/schemas/ErrorResponse'
  */
-// TODO: Fix TypeScript issue with createQuotation function
-router.post('/create-quotation', createQuotation);
+router.post('/create-quotation', handleDocumentUploadError, createQuotation);
 
 /**
  * @swagger

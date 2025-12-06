@@ -10,6 +10,7 @@ import {
 
 import express from "express";
 import { uploadSingleFile, handleUploadError } from "../middleware/upload";
+import { handleDocumentUploadError } from "../middleware/documentUpload";
 
 const router = express.Router();
 
@@ -113,14 +114,14 @@ router.get("/get-customer/:id", getCustomerById);
  * /customer/create-customer:
  *   post:
  *     summary: Create a new customer
- *     description: Create a new customer record
+ *     description: Create a new customer record with optional document uploads (max 3)
  *     tags: [Customers]
  *     security:
  *       - karvaanToken: []
  *     requestBody:
  *       required: true
  *       content:
- *         application/json:
+ *         multipart/form-data:
  *           schema:
  *             type: object
  *             required: [name, email, phone, ownerId]
@@ -143,8 +144,14 @@ router.get("/get-customer/:id", getCustomerById);
  *                 example: "507f1f77bcf86cd799439014"
  *               tier:
  *                 type: string
- *                 enum: [tier1, tier2, tier3]
+ *                 enum: [tier1, tier2, tier3, tier4, tier5]
  *                 example: "tier1"
+ *               documents:
+ *                 type: array
+ *                 items:
+ *                   type: string
+ *                   format: binary
+ *                 description: Up to 3 document files (PDF, images, DOC, DOCX, XLS, XLSX, TXT). Max 5MB each.
  *     responses:
  *       201:
  *         description: Customer created successfully
@@ -155,6 +162,8 @@ router.get("/get-customer/:id", getCustomerById);
  *               properties:
  *                 customer:
  *                   $ref: '#/components/schemas/Customer'
+ *       400:
+ *         description: Validation error (too many documents, invalid file type, etc.)
  *       500:
  *         description: Failed to create customer
  *         content:
@@ -162,7 +171,7 @@ router.get("/get-customer/:id", getCustomerById);
  *             schema:
  *               $ref: '#/components/schemas/ErrorResponse'
  */
-router.post("/create-customer", createCustomer);
+router.post("/create-customer", handleDocumentUploadError, createCustomer);
 
 /**
  * @swagger

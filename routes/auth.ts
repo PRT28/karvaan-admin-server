@@ -8,11 +8,14 @@ import {
     insertTest,
     loginWithPassword,
     registerBusinessUser,
-    verify2FA
+    verify2FA,
+    uploadProfileImage,
+    deleteProfileImage
 } from "../controllers/auth";
 import express from "express";
 
 import { checkKarvaanToken } from "../utils/middleware";
+import { handleProfileImageUploadError } from "../middleware/documentUpload";
 
 const router = express.Router();
 
@@ -501,5 +504,113 @@ router.get("/get-user/:id", checkKarvaanToken, getUserById);
  *         description: Internal server error
  */
 router.post("/register-business-user", registerBusinessUser);
+
+/**
+ * @swagger
+ * /auth/upload-profile-image/{userId}:
+ *   post:
+ *     summary: Upload profile image for a user
+ *     description: Upload a profile image for a specific user. Replaces existing image if present.
+ *     tags: [Authentication]
+ *     security:
+ *       - karvaanToken: []
+ *     parameters:
+ *       - in: path
+ *         name: userId
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: User ID to upload profile image for
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         multipart/form-data:
+ *           schema:
+ *             type: object
+ *             required: [profileImage]
+ *             properties:
+ *               profileImage:
+ *                 type: string
+ *                 format: binary
+ *                 description: Profile image file (JPEG, PNG, GIF, WEBP). Max 2MB.
+ *     responses:
+ *       200:
+ *         description: Profile image uploaded successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 message:
+ *                   type: string
+ *                   example: "Profile image uploaded successfully"
+ *                 profileImage:
+ *                   type: object
+ *                   properties:
+ *                     originalName:
+ *                       type: string
+ *                     fileName:
+ *                       type: string
+ *                     url:
+ *                       type: string
+ *                     key:
+ *                       type: string
+ *                     size:
+ *                       type: number
+ *                     mimeType:
+ *                       type: string
+ *                     uploadedAt:
+ *                       type: string
+ *                       format: date-time
+ *       400:
+ *         description: Validation error (no file, invalid type, file too large)
+ *       404:
+ *         description: User not found
+ *       500:
+ *         description: Failed to upload profile image
+ */
+router.post("/upload-profile-image/:userId", checkKarvaanToken, handleProfileImageUploadError, uploadProfileImage);
+
+/**
+ * @swagger
+ * /auth/delete-profile-image/{userId}:
+ *   delete:
+ *     summary: Delete profile image for a user
+ *     description: Delete the profile image for a specific user
+ *     tags: [Authentication]
+ *     security:
+ *       - karvaanToken: []
+ *     parameters:
+ *       - in: path
+ *         name: userId
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: User ID to delete profile image for
+ *     responses:
+ *       200:
+ *         description: Profile image deleted successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 message:
+ *                   type: string
+ *                   example: "Profile image deleted successfully"
+ *       400:
+ *         description: User does not have a profile image
+ *       404:
+ *         description: User not found
+ *       500:
+ *         description: Failed to delete profile image
+ */
+router.delete("/delete-profile-image/:userId", checkKarvaanToken, deleteProfileImage);
 
 export default router;

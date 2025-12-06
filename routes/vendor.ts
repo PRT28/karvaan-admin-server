@@ -1,12 +1,13 @@
-import { 
-    getVendors, 
-    getVendorById, 
-    updateVendor, 
-    deleteVendor, 
-    createVendor 
+import {
+    getVendors,
+    getVendorById,
+    updateVendor,
+    deleteVendor,
+    createVendor
 } from "../controllers/vendor";
 
 import express from "express";
+import { handleDocumentUploadError } from "../middleware/documentUpload";
 
 const router = express.Router();
 
@@ -93,14 +94,14 @@ router.get("/get-vendor/:id", getVendorById);
  * /vendor/create-vendor:
  *   post:
  *     summary: Create a new vendor
- *     description: Create a new vendor record
+ *     description: Create a new vendor record with optional document uploads (max 3)
  *     tags: [Vendors]
  *     security:
  *       - karvaanToken: []
  *     requestBody:
  *       required: true
  *       content:
- *         application/json:
+ *         multipart/form-data:
  *           schema:
  *             type: object
  *             required: [companyName, contactPerson, email, phone]
@@ -124,6 +125,12 @@ router.get("/get-vendor/:id", getVendorById);
  *               address:
  *                 type: string
  *                 example: "456 Business Ave, City, State"
+ *               documents:
+ *                 type: array
+ *                 items:
+ *                   type: string
+ *                   format: binary
+ *                 description: Up to 3 document files (PDF, images, DOC, DOCX, XLS, XLSX, TXT). Max 5MB each.
  *     responses:
  *       201:
  *         description: Vendor created successfully
@@ -134,6 +141,8 @@ router.get("/get-vendor/:id", getVendorById);
  *               properties:
  *                 vendor:
  *                   $ref: '#/components/schemas/Vendor'
+ *       400:
+ *         description: Validation error (too many documents, invalid file type, etc.)
  *       500:
  *         description: Failed to create vendor
  *         content:
@@ -141,7 +150,7 @@ router.get("/get-vendor/:id", getVendorById);
  *             schema:
  *               $ref: '#/components/schemas/ErrorResponse'
  */
-router.post("/create-vendor", createVendor);
+router.post("/create-vendor", handleDocumentUploadError, createVendor);
 
 /**
  * @swagger

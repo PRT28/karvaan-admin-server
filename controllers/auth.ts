@@ -8,6 +8,7 @@ import cache from 'node-cache';
 import bcrypt from 'bcryptjs';
 import { send2FACode, sendPasswordResetNotification } from '../utils/email';
 import mongoose from 'mongoose';
+import { uploadToS3, deleteFromS3, UploadedDocument } from '../utils/s3';
 
 // Cache for storing 2FA codes with email as key
 const twoFACache = new cache({ stdTTL: 300 }); // 5 minutes TTL
@@ -570,6 +571,132 @@ export const forgotPassword = async (req: Request, res: Response): Promise<void>
     res.status(500).json({
       success: false,
       message: 'Internal server error. Please try again later.',
+      error: error.message
+    });
+  }
+};
+
+// Upload profile image for user
+export const uploadProfileImage = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { userId } = req.params;
+
+    if (!userId) {
+      res.status(400).json({
+        success: false,
+        message: 'User ID is required'
+      });
+      return;
+    }
+
+    // Check if file was uploaded
+    if (!req.file) {
+      res.status(400).json({
+        success: false,
+        message: 'No image file uploaded'
+      });
+      return;
+    }
+
+    // Validate file type - only images allowed
+    const allowedMimeTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
+    if (!allowedMimeTypes.includes(req.file.mimetype)) {
+      res.status(400).json({
+        success: false,
+        message: 'Invalid file type. Only JPEG, PNG, GIF, and WEBP images are allowed'
+      });
+      return;
+    }
+
+    // Find the user
+    const user = await User.findById(userId);
+    if (!user) {
+      res.status(404).json({
+        success: false,
+        message: 'User not found'
+      });
+      return;
+    }
+
+    // Delete old profile image from S3 if exists
+    if (user.profileImage?.key) {
+      await deleteFromS3(user.profileImage.key);
+    }
+
+    // Upload new profile image to S3
+    const businessId = user.businessId || 'general';
+    const uploadedImage: UploadedDocument = await uploadToS3(
+      req.file,
+      `users/${businessId}/profile-images`
+    );
+
+    // Update user with new profile image
+    user.profileImage = uploadedImage;
+    await user.save();
+
+    res.status(200).json({
+      success: true,
+      message: 'Profile image uploaded successfully',
+      profileImage: uploadedImage
+    });
+  } catch (error: any) {
+    console.error('Error uploading profile image:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to upload profile image',
+      error: error.message
+    });
+  }
+};
+
+// Delete profile image for user
+export const deleteProfileImage = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { userId } = req.params;
+
+    if (!userId) {
+      res.status(400).json({
+        success: false,
+        message: 'User ID is required'
+      });
+      return;
+    }
+
+    // Find the user
+    const user = await User.findById(userId);
+    if (!user) {
+      res.status(404).json({
+        success: false,
+        message: 'User not found'
+      });
+      return;
+    }
+
+    // Check if user has a profile image
+    if (!user.profileImage?.key) {
+      res.status(400).json({
+        success: false,
+        message: 'User does not have a profile image'
+      });
+      return;
+    }
+
+    // Delete profile image from S3
+    await deleteFromS3(user.profileImage.key);
+
+    // Remove profile image from user
+    user.profileImage = undefined;
+    await user.save();
+
+    res.status(200).json({
+      success: true,
+      message: 'Profile image deleted successfully'
+    });
+  } catch (error: any) {
+    console.error('Error deleting profile image:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to delete profile image',
       error: error.message
     });
   }

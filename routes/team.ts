@@ -1,12 +1,13 @@
-import { 
-    getTeams, 
-    getTeamById, 
-    updateTeam, 
-    deleteTeam, 
-    createTeam 
+import {
+    getTeams,
+    getTeamById,
+    updateTeam,
+    deleteTeam,
+    createTeam
 } from "../controllers/team";
 
 import express from "express";
+import { handleDocumentUploadError } from "../middleware/documentUpload";
 
 const router = express.Router();
 
@@ -90,14 +91,14 @@ router.get("/get-team/:id", getTeamById);
  * /team/create-team:
  *   post:
  *     summary: Create a new team member
- *     description: Create a new team member record
+ *     description: Create a new team member record with optional document uploads (max 3)
  *     tags: [Teams]
  *     security:
  *       - karvaanToken: []
  *     requestBody:
  *       required: true
  *       content:
- *         application/json:
+ *         multipart/form-data:
  *           schema:
  *             type: object
  *             required: [name, email, phone, roleId]
@@ -118,6 +119,12 @@ router.get("/get-team/:id", getTeamById);
  *               roleId:
  *                 type: string
  *                 example: "507f1f77bcf86cd799439012"
+ *               documents:
+ *                 type: array
+ *                 items:
+ *                   type: string
+ *                   format: binary
+ *                 description: Up to 3 document files (PDF, images, DOC, DOCX, XLS, XLSX, TXT). Max 5MB each.
  *     responses:
  *       201:
  *         description: Team member created successfully
@@ -128,6 +135,8 @@ router.get("/get-team/:id", getTeamById);
  *               properties:
  *                 team:
  *                   $ref: '#/components/schemas/Team'
+ *       400:
+ *         description: Validation error (too many documents, invalid file type, etc.)
  *       500:
  *         description: Failed to create team member
  *         content:
@@ -135,7 +144,7 @@ router.get("/get-team/:id", getTeamById);
  *             schema:
  *               $ref: '#/components/schemas/ErrorResponse'
  */
-router.post("/create-team", createTeam);
+router.post("/create-team", handleDocumentUploadError, createTeam);
 
 /**
  * @swagger

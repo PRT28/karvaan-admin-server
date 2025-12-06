@@ -1,13 +1,32 @@
 import { Request, Response } from 'express';
 import Vendor from '../models/Vendors';
 import Quotation from '../models/Quotation';
+import { uploadMultipleToS3, UploadedDocument } from '../utils/s3';
 
 export const createVendor = async (req: Request, res: Response) => {
   try {
-    // Add businessId from authenticated user
+    const businessId = req.user?.businessId || req.user?._id;
+
+    // Handle document uploads if files are present
+    let uploadedDocuments: UploadedDocument[] = [];
+    if (req.files && Array.isArray(req.files) && req.files.length > 0) {
+      if (req.files.length > 3) {
+        res.status(400).json({
+          success: false,
+          message: 'Maximum 3 documents are allowed per vendor'
+        });
+        return;
+      }
+      uploadedDocuments = await uploadMultipleToS3(
+        req.files as Express.Multer.File[],
+        `vendors/${businessId}`
+      );
+    }
+
     const vendorData = {
       ...req.body,
-      businessId: req.user?.businessId || req.user?._id // Use businessId or fallback to user ID for super admin
+      businessId,
+      documents: uploadedDocuments
     };
 
     const vendor = await Vendor.create(vendorData);

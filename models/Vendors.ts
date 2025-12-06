@@ -3,6 +3,16 @@ import mongoose from 'mongoose';
 
 export type Tiers = 'tier1' | 'tier2' | 'tier3' | 'tier4' | 'tier5';
 
+export interface IVendorDocument {
+  originalName: string;
+  fileName: string;
+  url: string;
+  key: string;
+  size: number;
+  mimeType: string;
+  uploadedAt: Date;
+}
+
 export interface IVendor extends Document {
   companyName: string;
   contactPerson: string;
@@ -19,6 +29,7 @@ export interface IVendor extends Document {
   tier?: Tiers;
   isDeleted: boolean;
   customId: string;
+  documents: IVendorDocument[];
 }
 
 const vendorSchema = new Schema<IVendor>({
@@ -51,6 +62,24 @@ const vendorSchema = new Schema<IVendor>({
   isDeleted: {
     type: Boolean,
     default: false
+  },
+  documents: {
+    type: [{
+      originalName: { type: String, required: true },
+      fileName: { type: String, required: true },
+      url: { type: String, required: true },
+      key: { type: String, required: true },
+      size: { type: Number, required: true },
+      mimeType: { type: String, required: true },
+      uploadedAt: { type: Date, default: Date.now },
+    }],
+    default: [],
+    validate: {
+      validator: function(docs: any[]) {
+        return docs.length <= 3;
+      },
+      message: 'Maximum 3 documents are allowed per vendor'
+    }
   }
 });
 

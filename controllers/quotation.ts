@@ -5,6 +5,7 @@ import Vendor from '../models/Vendors';
 import Traveller from '../models/Traveller';
 import Team from '../models/Team';
 import mongoose from 'mongoose';
+import { uploadMultipleToS3, UploadedDocument } from '../utils/s3';
 
 export const createQuotation = async (req: Request, res: Response): Promise<void> => {
   try {
@@ -12,8 +13,9 @@ export const createQuotation = async (req: Request, res: Response): Promise<void
 
     console.log('📝 Creating quotation with payload:', JSON.stringify(quotationData, null, 2));
 
-    // Validate required fields
-    if (!quotationData.quotationType || !quotationData.channel) {
+    if (quotationData.serviceStatus !== 'draft') {
+
+      if (!quotationData.quotationType || !quotationData.channel) {
       res.status(400).json({
         success: false,
         message: 'Missing required fields: quotationType and channel are required'
@@ -53,70 +55,6 @@ export const createQuotation = async (req: Request, res: Response): Promise<void
       return;
     }
 
-    // Determine party ID and model based on channel
-    let partyId: string;
-    let partyModel: string;
-
-    if (quotationData.channel === 'B2B') {
-      partyModel = 'Vendor';
-      partyId = quotationData.vendorId;
-      if (!partyId) {
-        res.status(400).json({
-          success: false,
-          message: 'vendorId is required for B2B quotations'
-        });
-        return;
-      }
-    } else if (quotationData.channel === 'B2C') {
-      partyModel = 'Customer';
-      partyId = quotationData.customerId;
-      if (!partyId) {
-        res.status(400).json({
-          success: false,
-          message: 'customerId is required for B2C quotations'
-        });
-        return;
-      }
-    } else {
-      res.status(400).json({
-        success: false,
-        message: 'Invalid channel. Must be B2B or B2C'
-      });
-      return;
-    }
-
-    console.log(`🔍 Looking up ${partyModel} with ID: ${partyId}`);
-
-    // Get party to determine businessId
-    let party: any;
-    if (partyModel === 'Customer') {
-      party = await Customer.findById(partyId);
-    } else {
-      party = await Vendor.findById(partyId);
-    }
-
-    if (!party) {
-      res.status(404).json({
-        success: false,
-        message: `${partyModel} not found with ID: ${partyId}`
-      });
-      return;
-    }
-
-    console.log(`✅ Found ${partyModel}:`, party.name || party.companyName, 'Business:', party.businessId);
-
-    // Verify user can access this party's business
-    if (req.user?.userType !== 'super_admin' && party.businessId.toString() !== req.user?.businessInfo?.businessId?.toString()) {
-      res.status(403).json({
-        success: false,
-        message: 'Forbidden: Cannot create quotation for other business'
-      });
-      return;
-    }
-
-    // Add businessId to quotation data
-    quotationData.businessId = party.businessId;
-
     // Validate and convert travelDate if provided as string
     if (typeof quotationData.travelDate === 'string') {
       const travelDate = new Date(quotationData.travelDate);
@@ -139,40 +77,50 @@ export const createQuotation = async (req: Request, res: Response): Promise<void
       });
       return;
     }
+      
+    }
 
-    // Validate owner array (team members)
-    if (quotationData.owner && quotationData.owner.length > 0) {
-      const validOwners = await Team.find({
-        _id: { $in: quotationData.owner },
-        businessId: party.businessId
-      });
+    // Validate required fields
+    
 
-      if (validOwners.length !== quotationData.owner.length) {
+    // Add businessId to quotation data
+    quotationData.businessId = req.user?.businessInfo?.businessId;
+
+    
+
+
+    // Handle document uploads if files are present
+    let uploadedDocuments: UploadedDocument[] = [];
+    if (req.files && Array.isArray(req.files) && req.files.length > 0) {
+      console.log(`📁 Uploading ${req.files.length} document(s) to S3...`);
+
+      if (req.files.length > 3) {
         res.status(400).json({
           success: false,
-          message: 'One or more owner team member IDs are invalid or from different business'
+          message: 'Maximum 3 documents are allowed per quotation'
+        });
+        return;
+      }
+
+      try {
+        uploadedDocuments = await uploadMultipleToS3(
+          req.files as Express.Multer.File[],
+          `quotations/${req.user?.businessInfo?.businessId}`
+        );
+        console.log(`✅ ${uploadedDocuments.length} document(s) uploaded successfully`);
+      } catch (uploadError) {
+        console.error('❌ Error uploading documents to S3:', uploadError);
+        res.status(500).json({
+          success: false,
+          message: 'Failed to upload documents',
+          error: (uploadError as Error).message
         });
         return;
       }
     }
 
-    // Validate travelers array if provided
-    if (quotationData.travelers && quotationData.travelers.length > 0) {
-      const validTravelers = await Traveller.find({
-        _id: { $in: quotationData.travelers },
-        businessId: party.businessId
-      });
-
-      if (validTravelers.length !== quotationData.travelers.length) {
-        res.status(400).json({
-          success: false,
-          message: 'One or more traveler IDs are invalid or from different business'
-        });
-        return;
-      }
-    }
-
-    console.log('💾 Creating quotation with validated data...');
+    // Add documents to quotation data
+    quotationData.documents = uploadedDocuments;
 
     const newQuotation = new Quotation(quotationData);
     await newQuotation.save();

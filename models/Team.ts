@@ -1,6 +1,16 @@
 import mongoose, { Schema, model, Document } from 'mongoose';
 import Role from './Roles';
 
+export interface ITeamDocument {
+  originalName: string;
+  fileName: string;
+  url: string;
+  key: string;
+  size: number;
+  mimeType: string;
+  uploadedAt: Date;
+}
+
 export interface ITeam extends Document {
   name: string;
   email: string;
@@ -18,6 +28,7 @@ export interface ITeam extends Document {
   roleId?: mongoose.Types.ObjectId;
   remarks?: string;
   status: 'Former' | 'Current';
+  documents: ITeamDocument[];
 }
 
 const teamSchema = new Schema<ITeam>({
@@ -46,6 +57,24 @@ const teamSchema = new Schema<ITeam>({
     enum: ['Former', 'Current'],
     default: 'Current',
   },
+  documents: {
+    type: [{
+      originalName: { type: String, required: true },
+      fileName: { type: String, required: true },
+      url: { type: String, required: true },
+      key: { type: String, required: true },
+      size: { type: Number, required: true },
+      mimeType: { type: String, required: true },
+      uploadedAt: { type: Date, default: Date.now },
+    }],
+    default: [],
+    validate: {
+      validator: function(docs: any[]) {
+        return docs.length <= 3;
+      },
+      message: 'Maximum 3 documents are allowed per team member'
+    }
+  }
 });
 
 // Indexes for better performance

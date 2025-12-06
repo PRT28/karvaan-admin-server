@@ -6,12 +6,32 @@ import mongoose from 'mongoose';
 import * as XLSX from 'xlsx';
 import csv from 'csv-parser';
 import { Readable } from 'stream';
+import { uploadMultipleToS3, UploadedDocument } from '../utils/s3';
 
 export const createCustomer = async (req: Request, res: Response) => {
   try {
+    const businessId = req.user?.businessId || req.user?._id;
+
+    // Handle document uploads if files are present
+    let uploadedDocuments: UploadedDocument[] = [];
+    if (req.files && Array.isArray(req.files) && req.files.length > 0) {
+      if (req.files.length > 3) {
+        res.status(400).json({
+          success: false,
+          message: 'Maximum 3 documents are allowed per customer'
+        });
+        return;
+      }
+      uploadedDocuments = await uploadMultipleToS3(
+        req.files as Express.Multer.File[],
+        `customers/${businessId}`
+      );
+    }
+
     const customerData = {
       ...req.body,
-      businessId: req.user?.businessId || req.user?._id
+      businessId,
+      documents: uploadedDocuments
     };
 
     const customer = await Customer.create(customerData);

@@ -1,5 +1,15 @@
 import mongoose, { Schema, Document, Types } from 'mongoose';
 
+export interface IProfileImage {
+  originalName: string;
+  fileName: string;
+  url: string;
+  key: string;
+  size: number;
+  mimeType: string;
+  uploadedAt: Date;
+}
+
 export interface IUser extends Document {
   name: string;
   email: string;
@@ -21,6 +31,7 @@ export interface IUser extends Document {
   password: string;
   // Legacy field for backward compatibility
   superAdmin: boolean;
+  profileImage?: IProfileImage;
 }
 
 const userSchema = new Schema<IUser>({
@@ -108,6 +119,18 @@ const userSchema = new Schema<IUser>({
   superAdmin: {
     type: Boolean,
     default: false,
+  },
+  profileImage: {
+    type: {
+      originalName: { type: String, required: true },
+      fileName: { type: String, required: true },
+      url: { type: String, required: true },
+      key: { type: String, required: true },
+      size: { type: Number, required: true },
+      mimeType: { type: String, required: true },
+      uploadedAt: { type: Date, default: Date.now },
+    },
+    default: null,
   },
 }, {
   timestamps: true,

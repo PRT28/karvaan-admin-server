@@ -148,6 +148,10 @@ const options = {
               description: 'Whether user is a super admin',
               default: false,
             },
+            profileImage: {
+              $ref: '#/components/schemas/UploadedDocument',
+              description: 'User profile image',
+            },
             createdAt: {
               type: 'string',
               format: 'date-time',
@@ -160,7 +164,7 @@ const options = {
             },
           },
         },
-        
+
         // Role Schema
         Role: {
           type: 'object',
@@ -336,6 +340,13 @@ const options = {
               description: 'Whether customer can be deleted',
               example: true,
             },
+            documents: {
+              type: 'array',
+              description: 'Uploaded documents (max 3)',
+              items: {
+                $ref: '#/components/schemas/UploadedDocument',
+              },
+            },
             createdAt: {
               type: 'string',
               format: 'date-time',
@@ -422,6 +433,13 @@ const options = {
               description: 'Soft deletion flag',
               example: false,
             },
+            documents: {
+              type: 'array',
+              description: 'Uploaded documents (max 3)',
+              items: {
+                $ref: '#/components/schemas/UploadedDocument',
+              },
+            },
             createdAt: {
               type: 'string',
               format: 'date-time',
@@ -474,6 +492,13 @@ const options = {
               type: 'boolean',
               description: 'Soft deletion flag',
               example: false,
+            },
+            documents: {
+              type: 'array',
+              description: 'Uploaded documents (max 3)',
+              items: {
+                $ref: '#/components/schemas/UploadedDocument',
+              },
             },
             createdAt: {
               type: 'string',
@@ -789,6 +814,50 @@ const options = {
               description: 'Soft delete flag',
               example: false,
             },
+            documents: {
+              type: 'array',
+              description: 'Array of uploaded documents (max 3)',
+              items: {
+                type: 'object',
+                properties: {
+                  originalName: {
+                    type: 'string',
+                    description: 'Original file name',
+                    example: 'contract.pdf',
+                  },
+                  fileName: {
+                    type: 'string',
+                    description: 'Stored file name (UUID)',
+                    example: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890.pdf',
+                  },
+                  url: {
+                    type: 'string',
+                    description: 'Public S3 URL',
+                    example: 'https://karvaan-quotation-documents.s3.ap-south-1.amazonaws.com/quotations/businessId/a1b2c3d4.pdf',
+                  },
+                  key: {
+                    type: 'string',
+                    description: 'S3 object key',
+                    example: 'quotations/businessId/a1b2c3d4.pdf',
+                  },
+                  size: {
+                    type: 'number',
+                    description: 'File size in bytes',
+                    example: 102400,
+                  },
+                  mimeType: {
+                    type: 'string',
+                    description: 'File MIME type',
+                    example: 'application/pdf',
+                  },
+                  uploadedAt: {
+                    type: 'string',
+                    format: 'date-time',
+                    description: 'Upload timestamp',
+                  },
+                },
+              },
+            },
             createdAt: {
               type: 'string',
               format: 'date-time',
@@ -864,6 +933,48 @@ const options = {
             updatedAt: {
               type: 'string',
               format: 'date-time',
+            },
+          },
+        },
+
+        // Uploaded Document Schema
+        UploadedDocument: {
+          type: 'object',
+          properties: {
+            originalName: {
+              type: 'string',
+              description: 'Original file name',
+              example: 'passport.pdf',
+            },
+            fileName: {
+              type: 'string',
+              description: 'Generated unique file name',
+              example: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890.pdf',
+            },
+            url: {
+              type: 'string',
+              description: 'Public S3 URL to access the file',
+              example: 'https://bucket-name.s3.region.amazonaws.com/path/to/file.pdf',
+            },
+            key: {
+              type: 'string',
+              description: 'S3 object key',
+              example: 'customers/businessId/a1b2c3d4-e5f6-7890-abcd-ef1234567890.pdf',
+            },
+            size: {
+              type: 'number',
+              description: 'File size in bytes',
+              example: 102400,
+            },
+            mimeType: {
+              type: 'string',
+              description: 'MIME type of the file',
+              example: 'application/pdf',
+            },
+            uploadedAt: {
+              type: 'string',
+              format: 'date-time',
+              description: 'Upload timestamp',
             },
           },
         },
