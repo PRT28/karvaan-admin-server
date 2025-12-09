@@ -1,10 +1,16 @@
 import { S3Client, PutObjectCommand, DeleteObjectCommand } from '@aws-sdk/client-s3';
-import { v4 as uuidv4 } from 'uuid';
+const getUuid = async () => {
+  const { v4: uuidv4 } = await import("uuid");
+  return uuidv4();
+};
+
+
+
 
 // Lazy initialization of S3 Client to ensure env vars are loaded
 let s3Client: S3Client | null = null;
 
-const getS3Client = (): S3Client => {
+export const getS3Client = (): S3Client => {
   if (!s3Client) {
     s3Client = new S3Client({
       region: process.env.AWS_REGION || '',
@@ -17,7 +23,7 @@ const getS3Client = (): S3Client => {
   return s3Client;
 };
 
-const getBucketName = (): string => {
+export const getBucketName = (): string => {
   return process.env.AWS_S3_BUCKET_NAME || '';
 };
 
@@ -42,7 +48,8 @@ export const uploadToS3 = async (
   folder: string = ''
 ): Promise<UploadedDocument> => {
   const fileExtension = file.originalname.split('.').pop();
-  const uniqueFileName = `${uuidv4()}.${fileExtension}`;
+  const uniqueFileName = `${await getUuid()}.${fileExtension}`;
+
   const key = folder ? `${folder}/${uniqueFileName}` : uniqueFileName;
   const bucketName = getBucketName();
   const region = process.env.AWS_REGION || '';
@@ -107,6 +114,4 @@ export const deleteMultipleFromS3 = async (keys: string[]): Promise<void> => {
   const deletePromises = keys.map((key) => deleteFromS3(key));
   await Promise.all(deletePromises);
 };
-
-export { getS3Client, getBucketName };
 
