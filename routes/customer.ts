@@ -5,7 +5,8 @@ import {
     deleteCustomer,
     createCustomer,
     bulkUploadCustomers,
-    downloadBulkUploadTemplate
+    downloadBulkUploadTemplate,
+    mergeCustomers
 } from "../controllers/customer";
 
 import express from "express";
@@ -515,5 +516,7 @@ router.post('/bulk-upload', uploadSingleFile, handleUploadError, bulkUploadCusto
  *                   description: Error details
  */
 router.get('/bulk-upload-template/:format', downloadBulkUploadTemplate);
+
+router.post('/merge-customers', mergeCustomers);
 
 export default router;

@@ -568,3 +568,83 @@ export const downloadBulkUploadTemplate = async (req: Request, res: Response): P
     });
   }
 };
+
+export const mergeCustomers = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { primaryCustomerId, secondaryCustomersId } = req.body;
+
+    // Validate customer IDs
+    if (!primaryCustomerId || secondaryCustomersId.length === 0) {
+      res.status(400).json({
+        success: false,
+        message: 'Both primary and secondary customer IDs are required'
+      });
+      return;
+    }
+
+    // Validate that IDs are not the same
+    if (secondaryCustomersId.includes(primaryCustomerId)) {
+      res.status(400).json({
+        success: false,
+        message: 'Primary and secondary customer IDs cannot be the same'
+      });
+      return;
+    }
+
+    const primaryCustomer = await Customer.findById(primaryCustomerId);
+
+    if (!primaryCustomer) {
+      res.status(404).json({
+        success: false,
+        message: 'Primary customer not found'
+      });
+      return;
+    }
+
+    for (const id of secondaryCustomersId) {
+      if (id === primaryCustomerId) {
+        res.status(400).json({
+          success: false,
+          message: 'Primary and secondary customer IDs cannot be the same'
+        });
+        return;
+      }
+
+      const secondaryCustomer = await Customer.findById(id);
+
+      if (!secondaryCustomer) {
+        res.status(404).json({
+          success: false,
+          message: `Secondary customer with ID ${id} not found`
+        });
+        return;
+      }
+      
+    }
+
+    const quotationUpdate = await Quotation.updateMany(
+      {
+        customerId: { $in: secondaryCustomersId }
+      },
+      {
+        $set: { customerId: primaryCustomerId }
+      }
+    );
+
+    await Customer.deleteMany({ _id: { $in: secondaryCustomersId } });
+
+    res.status(200).json({
+      success: true,
+      message: 'Customers merged successfully',
+      quotationUpdate
+    });
+
+  } catch (error) {
+    console.error('Merge customers error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Internal server error during customer merge',
+      error: error instanceof Error ? error.message : 'Unknown error'
+    });
+  }
+}

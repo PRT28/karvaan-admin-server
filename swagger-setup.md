@@ -7,7 +7,7 @@ Comprehensive Swagger/OpenAPI 3.0 documentation has been implemented for the ent
 
 Once the server is running, you can access the Swagger UI at:
 - **Local Development**: http://localhost:8080/api-docs
-- **Production**: https://api.cooncierge.com/api-docs
+- **Production**: https://api.karvaann.com/api-docs
 
 ## Features
 

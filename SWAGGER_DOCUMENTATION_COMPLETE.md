@@ -76,6 +76,6 @@ The Swagger documentation is now:
 
 The API documentation is available at:
 - **Development**: `http://localhost:8080/api-docs`
-- **Production**: `https://api.cooncierge.com/api-docs`
+- **Production**: `https://api.karvaann.com/api-docs`
 
 Users can now test all endpoints directly from the Swagger UI with proper authentication token support.

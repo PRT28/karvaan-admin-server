@@ -20,7 +20,7 @@ const options = {
         description: 'Development server',
       },
       {
-        url: 'https://api.cooncierge.com',
+        url: 'https://api.karvaann.com',
         description: 'Production server',
       },
     ],
