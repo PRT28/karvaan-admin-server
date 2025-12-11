@@ -4,9 +4,8 @@ import Quotation from '../models/Quotation';
 import Team from '../models/Team';
 import mongoose from 'mongoose';
 import * as XLSX from 'xlsx';
-import csv from 'csv-parser';
-import { Readable } from 'stream';
 import { uploadMultipleToS3, UploadedDocument } from '../utils/s3';
+import { BulkUploadResult, parseCSVData, parseXLSXData } from '../utils/files';
 
 export const createCustomer = async (req: Request, res: Response) => {
   try {
@@ -180,20 +179,6 @@ export const deleteCustomer = async (req: Request, res: Response): Promise<void>
   }
 };
 
-// Interface for bulk upload result
-interface BulkUploadResult {
-  success: boolean;
-  totalRecords: number;
-  successfulRecords: number;
-  failedRecords: number;
-  errors: Array<{
-    row: number;
-    data: any;
-    error: string;
-  }>;
-  createdCustomers: any[];
-}
-
 // Helper function to validate customer data
 const validateCustomerData = (data: any): { isValid: boolean; errors: string[] } => {
   const errors: string[] = [];
@@ -249,27 +234,6 @@ const validateCustomerData = (data: any): { isValid: boolean; errors: string[] }
   };
 };
 
-// Helper function to parse CSV data
-const parseCSVData = (buffer: Buffer): Promise<any[]> => {
-  return new Promise((resolve, reject) => {
-    const results: any[] = [];
-    const stream = Readable.from(buffer.toString());
-
-    stream
-      .pipe(csv())
-      .on('data', (data) => results.push(data))
-      .on('end', () => resolve(results))
-      .on('error', (error) => reject(error));
-  });
-};
-
-// Helper function to parse XLSX data
-const parseXLSXData = (buffer: Buffer): any[] => {
-  const workbook = XLSX.read(buffer, { type: 'buffer' });
-  const sheetName = workbook.SheetNames[0];
-  const worksheet = workbook.Sheets[sheetName];
-  return XLSX.utils.sheet_to_json(worksheet);
-};
 
 export const bulkUploadCustomers = async (req: Request, res: Response): Promise<void> => {
   try {

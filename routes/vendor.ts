@@ -3,7 +3,8 @@ import {
     getVendorById,
     updateVendor,
     deleteVendor,
-    createVendor
+    createVendor,
+    mergeVendors
 } from "../controllers/vendor";
 
 import express from "express";
@@ -254,5 +255,7 @@ router.put("/update-vendor/:id", updateVendor);
  *               $ref: '#/components/schemas/ErrorResponse'
  */
 router.delete("/delete-vendor/:id", deleteVendor);
+
+router.post('/merge-vendors', mergeVendors);
 
 export default router;
