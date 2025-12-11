@@ -3,11 +3,14 @@ import {
     getTeamById,
     updateTeam,
     deleteTeam,
-    createTeam
+    createTeam,
+    bulkUploadTeams,
+    downloadBulkUploadTemplate
 } from "../controllers/team";
 
 import express from "express";
 import { handleDocumentUploadError } from "../middleware/documentUpload";
+import { handleUploadError, uploadSingleFile } from "../middleware/upload";
 
 const router = express.Router();
 
@@ -246,5 +249,9 @@ router.put("/update-team/:id", updateTeam);
  *               $ref: '#/components/schemas/ErrorResponse'
  */
 router.delete("/delete-team/:id", deleteTeam);
+
+router.post('/bulk-upload', uploadSingleFile, handleUploadError, bulkUploadTeams);
+
+router.get('/bulk-upload-template/:format', downloadBulkUploadTemplate);
 
 export default router;

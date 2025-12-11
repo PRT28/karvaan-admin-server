@@ -4,11 +4,14 @@ import {
     updateVendor,
     deleteVendor,
     createVendor,
-    mergeVendors
+    mergeVendors,
+    downloadBulkUploadTemplate,
+    bulkUploadVendors
 } from "../controllers/vendor";
 
 import express from "express";
 import { handleDocumentUploadError } from "../middleware/documentUpload";
+import { handleUploadError, uploadSingleFile } from "../middleware/upload";
 
 const router = express.Router();
 
@@ -255,6 +258,10 @@ router.put("/update-vendor/:id", updateVendor);
  *               $ref: '#/components/schemas/ErrorResponse'
  */
 router.delete("/delete-vendor/:id", deleteVendor);
+
+router.post('/bulk-upload', uploadSingleFile, handleUploadError, bulkUploadVendors);
+
+router.get('/bulk-upload-template/:format', downloadBulkUploadTemplate);
 
 router.post('/merge-vendors', mergeVendors);
 
