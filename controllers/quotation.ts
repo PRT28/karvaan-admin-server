@@ -240,6 +240,10 @@ export const getAllQuotations = async (req: Request, res: Response) => {
       query.travelDate = travelDateFilter;
     }
 
+    if (serviceStatus) {
+      query.serviceStatus = serviceStatus;
+    }
+
     // Get quotations with population
     const quotations = await Quotation.find({...query, isDeleted: isDeleted === 'true' ? true : false})
       .populate({
