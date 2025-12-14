@@ -31,14 +31,6 @@ export const createQuotation = async (req: Request, res: Response): Promise<void
       return;
     }
 
-    if (typeof quotationData.formFields === "string") {
-        quotationData.formFields = JSON.parse(quotationData.formFields);
-      }
-
-    if (typeof quotationData.travelers === "string") {
-        quotationData.travelers = JSON.parse(quotationData.travelers);
-      }
-
     if (quotationData.totalAmount === undefined || quotationData.totalAmount === null) {
       res.status(400).json({
         success: false,
@@ -47,7 +39,7 @@ export const createQuotation = async (req: Request, res: Response): Promise<void
       return;
     }
 
-    console.log()
+    console.log(typeof quotationData.formFields, typeof quotationData.travellers, quotationData)
 
     if (!quotationData.owner || !Array.isArray(quotationData.owner) || quotationData.owner.length === 0) {
       res.status(400).json({
@@ -91,6 +83,15 @@ export const createQuotation = async (req: Request, res: Response): Promise<void
     }
 
     // Validate required fields
+
+    if (typeof quotationData.formFields === "string") {
+        quotationData.formFields = JSON.parse(quotationData.formFields);
+      }
+
+    if (typeof quotationData.travelers === "string") {
+        quotationData.travelers = JSON.parse(quotationData.travelers);
+      }
+
     
 
     // Add businessId to quotation data
