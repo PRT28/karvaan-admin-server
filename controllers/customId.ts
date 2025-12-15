@@ -70,7 +70,7 @@ export const generateCustomId = async (req: Request, res: Response): Promise<voi
       return;
     }
 
-    const businessId = getBusinessId(req);
+    const businessId = req.user?.businessInfo?.businessId;
     if (!businessId || !mongoose.Types.ObjectId.isValid(businessId)) {
       res.status(400).json({ success: false, message: 'Valid businessId is required' });
       return;

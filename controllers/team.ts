@@ -9,7 +9,7 @@ import * as XLSX from 'xlsx';
 
 export const createTeam = async (req: Request, res: Response) => {
   try {
-    const businessId = req.user?.businessId || req.user?._id;
+    const businessId = req.user?.businessInfo?.businessId;
 
     // Handle document uploads if files are present
     let uploadedDocuments: UploadedDocument[] = [];

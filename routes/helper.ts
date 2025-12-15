@@ -24,9 +24,6 @@ const router = express.Router();
  *               type:
  *                 type: string
  *                 enum: [booking, customer, team, vendor, task]
- *               businessId:
- *                 type: string
- *                 description: Optional for super admins; defaults to the authenticated user's business
  *     responses:
  *       200:
  *         description: Custom ID generated successfully
