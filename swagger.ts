@@ -36,7 +36,7 @@ const options = {
           type: 'apiKey',
           in: 'header',
           name: 'x-access-token',
-          description: 'Karvaan token for authenticated requests',
+          description: 'Pass the JWT token in the x-access-token header (or Authorization: Bearer <token>). Required for endpoints protected by checkKarvaanToken.',
         },
       },
       schemas: {

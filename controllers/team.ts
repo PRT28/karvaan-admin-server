@@ -50,10 +50,6 @@ export const getTeams = async (req: Request, res: Response) => {
 
     const teams = await Team.find(filter)
       .populate({
-        path: 'roleId',
-        select: 'roleName -_id', // Only get roleName
-      })
-      .populate({
         path: 'businessId',
         select: 'businessName businessType',
       });
@@ -102,10 +98,6 @@ export const getTeamById = async (req: Request, res: Response): Promise<void> =>
 
     const team = await Team.findOne(filter)
       .populate({
-        path: 'roleId',
-        select: 'roleName -_id',
-      })
-      .populate({
         path: 'businessId',
         select: 'businessName businessType',
       });
@@ -134,10 +126,6 @@ export const updateTeam = async (req: Request, res: Response): Promise<void> => 
     delete updateData.businessId;
 
     const team = await Team.findOneAndUpdate(filter, updateData, { new: true })
-      .populate({
-        path: 'roleId',
-        select: 'roleName -_id',
-      })
       .populate({
         path: 'businessId',
         select: 'businessName businessType',
@@ -323,7 +311,6 @@ export const bulkUploadTeams = async (req: Request, res: Response): Promise<void
           phone: rowData.phone.trim(),
           address: rowData.gender || undefined,
           businessId: businessId,
-          roleId: rowData.roleId.trim(),
           status: rowData.status.trim()
         }
 
@@ -388,7 +375,6 @@ const getTemplateData = () => {
       dateOfLeaving: "",
       phone: "+919812345678",
       address: "123 Main Street, New Delhi",
-      roleId: "ROL1001",
       status: "active"
     },
     {
@@ -403,7 +389,6 @@ const getTemplateData = () => {
       dateOfLeaving: "",
       phone: "+917777444333",
       address: "Tower B, Sector 62, Noida",
-      roleId: "ROL1002",
       status: "active"
     },
     {
@@ -418,7 +403,6 @@ const getTemplateData = () => {
       dateOfLeaving: "2024-02-01",
       phone: "+919652341890",
       address: "MG Road, Bengaluru",
-      roleId: "ROL1003",
       status: "inactive"
     }
   ];
@@ -455,7 +439,6 @@ export const downloadBulkUploadTemplate = async (req: Request, res: Response): P
           "dateOfLeaving",
           "phone",
           "address",
-          "roleId",
           "status"
         ];
 
@@ -499,7 +482,6 @@ export const downloadBulkUploadTemplate = async (req: Request, res: Response): P
         { wch: 15 }, // dateOfLeaving
         { wch: 15 }, // phone
         { wch: 35 }, // address
-        { wch: 12 }, // roleId
         { wch: 10 }  // status
       ];
 
