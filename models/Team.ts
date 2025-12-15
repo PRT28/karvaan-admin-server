@@ -23,6 +23,7 @@ export interface ITeam extends Document {
   dateOfLeaving?: Date; //date of leaving
   phone: string; // work contact
   businessId: mongoose.Types.ObjectId;
+  customId?: string;
   createdAt: Date;
   remarks?: string;
   status: 'Former' | 'Current';
@@ -45,6 +46,10 @@ const teamSchema = new Schema<ITeam>({
     ref: 'Business',
     required: true,
     index: true
+  },
+  customId: {
+    type: String,
+    index: true,
   },
   createdAt: { type: Date, default: Date.now },
   remarks: { type: String },
@@ -76,6 +81,7 @@ const teamSchema = new Schema<ITeam>({
 // Indexes for better performance
 teamSchema.index({ businessId: 1, email: 1 }, { unique: true }); // Unique email per business
 teamSchema.index({ businessId: 1, createdAt: -1 });
+teamSchema.index({ businessId: 1, customId: 1 }, { unique: true, sparse: true });
 
 // Static method to find teams by business
 teamSchema.statics.findByBusiness = function(businessId: string) {

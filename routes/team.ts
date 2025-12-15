@@ -104,7 +104,7 @@ router.get("/get-team/:id", getTeamById);
  *         multipart/form-data:
  *           schema:
  *             type: object
- *             required: [name, email, phone, roleId]
+ *             required: [name, email, phone]
  *             properties:
  *               name:
  *                 type: string
@@ -116,12 +116,32 @@ router.get("/get-team/:id", getTeamById);
  *               phone:
  *                 type: string
  *                 example: "+1234567890"
- *               address:
+ *               alias:
  *                 type: string
- *                 example: "789 Office St, City, State"
- *               roleId:
+ *                 example: "Alice"
+ *               designation:
  *                 type: string
- *                 example: "507f1f77bcf86cd799439012"
+ *                 example: "Travel Consultant"
+ *               dateOfBirth:
+ *                 type: string
+ *                 format: date
+ *               gender:
+ *                 type: string
+ *                 enum: [male, female, other]
+ *               emergencyContact:
+ *                 type: string
+ *               dateOfJoining:
+ *                 type: string
+ *                 format: date
+ *               dateOfLeaving:
+ *                 type: string
+ *                 format: date
+ *               status:
+ *                 type: string
+ *                 enum: [Former, Current]
+ *                 example: "Current"
+ *               remarks:
+ *                 type: string
  *               documents:
  *                 type: array
  *                 items:
@@ -179,9 +199,28 @@ router.post("/create-team", handleDocumentUploadError, createTeam);
  *                 format: email
  *               phone:
  *                 type: string
- *               address:
+ *               alias:
  *                 type: string
- *               roleId:
+ *               designation:
+ *                 type: string
+ *               dateOfBirth:
+ *                 type: string
+ *                 format: date
+ *               gender:
+ *                 type: string
+ *                 enum: [male, female, other]
+ *               emergencyContact:
+ *                 type: string
+ *               dateOfJoining:
+ *                 type: string
+ *                 format: date
+ *               dateOfLeaving:
+ *                 type: string
+ *                 format: date
+ *               status:
+ *                 type: string
+ *                 enum: [Former, Current]
+ *               remarks:
  *                 type: string
  *     responses:
  *       200:
@@ -250,8 +289,71 @@ router.put("/update-team/:id", updateTeam);
  */
 router.delete("/delete-team/:id", deleteTeam);
 
+/**
+ * @swagger
+ * /team/bulk-upload:
+ *   post:
+ *     summary: Bulk upload team members from CSV or XLSX
+ *     description: Upload a CSV or XLSX file (field name: `file`) to create multiple team members.
+ *     tags: [Teams]
+ *     security:
+ *       - karvaanToken: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         multipart/form-data:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               file:
+ *                 type: string
+ *                 format: binary
+ *                 description: CSV or XLSX file with team data
+ *             required:
+ *               - file
+ *     responses:
+ *       200:
+ *         description: Bulk upload completed (may contain errors)
+ *       400:
+ *         description: Validation error or parse failure
+ *       500:
+ *         description: Failed to process bulk upload
+ */
 router.post('/bulk-upload', uploadSingleFile, handleUploadError, bulkUploadTeams);
 
+/**
+ * @swagger
+ * /team/bulk-upload-template/{format}:
+ *   get:
+ *     summary: Download team bulk upload template
+ *     description: Download a sample CSV or XLSX template for team bulk upload.
+ *     tags: [Teams]
+ *     security:
+ *       - karvaanToken: []
+ *     parameters:
+ *       - in: path
+ *         name: format
+ *         required: true
+ *         schema:
+ *           type: string
+ *           enum: [csv, xlsx]
+ *         description: File format to download
+ *     responses:
+ *       200:
+ *         description: Template file
+ *         content:
+ *           text/csv:
+ *             schema:
+ *               type: string
+ *           application/vnd.openxmlformats-officedocument.spreadsheetml.sheet:
+ *             schema:
+ *               type: string
+ *               format: binary
+ *       400:
+ *         description: Invalid format
+ *       500:
+ *         description: Failed to generate template
+ */
 router.get('/bulk-upload-template/:format', downloadBulkUploadTemplate);
 
 export default router;

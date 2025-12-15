@@ -43,7 +43,6 @@ const QuotationSchema = new Schema<IQuotation>(
   {
     customId: {
       type: String,
-      unique: true,
       index: true,
       // Will be auto-generated in pre-save hook
     },
@@ -115,6 +114,7 @@ QuotationSchema.index({ businessId: 1, channel: 1 });
 QuotationSchema.index({ businessId: 1, customerId: 1 });
 QuotationSchema.index({ businessId: 1, vendorId: 1 });
 QuotationSchema.index({ businessId: 1, travelers: 1 });
+QuotationSchema.index({ businessId: 1, customId: 1 }, { unique: true, sparse: true });
 
 // Static method to find quotations by business
 QuotationSchema.statics.findByBusiness = function(businessId: string) {
@@ -127,4 +127,3 @@ QuotationSchema.statics.findByCustomId = function(customId: string) {
 };
 
 export default mongoose.model<IQuotation>('Quotation', QuotationSchema);
-

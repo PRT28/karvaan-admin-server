@@ -22,6 +22,7 @@ export interface ILogs extends Document {
     dueDate: Date,
     category: string,
     subCategory: string,
+    customId?: string,
     bookingId: Schema.Types.ObjectId,
     assignedTo: Array<Schema.Types.ObjectId>,
     isCompleted: boolean,
@@ -46,6 +47,10 @@ const logSchema = new Schema<ILogs>({
     dueDate: {type: Date, required: true, default: new Date()},
     category: { type: String, required: true },
     subCategory: { type: String, required: true },
+    customId: {
+        type: String,
+        index: true,
+    },
     bookingId: { type: Schema.Types.ObjectId, ref: 'Booking' },
     logs: [{
         heading: { type: String, required: true },
@@ -60,6 +65,7 @@ logSchema.index({ businessId: 1, dateTime: -1 });
 logSchema.index({ businessId: 1, status: 1 });
 logSchema.index({ businessId: 1, userId: 1 });
 logSchema.index({ businessId: 1, bookingId: 1 });
+logSchema.index({ businessId: 1, customId: 1 }, { unique: true, sparse: true });
 
 // Static method to find logs by business
 logSchema.statics.findByBusiness = function(businessId: string) {

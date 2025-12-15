@@ -35,7 +35,6 @@ export interface IVendor extends Document {
 const vendorSchema = new Schema<IVendor>({
   customId: {
     type: String,
-    unique: true,
     index: true,
   },
   companyName: { type: String, required: true },
@@ -87,6 +86,7 @@ const vendorSchema = new Schema<IVendor>({
 vendorSchema.index({ businessId: 1, email: 1 }, { unique: true }); // Unique email per business
 vendorSchema.index({ businessId: 1, companyName: 1 });
 vendorSchema.index({ businessId: 1, createdAt: -1 });
+vendorSchema.index({ businessId: 1, customId: 1 }, { unique: true, sparse: true });
 
 // Static method to find vendors by business
 vendorSchema.statics.findByBusiness = function(businessId: string) {
@@ -96,4 +96,3 @@ vendorSchema.statics.findByBusiness = function(businessId: string) {
 const Vendor = model<IVendor>('Vendor', vendorSchema);
 
 export default Vendor;
-

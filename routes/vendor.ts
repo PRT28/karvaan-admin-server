@@ -27,10 +27,17 @@ const router = express.Router();
  * /vendor/get-all-vendors:
  *   get:
  *     summary: Get all vendors
- *     description: Retrieve all vendors
+ *     description: Retrieve all vendors. For business users, results are scoped to their business.
  *     tags: [Vendors]
  *     security:
  *       - karvaanToken: []
+ *     parameters:
+ *       - in: query
+ *         name: isDeleted
+ *         schema:
+ *           type: boolean
+ *         required: false
+ *         description: Filter by deletion status (true to include only deleted vendors)
  *     responses:
  *       200:
  *         description: Vendors retrieved successfully
@@ -123,12 +130,28 @@ router.get("/get-vendor/:id", getVendorById);
  *               phone:
  *                 type: string
  *                 example: "+1234567890"
+ *               alias:
+ *                 type: string
+ *                 example: "ABC"
+ *               dateOfBirth:
+ *                 type: string
+ *                 format: date
+ *                 example: "1985-07-20"
+ *               openingBalance:
+ *                 type: number
+ *                 example: 5000
+ *               balanceType:
+ *                 type: string
+ *                 enum: [credit, debit]
  *               GSTIN:
  *                 type: string
  *                 example: "22AAAAA0000A1Z5"
  *               address:
  *                 type: string
  *                 example: "456 Business Ave, City, State"
+ *               tier:
+ *                 type: string
+ *                 enum: [tier1, tier2, tier3, tier4, tier5]
  *               documents:
  *                 type: array
  *                 items:
@@ -259,10 +282,110 @@ router.put("/update-vendor/:id", updateVendor);
  */
 router.delete("/delete-vendor/:id", deleteVendor);
 
+/**
+ * @swagger
+ * /vendor/bulk-upload:
+ *   post:
+ *     summary: Bulk upload vendors from CSV or XLSX
+ *     description: Upload a CSV or XLSX file (field name: `file`) to create multiple vendors at once.
+ *     tags: [Vendors]
+ *     security:
+ *       - karvaanToken: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         multipart/form-data:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               file:
+ *                 type: string
+ *                 format: binary
+ *                 description: CSV or XLSX file with vendor data
+ *             required:
+ *               - file
+ *     responses:
+ *       200:
+ *         description: Bulk upload completed (may contain errors)
+ *       400:
+ *         description: Validation error or parse failure
+ *       500:
+ *         description: Failed to process bulk upload
+ */
 router.post('/bulk-upload', uploadSingleFile, handleUploadError, bulkUploadVendors);
 
+/**
+ * @swagger
+ * /vendor/bulk-upload-template/{format}:
+ *   get:
+ *     summary: Download vendor bulk upload template
+ *     description: Download a sample CSV or XLSX template for vendor bulk upload.
+ *     tags: [Vendors]
+ *     security:
+ *       - karvaanToken: []
+ *     parameters:
+ *       - in: path
+ *         name: format
+ *         required: true
+ *         schema:
+ *           type: string
+ *           enum: [csv, xlsx]
+ *         description: File format to download
+ *     responses:
+ *       200:
+ *         description: Template file
+ *         content:
+ *           text/csv:
+ *             schema:
+ *               type: string
+ *           application/vnd.openxmlformats-officedocument.spreadsheetml.sheet:
+ *             schema:
+ *               type: string
+ *               format: binary
+ *       400:
+ *         description: Invalid format
+ *       500:
+ *         description: Failed to generate template
+ */
 router.get('/bulk-upload-template/:format', downloadBulkUploadTemplate);
 
+/**
+ * @swagger
+ * /vendor/merge-vendors:
+ *   post:
+ *     summary: Merge vendors
+ *     description: Moves all quotations from the secondary vendor IDs to the primary vendor ID.
+ *     tags: [Vendors]
+ *     security:
+ *       - karvaanToken: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - primaryVendorId
+ *               - secondaryVendorsId
+ *             properties:
+ *               primaryVendorId:
+ *                 type: string
+ *                 description: Vendor ID that will remain after merge
+ *               secondaryVendorsId:
+ *                 type: array
+ *                 description: Vendor IDs to merge into the primary vendor
+ *                 items:
+ *                   type: string
+ *     responses:
+ *       200:
+ *         description: Vendors merged successfully
+ *       400:
+ *         description: Validation error
+ *       404:
+ *         description: Vendor not found
+ *       500:
+ *         description: Failed to merge vendors
+ */
 router.post('/merge-vendors', mergeVendors);
 
 export default router;

@@ -36,7 +36,6 @@ export interface ICustomer extends Document {
 const customerSchema = new Schema<ICustomer>({
   customId: {
     type: String,
-    unique: true,
     index: true,
   },
   name: { type: String, required: true },
@@ -89,6 +88,7 @@ const customerSchema = new Schema<ICustomer>({
 customerSchema.index({ businessId: 1, email: 1 }, { unique: true }); // Unique email per business
 customerSchema.index({ businessId: 1, createdAt: -1 });
 customerSchema.index({ businessId: 1, tier: 1 });
+customerSchema.index({ businessId: 1, customId: 1 }, { unique: true, sparse: true });
 
 // Static method to find customers by business
 customerSchema.statics.findByBusiness = function(businessId: string) {

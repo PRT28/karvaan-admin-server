@@ -261,6 +261,11 @@ const options = {
               description: 'Customer ID',
               example: '507f1f77bcf86cd799439013',
             },
+            customId: {
+              type: 'string',
+              description: '5-character ID unique within the business',
+              example: 'AB12C',
+            },
             name: {
               type: 'string',
               description: 'Customer name',
@@ -364,6 +369,11 @@ const options = {
               description: 'Vendor ID',
               example: '507f1f77bcf86cd799439015',
             },
+            customId: {
+              type: 'string',
+              description: '5-character ID unique within the business',
+              example: 'CD34E',
+            },
             companyName: {
               type: 'string',
               description: 'Vendor company name',
@@ -450,12 +460,17 @@ const options = {
         // Team Schema
         Team: {
           type: 'object',
-          required: ['name', 'email', 'phone', 'roleId', 'businessId'],
+          required: ['name', 'email', 'phone', 'businessId'],
           properties: {
             _id: {
               type: 'string',
               description: 'Team member ID',
               example: '507f1f77bcf86cd799439016',
+            },
+            customId: {
+              type: 'string',
+              description: '5-character ID unique within the business',
+              example: 'EF56G',
             },
             name: {
               type: 'string',
@@ -473,15 +488,37 @@ const options = {
               description: 'Team member phone',
               example: '+91-9876543210',
             },
-            address: {
+            alias: {
               type: 'string',
-              description: 'Team member address',
-              example: '789 Office St, Mumbai, Maharashtra, India',
+              description: 'Alias or nickname',
             },
-            roleId: {
+            designation: {
               type: 'string',
-              description: 'Reference to Role document',
-              example: '507f1f77bcf86cd799439012',
+              description: 'Job designation',
+              example: 'Travel Consultant',
+            },
+            dateOfBirth: {
+              type: 'string',
+              format: 'date',
+              description: 'Date of birth',
+            },
+            gender: {
+              type: 'string',
+              enum: ['male', 'female', 'other'],
+            },
+            emergencyContact: {
+              type: 'string',
+              description: 'Emergency contact number',
+            },
+            dateOfJoining: {
+              type: 'string',
+              format: 'date',
+              description: 'Joining date',
+            },
+            dateOfLeaving: {
+              type: 'string',
+              format: 'date',
+              description: 'Leaving date',
             },
             businessId: {
               type: 'string',
@@ -501,10 +538,6 @@ const options = {
               },
             },
             createdAt: {
-              type: 'string',
-              format: 'date-time',
-            },
-            updatedAt: {
               type: 'string',
               format: 'date-time',
             },
@@ -661,6 +694,11 @@ const options = {
               description: 'Traveller ID',
               example: '507f1f77bcf86cd799439022',
             },
+            customId: {
+              type: 'string',
+              description: '5-character ID unique within the business',
+              example: 'IJ90K',
+            },
             name: {
               type: 'string',
               description: 'Traveller full name',
@@ -721,8 +759,8 @@ const options = {
             },
             customId: {
               type: 'string',
-              description: 'Auto-generated custom ID with business prefix',
-              example: 'KVN-001',
+              description: '5-character ID unique within the business',
+              example: 'LM12N',
             },
             quotationType: {
               type: 'string',
@@ -878,6 +916,11 @@ const options = {
               type: 'string',
               description: 'Log ID',
               example: '507f1f77bcf86cd799439018',
+            },
+            customId: {
+              type: 'string',
+              description: '5-character ID unique within the business',
+              example: 'OP34Q',
             },
             activity: {
               type: 'string',
