@@ -12,20 +12,18 @@ export interface ITeamDocument {
 }
 
 export interface ITeam extends Document {
-  name: string;
-  email: string;
-  dateOfBirth?: Date;
-  gender?: string;
-  emergencyContact?: string;
-  alias?: string;
-  designation: string;
-  dateOfJoining?: Date;
-  dateOfLeaving?: Date;
-  phone: string;
-  address?: string;
+  name: string; // first name + last name
+  email: string; // work email
+  dateOfBirth?: Date; // date of birth
+  gender?: string; // gender
+  emergencyContact?: string; //emergency contact
+  alias?: string; // alias
+  designation?: string; //designation
+  dateOfJoining?: Date; //date of joining
+  dateOfLeaving?: Date; //date of leaving
+  phone: string; // work contact
   businessId: mongoose.Types.ObjectId;
   createdAt: Date;
-  roleId?: mongoose.Types.ObjectId;
   remarks?: string;
   status: 'Former' | 'Current';
   documents: ITeamDocument[];
@@ -42,7 +40,6 @@ const teamSchema = new Schema<ITeam>({
   designation: { type: String },
   dateOfJoining: { type: Date },
   dateOfLeaving: { type: Date },
-  address: { type: String },
   businessId: {
     type: Schema.Types.ObjectId,
     ref: 'Business',
@@ -50,7 +47,6 @@ const teamSchema = new Schema<ITeam>({
     index: true
   },
   createdAt: { type: Date, default: Date.now },
-  roleId: { type: Schema.Types.ObjectId, ref: 'Role', required: true },
   remarks: { type: String },
   status: {
     type: String,
