@@ -2,7 +2,7 @@ import { Request, Response } from 'express';
 import User from '../models/User';
 import Business from '../models/Business';
 import { createToken } from '../utils/jwt';
-import { isValidPermissions } from '../utils/utils';
+import { generateSecurePassword, isValidPermissions } from '../utils/utils';
 import Role from '../models/Roles';
 import cache from 'node-cache';
 import bcrypt from 'bcryptjs';
@@ -692,6 +692,210 @@ export const deleteProfileImage = async (req: Request, res: Response): Promise<v
     // Remove profile image from user
     user.profileImage = undefined;
     await user.save();
+
+    res.status(200).json({
+      success: true,
+      message: 'Profile image deleted successfully'
+    });
+  } catch (error: any) {
+    console.error('Error deleting profile image:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to delete profile image',
+      error: error.message
+    });
+  }
+};
+
+export const resetPassword = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { email, newPassword } = req.body;
+
+    if (!email) {
+      res.status(400).json({
+        success: false,
+        message: 'Email is required'
+      });
+      return;
+    }
+    if (!newPassword) {
+      res.status(400).json({
+        success: false,
+        message: 'New password is required'
+      });
+      return;
+    }
+    const user = await User.findOne({ email, isActive: true });
+    if (!user) {
+      res.status(404).json({
+        success: false,
+        message: 'User not found'
+      });
+      return;
+    }
+    const hashedPassword = await bcrypt.hash(newPassword, 10);
+    user.password = hashedPassword;
+    user.resetPasswordRequired = false;
+    await user.save();
+    res.status(200).json({
+      success: true,
+      message: 'Password reset successfully'
+    });
+  } catch (error: any) {
+    console.error('Error resetting password:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to reset password',
+      error: error.message
+    });
+  }
+}; 
+
+export const resetPasswordRequest = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { userId, password, autoGeneratePassword, requireReset } = req.body;
+
+    if (!userId || !password) {
+      res.status(400).json({
+        success: false,
+        message: 'User ID and password are required'
+      });
+      return;
+    }
+
+    let autoPassword;
+
+    if (autoGeneratePassword) {
+      autoPassword = generateSecurePassword();
+    }
+
+    // Find the user
+    const user = await User.findById(userId);
+    if (!user) {
+      res.status(404).json({
+        success: false,
+        message: 'User not found'
+      });
+      return;
+    }
+
+    // Hash the new password
+    const hashedPassword = await bcrypt.hash(autoGeneratePassword ? autoPassword : password, 10);
+
+    // Update the password
+    user.password = hashedPassword;
+    user.resetPasswordRequired = requireReset;
+    await user.save();
+
+    res.status(200).json({
+      success: true,
+      message: 'Password reset successfully'
+    });
+  } catch (error: any) {
+    console.error('Error resetting password:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to reset password',
+      error: error.message
+    });
+  }
+};
+
+
+// Upload profile image for user
+export const uploadCompanyLogo = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const businessId = req.user?.businessInfo?.businessId;
+
+    // Check if file was uploaded
+    if (!req.file) {
+      res.status(400).json({
+        success: false,
+        message: 'No image file uploaded'
+      });
+      return;
+    }
+
+    // Validate file type - only images allowed
+    const allowedMimeTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
+    if (!allowedMimeTypes.includes(req.file.mimetype)) {
+      res.status(400).json({
+        success: false,
+        message: 'Invalid file type. Only JPEG, PNG, GIF, and WEBP images are allowed'
+      });
+      return;
+    }
+
+    // Find the user
+    const business = await Business.findById(businessId);
+    if (!business) {
+      res.status(404).json({
+        success: false,
+        message: 'Business not found'
+      });
+      return;
+    }
+
+    // Delete old profile image from S3 if exists
+    if (business.profileImage?.key) {
+      await deleteFromS3(business.profileImage.key);
+    }
+
+    const uploadedImage: UploadedDocument = await uploadToS3(
+      req.file,
+      `business/${businessId}/profile-images`
+    );
+
+    // Update user with new profile image
+    business.profileImage = uploadedImage;
+    await business.save();
+
+    res.status(200).json({
+      success: true,
+      message: 'Profile image uploaded successfully',
+      profileImage: uploadedImage
+    });
+  } catch (error: any) {
+    console.error('Error uploading profile image:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to upload profile image',
+      error: error.message
+    });
+  }
+};
+
+// Delete profile image for user
+export const deleteCompanyLogo = async (req: Request, res: Response): Promise<void> => {
+  try {
+
+    const businessId = req.user?.businessInfo?.businessId;
+
+    // Find the user
+    const business = await Business.findById(businessId);
+    if (!business) {
+      res.status(404).json({
+        success: false,
+        message: 'Business not found'
+      });
+      return;
+    }
+
+    // Check if user has a profile image
+    if (!business.profileImage?.key) {
+      res.status(400).json({
+        success: false,
+        message: 'User does not have a profile image'
+      });
+      return;
+    }
+
+    // Delete profile image from S3
+    await deleteFromS3(business.profileImage.key);
+
+    // Remove profile image from user
+    business.profileImage = undefined;
+    await business.save();
 
     res.status(200).json({
       success: true,

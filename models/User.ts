@@ -32,6 +32,7 @@ export interface IUser extends Document {
   // Legacy field for backward compatibility
   superAdmin: boolean;
   profileImage?: IProfileImage;
+  resetPasswordRequired: boolean;
 }
 
 const userSchema = new Schema<IUser>({
@@ -117,6 +118,10 @@ const userSchema = new Schema<IUser>({
   },
   // Legacy field for backward compatibility
   superAdmin: {
+    type: Boolean,
+    default: false,
+  },
+  resetPasswordRequired: {
     type: Boolean,
     default: false,
   },

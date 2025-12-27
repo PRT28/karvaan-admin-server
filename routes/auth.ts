@@ -10,7 +10,9 @@ import {
     registerBusinessUser,
     verify2FA,
     uploadProfileImage,
-    deleteProfileImage
+    deleteProfileImage,
+    uploadCompanyLogo,
+    deleteCompanyLogo
 } from "../controllers/auth";
 import express from "express";
 
@@ -612,5 +614,9 @@ router.post("/upload-profile-image/:userId", checkKarvaanToken, handleProfileIma
  *         description: Failed to delete profile image
  */
 router.delete("/delete-profile-image/:userId", checkKarvaanToken, deleteProfileImage);
+
+router.post("/upload-company-logo", checkKarvaanToken, handleProfileImageUploadError, uploadCompanyLogo);
+
+router.delete("/delete-company-logo", checkKarvaanToken, deleteCompanyLogo);
 
 export default router;

@@ -1,5 +1,15 @@
 import mongoose, { Schema, Document, Types } from 'mongoose';
 
+export interface IProfileImage {
+  originalName: string;
+  fileName: string;
+  url: string;
+  key: string;
+  size: number;
+  mimeType: string;
+  uploadedAt: Date;
+}
+
 export interface IBusiness extends Document {
   businessName: string;
   businessType: string;
@@ -29,6 +39,7 @@ export interface IBusiness extends Document {
   };
   createdAt: Date;
   updatedAt: Date;
+  profileImage?: IProfileImage;
 }
 
 const addressSchema = new Schema({
@@ -160,6 +171,18 @@ const businessSchema = new Schema<IBusiness>({
       features: ['basic_features']
     }
   },
+  profileImage: {
+    type: {
+      originalName: { type: String, required: true },
+      fileName: { type: String, required: true },
+      url: { type: String, required: true },
+      key: { type: String, required: true },
+      size: { type: Number, required: true },
+      mimeType: { type: String, required: true },
+      uploadedAt: { type: Date, default: Date.now },
+    },
+    default: null,
+  }
 }, {
   timestamps: true,
 });

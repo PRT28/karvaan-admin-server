@@ -544,6 +544,61 @@ const options = {
           },
         },
 
+        // Maker Checker Group Schema
+        MakerCheckerGroup: {
+          type: 'object',
+          required: ['name', 'makers', 'checkers', 'type', 'businessId'],
+          properties: {
+            _id: {
+              type: 'string',
+              description: 'Maker checker group ID',
+              example: '507f1f77bcf86cd799439099',
+            },
+            name: {
+              type: 'string',
+              description: 'Group name',
+              example: 'Booking Approval Group',
+            },
+            description: {
+              type: 'string',
+              description: 'Group description',
+            },
+            makers: {
+              type: 'array',
+              description: 'User IDs or populated maker users',
+              items: {
+                $ref: '#/components/schemas/User',
+              },
+            },
+            checkers: {
+              type: 'array',
+              description: 'User IDs or populated checker users',
+              items: {
+                $ref: '#/components/schemas/User',
+              },
+            },
+            type: {
+              type: 'string',
+              enum: ['booking', 'finance'],
+              description: 'Group type',
+              example: 'booking',
+            },
+            businessId: {
+              type: 'string',
+              description: 'Reference to Business',
+              example: '507f1f77bcf86cd799439020',
+            },
+            createdAt: {
+              type: 'string',
+              format: 'date-time',
+            },
+            updatedAt: {
+              type: 'string',
+              format: 'date-time',
+            },
+          },
+        },
+
         // Business Schema
         Business: {
           type: 'object',

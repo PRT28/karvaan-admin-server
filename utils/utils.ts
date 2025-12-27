@@ -37,3 +37,39 @@ export const QuotationInputSchema = z.object({
 });
 
 export type QuotationInput = z.infer<typeof QuotationInputSchema>;
+
+
+export function generateSecurePassword() {
+
+  const upper = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+  const lower = "abcdefghijklmnopqrstuvwxyz";
+  const numbers = "0123456789";
+  const symbols = "!@#$%^&*()-_=+[]{}|;:,.<>?";
+
+  const allChars = upper + lower + numbers + symbols;
+
+  const cryptoObj = window.crypto || require("crypto").webcrypto;
+  const randomValues = new Uint32Array(16);
+  cryptoObj.getRandomValues(randomValues);
+
+  // Ensure at least one character from each category
+  let password = [
+    upper[randomValues[0] % upper.length],
+    lower[randomValues[1] % lower.length],
+    numbers[randomValues[2] % numbers.length],
+    symbols[randomValues[3] % symbols.length],
+  ];
+
+  // Fill the remaining characters
+  for (let i = 4; i < 16; i++) {
+    password.push(allChars[randomValues[i] % allChars.length]);
+  }
+
+  // Shuffle password securely
+  for (let i = password.length - 1; i > 0; i--) {
+    const j = randomValues[i] % (i + 1);
+    [password[i], password[j]] = [password[j], password[i]];
+  }
+
+  return password.join("");
+}

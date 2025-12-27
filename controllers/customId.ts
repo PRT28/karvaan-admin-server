@@ -12,6 +12,14 @@ const LETTERS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
 const DIGITS = '0123456789';
 const ALL = LETTERS + DIGITS;
 
+const prefixMap: Record<SupportedType, string> = {
+  booking: 'OS',
+  customer: 'CU',
+  team: 'TE',
+  vendor: 'VE',
+  task: 'TA',
+};
+
 const shuffle = (chars: string[]): string[] => {
   for (let i = chars.length - 1; i > 0; i -= 1) {
     const j = Math.floor(Math.random() * (i + 1));
@@ -20,7 +28,7 @@ const shuffle = (chars: string[]): string[] => {
   return chars;
 };
 
-const generateCandidateId = (): string => {
+const generateCandidateId = (type: SupportedType): string => {
   const baseChars = [
     LETTERS[Math.floor(Math.random() * LETTERS.length)],
     LETTERS[Math.floor(Math.random() * LETTERS.length)],
@@ -29,7 +37,7 @@ const generateCandidateId = (): string => {
     ALL[Math.floor(Math.random() * ALL.length)],
   ];
 
-  return shuffle(baseChars).join('');
+  return prefixMap[type] + '-' + shuffle(baseChars).join('');
 };
 
 const getBusinessId = (req: Request): string | undefined => {
@@ -80,7 +88,7 @@ export const generateCustomId = async (req: Request, res: Response): Promise<voi
     const maxAttempts = 25;
 
     for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
-      const candidate = generateCandidateId();
+      const candidate = generateCandidateId(normalizedType);
       const exists = await typeModelMap[normalizedType].exists(businessObjectId, candidate);
       if (!exists) {
         res.status(200).json({
