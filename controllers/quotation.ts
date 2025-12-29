@@ -6,6 +6,32 @@ import Traveller from '../models/Traveller';
 import Team from '../models/Team';
 import mongoose from 'mongoose';
 import { uploadMultipleToS3, UploadedDocument } from '../utils/s3';
+import MakerCheckerGroup from '../models/MakerCheckerGroup';
+
+const getBusinessIdFromRequest = (req: Request): string | undefined => {
+  const businessInfoId = req.user?.businessInfo?.businessId;
+  if (businessInfoId) return businessInfoId.toString();
+
+  const userBusinessId = req.user?.businessId;
+  if (!userBusinessId) return undefined;
+
+  if (typeof userBusinessId === 'string') return userBusinessId;
+  if (typeof userBusinessId === 'object' && (userBusinessId as any)._id) {
+    return (userBusinessId as any)._id.toString();
+  }
+
+  return undefined;
+};
+
+const getUserIdFromRequest = (req: Request): string | undefined => {
+  const userId = (req.user as any)?._id;
+  if (!userId) return undefined;
+  if (typeof userId === 'string') return userId;
+  if (typeof userId === 'object' && (userId as any)._id) {
+    return (userId as any)._id.toString();
+  }
+  return undefined;
+};
 
 export const createQuotation = async (req: Request, res: Response): Promise<void> => {
   try {
@@ -821,5 +847,132 @@ export const getBookingHistoryByTeamMember = async (req: Request, res: Response)
       message: 'Internal server error while fetching booking history',
       error: error instanceof Error ? error.message : 'Unknown error'
     });
+  }
+};
+
+
+export const approveQuotation = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { id } = req.params;
+    const { reason } = req.body;
+
+    // Build filter based on user type
+    const filter: any = { _id: id };
+    if (req.user?.userType !== 'super_admin') {
+      const businessId = getBusinessIdFromRequest(req);
+      if (!businessId) {
+        res.status(400).json({ success: false, message: 'Business context is missing' });
+        return;
+      }
+      filter.businessId = businessId;
+    }
+
+    const userId = getUserIdFromRequest(req);
+    if (!userId || !mongoose.Types.ObjectId.isValid(userId)) {
+      res.status(401).json({ success: false, message: 'Unauthorized user' });
+      return;
+    }
+
+    const quotation = await Quotation.findOne(filter).select('owner businessId');
+    if (!quotation) {
+      res.status(404).json({ success: false, message: 'Quotation not found' });
+      return;
+    }
+
+    const ownerIds = Array.isArray(quotation.owner) ? quotation.owner : [];
+    if (ownerIds.length === 0) {
+      res.status(400).json({ success: false, message: 'Quotation owner is missing' });
+      return;
+    }
+
+    const checkerGroup = await MakerCheckerGroup.findOne({
+      businessId: quotation.businessId,
+      type: 'booking',
+      checkers: userId,
+      makers: { $in: ownerIds },
+    }).select('_id');
+
+    if (!checkerGroup) {
+      res.status(403).json({ success: false, message: 'Not authorized to approve this quotation' });
+      return;
+    }
+
+    const updated = await Quotation.findOneAndUpdate(
+      { _id: quotation._id },
+      { serviceStatus: 'approved', remarks: reason },
+      { new: true }
+    );
+
+    if (!updated) {
+      res.status(404).json({ success: false, message: 'Quotation not found' });
+      return;
+    }
+
+    res.status(200).json({ success: true, quotation: updated });
+  } catch (err) {
+    res.status(500).json({ success: false, message: 'Failed to approve quotation', error: (err as Error).message });
+  }
+};
+
+export const denyQuotation = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { id } = req.params;
+    const { reason } = req.body;
+
+    // Build filter based on user type
+    const filter: any = { _id: id };
+    if (req.user?.userType !== 'super_admin') {
+      const businessId = getBusinessIdFromRequest(req);
+      if (!businessId) {
+        res.status(400).json({ success: false, message: 'Business context is missing' });
+        return;
+      }
+      filter.businessId = businessId;
+    }
+
+    const userId = getUserIdFromRequest(req);
+    if (!userId || !mongoose.Types.ObjectId.isValid(userId)) {
+      res.status(401).json({ success: false, message: 'Unauthorized user' });
+      return;
+    }
+
+    const quotation = await Quotation.findOne(filter).select('owner businessId');
+    if (!quotation) {
+      res.status(404).json({ success: false, message: 'Quotation not found' });
+      return;
+    }
+
+    const ownerIds = Array.isArray(quotation.owner) ? quotation.owner : [];
+    if (ownerIds.length === 0) {
+      res.status(400).json({ success: false, message: 'Quotation owner is missing' });
+      return;
+    }
+
+    const checkerGroup = await MakerCheckerGroup.findOne({
+      businessId: quotation.businessId,
+      type: 'booking',
+      checkers: userId,
+      makers: { $in: ownerIds },
+    }).select('_id');
+
+    if (!checkerGroup) {
+      res.status(403).json({ success: false, message: 'Not authorized to deny this quotation' });
+      return;
+    }
+
+    const updated = await Quotation.findOneAndUpdate(
+      { _id: quotation._id },
+      { serviceStatus: 'denied', remarks: reason },
+      { new: true }
+    );
+
+    if (!updated) {
+      res.status(404).json({ success: false, message: 'Quotation not found' });
+      return;
+    }
+
+    res.status(200).json({ success: true, quotation: updated });
+  } catch (err) {
+    res.status(500).json({ success: false, message: 'Failed to deny quotation', error: (err as Error).message });
   }
 };

@@ -12,7 +12,10 @@ import {
     uploadProfileImage,
     deleteProfileImage,
     uploadCompanyLogo,
-    deleteCompanyLogo
+    deleteCompanyLogo,
+    getCompanyDetails,
+    updateCompanyDetails,
+    getCurrentUser,
 } from "../controllers/auth";
 import express from "express";
 
@@ -615,8 +618,221 @@ router.post("/upload-profile-image/:userId", checkKarvaanToken, handleProfileIma
  */
 router.delete("/delete-profile-image/:userId", checkKarvaanToken, deleteProfileImage);
 
+/**
+ * @swagger
+ * /auth/upload-company-logo:
+ *   post:
+ *     summary: Upload company logo
+ *     description: Upload a company logo for the authenticated user's business (stored as business profile image).
+ *     tags: [Authentication]
+ *     security:
+ *       - karvaanToken: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         multipart/form-data:
+ *           schema:
+ *             type: object
+ *             required: [profileImage]
+ *             properties:
+ *               profileImage:
+ *                 type: string
+ *                 format: binary
+ *                 description: Logo image file (JPEG, PNG, GIF, WEBP). Max 2MB.
+ *     responses:
+ *       200:
+ *         description: Company logo uploaded successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 message:
+ *                   type: string
+ *                   example: "Profile image uploaded successfully"
+ *                 profileImage:
+ *                   $ref: '#/components/schemas/UploadedDocument'
+ *       400:
+ *         description: Validation error (no file, invalid type, file too large)
+ *       404:
+ *         description: Business not found
+ *       500:
+ *         description: Failed to upload company logo
+ */
 router.post("/upload-company-logo", checkKarvaanToken, handleProfileImageUploadError, uploadCompanyLogo);
 
+/**
+ * @swagger
+ * /auth/delete-company-logo:
+ *   delete:
+ *     summary: Delete company logo
+ *     description: Delete the company logo for the authenticated user's business.
+ *     tags: [Authentication]
+ *     security:
+ *       - karvaanToken: []
+ *     responses:
+ *       200:
+ *         description: Company logo deleted successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 message:
+ *                   type: string
+ *                   example: "Profile image deleted successfully"
+ *       400:
+ *         description: Business does not have a logo
+ *       404:
+ *         description: Business not found
+ *       500:
+ *         description: Failed to delete company logo
+ */
 router.delete("/delete-company-logo", checkKarvaanToken, deleteCompanyLogo);
+
+/**
+ * @swagger
+ * /auth/get-company-details:
+ *   get:
+ *     summary: Get company details
+ *     description: Retrieve the authenticated user's business details.
+ *     tags: [Authentication]
+ *     security:
+ *       - karvaanToken: []
+ *     responses:
+ *       200:
+ *         description: Business details retrieved successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 business:
+ *                   $ref: '#/components/schemas/Business'
+ *       404:
+ *         description: Business not found
+ *       500:
+ *         description: Failed to fetch business details
+ */
+router.get("/get-company-details", checkKarvaanToken, getCompanyDetails);
+
+/**
+ * @swagger
+ * /auth/update-company-details:
+ *   patch:
+ *     summary: Update company details
+ *     description: Update the authenticated user's business details.
+ *     tags: [Authentication]
+ *     security:
+ *       - karvaanToken: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             description: Fields to update on the business record.
+ *             properties:
+ *               businessName:
+ *                 type: string
+ *               businessType:
+ *                 type: string
+ *                 enum: [travel_agency, tour_operator, hotel, restaurant, transport, event_management, consulting, other]
+ *               email:
+ *                 type: string
+ *                 format: email
+ *               phone:
+ *                 type: string
+ *               address:
+ *                 type: object
+ *                 properties:
+ *                   street:
+ *                     type: string
+ *                   city:
+ *                     type: string
+ *                   state:
+ *                     type: string
+ *                   country:
+ *                     type: string
+ *                   zipCode:
+ *                     type: string
+ *               website:
+ *                 type: string
+ *               description:
+ *                 type: string
+ *               logo:
+ *                 type: string
+ *               gstin:
+ *                 type: string
+ *               panNumber:
+ *                 type: string
+ *               registrationNumber:
+ *                 type: string
+ *               settings:
+ *                 type: object
+ *                 properties:
+ *                   allowUserRegistration:
+ *                     type: boolean
+ *                   maxUsers:
+ *                     type: integer
+ *                   features:
+ *                     type: array
+ *                     items:
+ *                       type: string
+ *     responses:
+ *       200:
+ *         description: Business details updated successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 business:
+ *                   $ref: '#/components/schemas/Business'
+ *       404:
+ *         description: Business not found
+ *       500:
+ *         description: Failed to update business details
+ */
+router.patch("/update-company-details", checkKarvaanToken, updateCompanyDetails);
+
+/**
+ * @swagger
+ * /auth/get-current-user:
+ *   get:
+ *     summary: Get current user
+ *     description: Retrieve the authenticated user's details from the token context.
+ *     tags: [Authentication]
+ *     security:
+ *       - karvaanToken: []
+ *     responses:
+ *       200:
+ *         description: Current user retrieved successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 user:
+ *                   $ref: '#/components/schemas/User'
+ *       500:
+ *         description: Failed to fetch current user
+ */
+router.get("/get-current-user", checkKarvaanToken, getCurrentUser);
 
 export default router;

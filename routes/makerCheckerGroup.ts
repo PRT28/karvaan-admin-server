@@ -49,6 +49,10 @@ const router = express.Router();
  *                   type: array
  *                   items:
  *                     $ref: '#/components/schemas/MakerCheckerGroup'
+ *       400:
+ *         description: Invalid businessId or type filter, or missing business context
+ *       500:
+ *         description: Failed to fetch maker checker groups
  */
 router.get('/get-all-groups', getMakerCheckerGroups);
 
@@ -78,6 +82,10 @@ router.get('/get-all-groups', getMakerCheckerGroups);
  *                   $ref: '#/components/schemas/MakerCheckerGroup'
  *       404:
  *         description: Maker-checker group not found
+ *       400:
+ *         description: Invalid group ID or missing business context
+ *       500:
+ *         description: Failed to fetch maker checker group
  */
 router.get('/get-group/:id', getMakerCheckerGroupById);
 
@@ -125,6 +133,10 @@ router.get('/get-group/:id', getMakerCheckerGroupById);
  *               properties:
  *                 group:
  *                   $ref: '#/components/schemas/MakerCheckerGroup'
+ *       400:
+ *         description: Validation error for request fields
+ *       500:
+ *         description: Failed to create maker checker group
  */
 router.post('/create-group', createMakerCheckerGroup);
 
@@ -174,6 +186,12 @@ router.post('/create-group', createMakerCheckerGroup);
  *               properties:
  *                 group:
  *                   $ref: '#/components/schemas/MakerCheckerGroup'
+ *       400:
+ *         description: Invalid group ID, missing business context, or validation error
+ *       404:
+ *         description: Maker-checker group not found
+ *       500:
+ *         description: Failed to update maker checker group
  */
 router.put('/update-group/:id', updateMakerCheckerGroup);
 
@@ -194,6 +212,12 @@ router.put('/update-group/:id', updateMakerCheckerGroup);
  *     responses:
  *       200:
  *         description: Maker-checker group deleted successfully
+ *       400:
+ *         description: Invalid group ID or missing business context
+ *       404:
+ *         description: Maker-checker group not found
+ *       500:
+ *         description: Failed to delete maker checker group
  */
 router.delete('/delete-group/:id', deleteMakerCheckerGroup);
 
@@ -233,6 +257,12 @@ router.delete('/delete-group/:id', deleteMakerCheckerGroup);
  *               properties:
  *                 group:
  *                   $ref: '#/components/schemas/MakerCheckerGroup'
+ *       400:
+ *         description: Invalid group ID, missing business context, or validation error
+ *       404:
+ *         description: Maker-checker group not found
+ *       500:
+ *         description: Failed to update makers list
  */
 router.put('/update-makers/:id', updateMakersList);
 
@@ -272,6 +302,12 @@ router.put('/update-makers/:id', updateMakersList);
  *               properties:
  *                 group:
  *                   $ref: '#/components/schemas/MakerCheckerGroup'
+ *       400:
+ *         description: Invalid group ID, missing business context, or validation error
+ *       404:
+ *         description: Maker-checker group not found
+ *       500:
+ *         description: Failed to update checkers list
  */
 router.put('/update-checkers/:id', updateCheckersList);
 

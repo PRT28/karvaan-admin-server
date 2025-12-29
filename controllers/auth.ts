@@ -910,3 +910,76 @@ export const deleteCompanyLogo = async (req: Request, res: Response): Promise<vo
     });
   }
 };
+
+export const getCompanyDetails = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const businessId = req.user?.businessInfo?.businessId;
+
+    // Find the user
+    const business = await Business.findById(businessId);
+    if (!business) {
+      res.status(404).json({
+        success: false,
+        message: 'Business not found'
+      });
+      return;
+    }
+
+    res.status(200).json({
+      success: true,
+      business
+    });
+  } catch (error: any) {
+    console.error('Error fetching business details:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch business details',
+      error: error.message
+    });
+  }
+};
+
+export const updateCompanyDetails = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const businessId = req.user?.businessInfo?.businessId;
+
+    // Find the user
+    const business = await Business.findByIdAndUpdate(businessId, req.body, { new: true });
+    if (!business) {
+      res.status(404).json({
+        success: false,
+        message: 'Business not found'
+      });
+      return;
+    }
+
+    res.status(200).json({
+      success: true,
+      business
+    });
+  } catch (error: any) {
+    console.error('Error updating business details:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to update business details',
+      error: error.message
+    });
+  }
+};
+
+
+export const getCurrentUser = async (req: Request, res: Response): Promise<void> => {
+  try {
+    res.status(200).json({
+      success: true,
+      user: req.user
+    });
+  } catch (error: any) {
+    console.error('Error fetching current user:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch current user',
+      error: error.message
+    });
+  }
+};

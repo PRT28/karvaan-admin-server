@@ -567,14 +567,32 @@ const options = {
               type: 'array',
               description: 'User IDs or populated maker users',
               items: {
-                $ref: '#/components/schemas/User',
+                oneOf: [
+                  {
+                    type: 'string',
+                    description: 'User ID',
+                    example: '507f1f77bcf86cd799439012',
+                  },
+                  {
+                    $ref: '#/components/schemas/User',
+                  },
+                ],
               },
             },
             checkers: {
               type: 'array',
               description: 'User IDs or populated checker users',
               items: {
-                $ref: '#/components/schemas/User',
+                oneOf: [
+                  {
+                    type: 'string',
+                    description: 'User ID',
+                    example: '507f1f77bcf86cd799439012',
+                  },
+                  {
+                    $ref: '#/components/schemas/User',
+                  },
+                ],
               },
             },
             type: {
@@ -584,9 +602,16 @@ const options = {
               example: 'booking',
             },
             businessId: {
-              type: 'string',
-              description: 'Reference to Business',
-              example: '507f1f77bcf86cd799439020',
+              description: 'Reference to Business or populated business',
+              oneOf: [
+                {
+                  type: 'string',
+                  example: '507f1f77bcf86cd799439020',
+                },
+                {
+                  $ref: '#/components/schemas/Business',
+                },
+              ],
             },
             createdAt: {
               type: 'string',
@@ -671,6 +696,10 @@ const options = {
               type: 'string',
               description: 'Business logo URL',
               example: 'https://example.com/logo.png',
+            },
+            profileImage: {
+              $ref: '#/components/schemas/UploadedDocument',
+              description: 'Business profile image/logo',
             },
             gstin: {
               type: 'string',
