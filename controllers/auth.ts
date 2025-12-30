@@ -173,8 +173,10 @@ export const createNewRole = async (req: Request, res: Response): Promise<void> 
     try {
         const {roleName, permission} = req.body;
 
+        const businessId = req.user?.businessInfo?.businessId;
+
         if (roleName && roleName !== "" && isValidPermissions(permission)) {
-            Role.insertOne({roleName, permission})
+            Role.insertOne({roleName, permission, businessId})
                 .then(data => {
                     res.status(201).json({
                         message: 'role created',
@@ -979,6 +981,47 @@ export const getCurrentUser = async (req: Request, res: Response): Promise<void>
     res.status(500).json({
       success: false,
       message: 'Failed to fetch current user',
+      error: error.message
+    });
+  }
+};
+
+
+export const getBusinessRoles = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const businessId = req.user?.businessInfo?.businessId;
+
+    // Find the user
+    const roles = await Role.find({ businessId });
+    if (!roles) {
+      res.status(404).json({
+        success: false,
+        message: 'Roles not found'
+      });
+      return;
+    }
+
+    const output = [];
+
+    for (let i = 0; i < roles.length; i++) {
+        const users = User.find({ roleId: roles[i]._id });
+        output.push({
+          id: roles[i]._id,
+          name: roles[i].roleName,
+          permissions: roles[i].permission, 
+          users
+        });
+    }
+
+    res.status(200).json({
+      success: true,
+      output
+    });
+  } catch (error: any) {
+    console.error('Error fetching roles:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch roles',
       error: error.message
     });
   }

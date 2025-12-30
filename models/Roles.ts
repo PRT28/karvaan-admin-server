@@ -22,6 +22,7 @@ interface Permissions {
 export interface RoleDocument extends Document {
   roleName: string;
   permission: Permissions;
+  businessId: mongoose.Types.ObjectId;
 }
 
 const crudPermissionsSchema = new Schema<CRUDPermissions>({
@@ -46,6 +47,12 @@ const permissionsSchema = new Schema<Permissions>({
 const roleSchema = new Schema<RoleDocument>({
   roleName: { type: String, required: true, unique: true },
   permission: { type: permissionsSchema, required: true },
+  businessId: {
+    type: Schema.Types.ObjectId,
+    ref: 'Business',
+    required: true,
+    index: true
+  }
 }, {
   timestamps: true,
 });

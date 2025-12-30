@@ -16,6 +16,9 @@ import {
     getCompanyDetails,
     updateCompanyDetails,
     getCurrentUser,
+    resetPassword,
+    resetPasswordRequest,
+    getBusinessRoles
 } from "../controllers/auth";
 import express from "express";
 
@@ -834,5 +837,100 @@ router.patch("/update-company-details", checkKarvaanToken, updateCompanyDetails)
  *         description: Failed to fetch current user
  */
 router.get("/get-current-user", checkKarvaanToken, getCurrentUser);
+
+/**
+ * @swagger
+ * /auth/reset-password:
+ *   post:
+ *     summary: Reset password
+ *     description: Reset the password for the authenticated user
+ *     tags: [Authentication]
+ *     security:
+ *       - karvaanToken: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [newPassword]
+ *             properties:
+ *               newPassword:
+ *                 type: string
+ *                 description: New password for the user
+ *     responses:
+ *       200:
+ *         description: Password reset successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 message:
+ *                   type: string
+ *                   example: "Password reset successfully"
+ *       400:
+ *         description: New password is required
+ *       404:
+ *         description: User not found
+ *       500:
+ *         description: Failed to reset password
+ */
+router.post("/reset-password", checkKarvaanToken, resetPassword);
+
+/**
+ * @swagger
+ * /auth/reset-password-request:
+ *   post:
+ *     summary: Reset password request
+ *     description: Reset the password for a user (business admin only)
+ *     tags: [Authentication]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [userId, password]
+ *             properties:
+ *               userId:
+ *                 type: string
+ *                 description: ID of the user to reset password for
+ *               password:
+ *                 type: string
+ *                 description: New password for the user
+ *               autoGeneratePassword:
+ *                 type: boolean
+ *                 description: Whether to auto-generate a password
+ *               requireReset:
+ *                 type: boolean
+ *                 description: Whether to require the user to reset password on next login
+ *     responses:
+ *       200:
+ *         description: Password reset request processed successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 message:
+ *                   type: string
+ *                   example: "Password reset successfully"
+ *       400:
+ *         description: User ID and password are required
+ *       404:
+ *         description: User not found
+ *       500:
+ *         description: Failed to process password reset request
+ */
+router.post("/reset-password-request", resetPasswordRequest);
+
+router.get("/business/roles", checkKarvaanToken, getBusinessRoles);
 
 export default router;
