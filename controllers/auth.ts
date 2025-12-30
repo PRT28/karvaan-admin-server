@@ -9,6 +9,7 @@ import bcrypt from 'bcryptjs';
 import { send2FACode, sendPasswordResetNotification } from '../utils/email';
 import mongoose from 'mongoose';
 import { uploadToS3, deleteFromS3, UploadedDocument } from '../utils/s3';
+import MakerCheckerGroup from '../models/MakerCheckerGroup';
 
 // Cache for storing 2FA codes with email as key
 const twoFACache = new cache({ stdTTL: 300 }); // 5 minutes TTL
@@ -453,9 +454,30 @@ export const verify2FA = async (req: Request, res: Response): Promise<void> => {
     user.lastLogin = new Date();
     await user.save();
 
+    // Remove password from response
+    const userResponse = user.toObject();
+    delete (userResponse as any).password;
+    const businessId = (user.businessId as any)?._id || user.businessId;
+    const makerCheckerFilter = businessId ? { businessId } : {};
+    const [
+      isBookingMaker,
+      isBookingChecker,
+      isFinanceMaker,
+      isFinanceChecker,
+    ] = await Promise.all([
+      MakerCheckerGroup.exists({ ...makerCheckerFilter, type: 'booking', makers: user._id }),
+      MakerCheckerGroup.exists({ ...makerCheckerFilter, type: 'booking', checkers: user._id }),
+      MakerCheckerGroup.exists({ ...makerCheckerFilter, type: 'finance', makers: user._id }),
+      MakerCheckerGroup.exists({ ...makerCheckerFilter, type: 'finance', checkers: user._id }),
+    ]);
+    (userResponse as any).isBookingMaker = Boolean(isBookingMaker);
+    (userResponse as any).isBookingChecker = Boolean(isBookingChecker);
+    (userResponse as any).isFinanceMaker = Boolean(isFinanceMaker);
+    (userResponse as any).isFinanceChecker = Boolean(isFinanceChecker);
+
     // Create JWT token with business information
     const tokenPayload = {
-      ...user.toObject(),
+      ...userResponse,
       businessInfo: user.businessId ? {
         businessId: (user.businessId as any)._id,
         businessName: (user.businessId as any).businessName,
@@ -463,10 +485,6 @@ export const verify2FA = async (req: Request, res: Response): Promise<void> => {
       } : null
     };
     const token = createToken(tokenPayload);
-
-    // Remove password from response
-    const userResponse = user.toObject();
-    delete (userResponse as any).password;
 
     res.status(200).json({
       message: '2FA verified successfully. Login successful.',
