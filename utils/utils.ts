@@ -3,21 +3,44 @@ import { z } from 'zod';
 
 
 const CRUDSchema = z.object({
-  create: z.boolean(),
-  read: z.boolean(),
-  update: z.boolean(),
+  view: z.boolean(),
+  add: z.boolean(),
+  edit: z.boolean(),
   delete: z.boolean(),
 });
 
 const PermissionsSchema = z.object({
-  sales: CRUDSchema,
-  operateions: z.object({
-    voucher: CRUDSchema,
-    content: CRUDSchema,
+  cooncierce: z.object({
+    bookings: z.object({
+      limitless: z.boolean(),
+      os: z.boolean(),
+    }),
+    directory: z.object({
+      customer: z.boolean(),
+      vendor: z.boolean(),
+      team: z.boolean(),
+    }),
   }),
-  userAccess: z.object({
+  settings: z.object({
+    companyDetails: CRUDSchema,
+    billing: CRUDSchema,
+    users: CRUDSchema,
     roles: CRUDSchema,
-    user: CRUDSchema,
+    approval: CRUDSchema,
+    deleteAfterApproval: z.boolean(),
+    noEditAfterTravelDate: z.boolean(),
+    osPrimary: CRUDSchema,
+    osSecondary: CRUDSchema,
+    limitlessPrimary: CRUDSchema,
+    limitlessSecondary: CRUDSchema,
+  }),
+  bookings: z.object({
+    deleteAfterApproval: z.boolean(),
+    noEditAfterTravelDate: z.boolean(),
+    osPrimary: CRUDSchema,
+    osSecondary: CRUDSchema,
+    limitlessPrimary: CRUDSchema,
+    limitlessSecondary: CRUDSchema,
   }),
 });
 

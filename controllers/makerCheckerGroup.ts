@@ -39,7 +39,7 @@ const populateGroup = (query: any) => {
 
 export const createMakerCheckerGroup = async (req: Request, res: Response): Promise<void> => {
   try {
-    const { name, description, makers, checkers, type } = req.body;
+    const { name, status, makers, checkers, type } = req.body;
 
     if (!name || typeof name !== 'string') {
       res.status(400).json({ message: 'Name is required' });
@@ -75,7 +75,7 @@ export const createMakerCheckerGroup = async (req: Request, res: Response): Prom
 
     const group = await MakerCheckerGroup.create({
       name,
-      description,
+      status,
       makers: makersResult.ids,
       checkers: checkersResult.ids,
       type,

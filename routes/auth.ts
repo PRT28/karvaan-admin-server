@@ -325,7 +325,7 @@ router.post("/create-or-update-user", checkKarvaanToken, createOrUpdateUser);
  *       500:
  *         description: Internal server error
  */
-router.post("/create-new-role", createNewRole);
+router.post("/create-new-role", checkKarvaanToken, createNewRole);
 
 /**
  * @swagger

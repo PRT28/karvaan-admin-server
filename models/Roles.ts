@@ -1,21 +1,44 @@
 import mongoose, { Schema, Document } from 'mongoose';
 
 interface CRUDPermissions {
-  create: boolean;
-  read: boolean;
-  update: boolean;
+  view: boolean;
+  add: boolean;
+  edit: boolean;
   delete: boolean;
 }
 
 interface Permissions {
-  sales: CRUDPermissions;
-  operateions: {
-    voucher: CRUDPermissions;
-    content: CRUDPermissions;
+  cooncierce: {
+    bookings: {
+      limitless: boolean;
+      os: boolean;
+    };
+    directory: {
+      customer: boolean;
+      vendor: boolean;
+      team: boolean;
+    };
   };
-  userAccess: {
+  settings: {
+    companyDetails: CRUDPermissions;
+    billing: CRUDPermissions;
+    users: CRUDPermissions;
     roles: CRUDPermissions;
-    user: CRUDPermissions;
+    approval: CRUDPermissions;
+    deleteAfterApproval: boolean;
+    noEditAfterTravelDate: boolean;
+    osPrimary: CRUDPermissions;
+    osSecondary: CRUDPermissions;
+    limitlessPrimary: CRUDPermissions;
+    limitlessSecondary: CRUDPermissions;
+  };
+  bookings: {
+    deleteAfterApproval: boolean;
+    noEditAfterTravelDate: boolean;
+    osPrimary: CRUDPermissions;
+    osSecondary: CRUDPermissions;
+    limitlessPrimary: CRUDPermissions;
+    limitlessSecondary: CRUDPermissions;
   };
 }
 
@@ -26,22 +49,45 @@ export interface RoleDocument extends Document {
 }
 
 const crudPermissionsSchema = new Schema<CRUDPermissions>({
-  create: { type: Boolean, required: true },
-  read: { type: Boolean, required: true },
-  update: { type: Boolean, required: true },
+  view: { type: Boolean, required: true },
+  add: { type: Boolean, required: true },
+  edit: { type: Boolean, required: true },
   delete: { type: Boolean, required: true },
 }, { _id: false });
 
 const permissionsSchema = new Schema<Permissions>({
-  sales: { type: crudPermissionsSchema, required: true },
-  operateions: {
-    voucher: { type: crudPermissionsSchema, required: true },
-    content: { type: crudPermissionsSchema, required: true },
+  cooncierce: {
+    bookings: {
+      limitless: { type: Boolean, required: true },
+      os: { type: Boolean, required: true },
+    },
+    directory: {
+      customer: { type: Boolean, required: true },
+      vendor: { type: Boolean, required: true },
+      team: { type: Boolean, required: true },
+    },
   },
-  userAccess: {
+  settings: {
+    companyDetails: { type: crudPermissionsSchema, required: true },
+    billing: { type: crudPermissionsSchema, required: true },
+    users: { type: crudPermissionsSchema, required: true },
     roles: { type: crudPermissionsSchema, required: true },
-    user: { type: crudPermissionsSchema, required: true },
-  }
+    approval: { type: crudPermissionsSchema, required: true },
+    deleteAfterApproval: { type: Boolean, required: true },
+    noEditAfterTravelDate: { type: Boolean, required: true },
+    osPrimary: { type: crudPermissionsSchema, required: true },
+    osSecondary: { type: crudPermissionsSchema, required: true },
+    limitlessPrimary: { type: crudPermissionsSchema, required: true },
+    limitlessSecondary: { type: crudPermissionsSchema, required: true },
+  },
+  bookings: {
+    deleteAfterApproval: { type: Boolean, required: true },
+    noEditAfterTravelDate: { type: Boolean, required: true },
+    osPrimary: { type: crudPermissionsSchema, required: true },
+    osSecondary: { type: crudPermissionsSchema, required: true },
+    limitlessPrimary: { type: crudPermissionsSchema, required: true },
+    limitlessSecondary: { type: crudPermissionsSchema, required: true },
+  },
 }, { _id: false });
 
 const roleSchema = new Schema<RoleDocument>({

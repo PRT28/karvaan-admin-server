@@ -176,6 +176,8 @@ export const createNewRole = async (req: Request, res: Response): Promise<void> 
 
         const businessId = req.user?.businessInfo?.businessId;
 
+        console.log(businessId, 'businessId', req.user)
+
         if (roleName && roleName !== "" && isValidPermissions(permission)) {
             Role.insertOne({roleName, permission, businessId})
                 .then(data => {
@@ -1009,6 +1011,8 @@ export const getBusinessRoles = async (req: Request, res: Response): Promise<voi
   try {
     const businessId = req.user?.businessInfo?.businessId;
 
+    console.log(businessId, 'businessId');
+
     // Find the user
     const roles = await Role.find({ businessId });
     if (!roles) {
@@ -1019,17 +1023,17 @@ export const getBusinessRoles = async (req: Request, res: Response): Promise<voi
       return;
     }
 
-    const output = [];
-
-    for (let i = 0; i < roles.length; i++) {
-        const users = User.find({ roleId: roles[i]._id });
-        output.push({
-          id: roles[i]._id,
-          name: roles[i].roleName,
-          permissions: roles[i].permission, 
+    const output = await Promise.all(
+      roles.map(async (role) => {
+        const users = await User.find({ roleId: role._id }).select('-password').lean();
+        return {
+          id: role._id,
+          name: role.roleName,
+          permissions: role.permission,
           users
-        });
-    }
+        };
+      })
+    );
 
     res.status(200).json({
       success: true,
