@@ -43,7 +43,7 @@ const options = {
         // User Schema
         User: {
           type: 'object',
-          required: ['name', 'email', 'mobile', 'phoneCode', 'roleId', 'password', 'designation'],
+          required: ['name', 'email', 'mobile', 'phoneCode', 'roleId', 'userType', 'isActive', 'superAdmin', 'resetPasswordRequired'],
           properties: {
             _id: {
               type: 'string',
@@ -61,55 +61,10 @@ const options = {
               description: 'User email address',
               example: 'john.doe@example.com',
             },
-            dateOfBirth: {
-              type: 'string',
-              format: 'date',
-              description: 'Date of birth',
-              example: '1990-01-15',
-            },
-            gender: {
-              type: 'string',
-              enum: ['male', 'female', 'other'],
-              description: 'Gender',
-              example: 'male',
-            },
-            emergencyContact: {
-              type: 'string',
-              description: 'Emergency contact number',
-              example: '+91-9876543210',
-            },
-            alias: {
-              type: 'string',
-              description: 'User alias or nickname',
-              example: 'JD',
-            },
             mobile: {
               type: 'string',
               description: 'User mobile number',
               example: '+91-9876543210',
-            },
-            designation: {
-              type: 'string',
-              description: 'Job designation',
-              example: 'Travel Consultant',
-            },
-            dateOfJoining: {
-              type: 'string',
-              format: 'date',
-              description: 'Date of joining',
-              example: '2024-01-01',
-            },
-            dateOfLeaving: {
-              type: 'string',
-              format: 'date',
-              description: 'Date of leaving (if applicable)',
-              example: '2024-12-31',
-            },
-            agentId: {
-              type: 'string',
-              nullable: true,
-              description: 'Agent ID if user is an agent',
-              example: 'AGENT001',
             },
             phoneCode: {
               type: 'number',
@@ -132,6 +87,7 @@ const options = {
               enum: ['super_admin', 'business_admin', 'business_user'],
               description: 'User type in the system',
               example: 'business_user',
+              default: 'business_user',
             },
             isActive: {
               type: 'boolean',
@@ -146,6 +102,11 @@ const options = {
             superAdmin: {
               type: 'boolean',
               description: 'Whether user is a super admin',
+              default: false,
+            },
+            resetPasswordRequired: {
+              type: 'boolean',
+              description: 'Whether user must reset password on next login',
               default: false,
             },
             profileImage: {
@@ -168,7 +129,7 @@ const options = {
         // Role Schema
         Role: {
           type: 'object',
-          required: ['roleName', 'permission'],
+          required: ['roleName', 'permission', 'businessId'],
           properties: {
             _id: {
               type: 'string',
@@ -182,6 +143,11 @@ const options = {
             },
             permission: {
               $ref: '#/components/schemas/Permissions',
+            },
+            businessId: {
+              type: 'string',
+              description: 'Reference to Business',
+              example: '507f1f77bcf86cd799439020',
             },
             createdAt: {
               type: 'string',
@@ -197,29 +163,95 @@ const options = {
         // Permissions Schema
         Permissions: {
           type: 'object',
-          required: ['sales', 'operateions', 'userAccess'],
+          required: ['cooncierce', 'settings', 'bookings'],
           properties: {
-            sales: {
-              $ref: '#/components/schemas/CRUDPermissions',
-            },
-            operateions: {
+            cooncierce: {
               type: 'object',
               properties: {
-                voucher: {
+                bookings: {
+                  type: 'object',
+                  properties: {
+                    limitless: {
+                      type: 'boolean',
+                    },
+                    os: {
+                      type: 'boolean',
+                    },
+                  },
+                },
+                directory: {
+                  type: 'object',
+                  properties: {
+                    customer: {
+                      type: 'boolean',
+                    },
+                    vendor: {
+                      type: 'boolean',
+                    },
+                    team: {
+                      type: 'boolean',
+                    },
+                  },
+                },
+              },
+            },
+            settings: {
+              type: 'object',
+              properties: {
+                companyDetails: {
                   $ref: '#/components/schemas/CRUDPermissions',
                 },
-                content: {
+                billing: {
+                  $ref: '#/components/schemas/CRUDPermissions',
+                },
+                users: {
+                  $ref: '#/components/schemas/CRUDPermissions',
+                },
+                roles: {
+                  $ref: '#/components/schemas/CRUDPermissions',
+                },
+                approval: {
+                  $ref: '#/components/schemas/CRUDPermissions',
+                },
+                deleteAfterApproval: {
+                  type: 'boolean',
+                },
+                noEditAfterTravelDate: {
+                  type: 'boolean',
+                },
+                osPrimary: {
+                  $ref: '#/components/schemas/CRUDPermissions',
+                },
+                osSecondary: {
+                  $ref: '#/components/schemas/CRUDPermissions',
+                },
+                limitlessPrimary: {
+                  $ref: '#/components/schemas/CRUDPermissions',
+                },
+                limitlessSecondary: {
                   $ref: '#/components/schemas/CRUDPermissions',
                 },
               },
             },
-            userAccess: {
+            bookings: {
               type: 'object',
               properties: {
-                roles: {
+                deleteAfterApproval: {
+                  type: 'boolean',
+                },
+                noEditAfterTravelDate: {
+                  type: 'boolean',
+                },
+                osPrimary: {
                   $ref: '#/components/schemas/CRUDPermissions',
                 },
-                user: {
+                osSecondary: {
+                  $ref: '#/components/schemas/CRUDPermissions',
+                },
+                limitlessPrimary: {
+                  $ref: '#/components/schemas/CRUDPermissions',
+                },
+                limitlessSecondary: {
                   $ref: '#/components/schemas/CRUDPermissions',
                 },
               },
@@ -230,19 +262,19 @@ const options = {
         // CRUD Permissions Schema
         CRUDPermissions: {
           type: 'object',
-          required: ['create', 'read', 'update', 'delete'],
+          required: ['view', 'add', 'edit', 'delete'],
           properties: {
-            create: {
+            view: {
               type: 'boolean',
-              description: 'Create permission',
+              description: 'View permission',
             },
-            read: {
+            add: {
               type: 'boolean',
-              description: 'Read permission',
+              description: 'Add permission',
             },
-            update: {
+            edit: {
               type: 'boolean',
-              description: 'Update permission',
+              description: 'Edit permission',
             },
             delete: {
               type: 'boolean',
@@ -834,7 +866,6 @@ const options = {
         // Quotation Schema
         Quotation: {
           type: 'object',
-          required: ['quotationType', 'channel', 'formFields', 'totalAmount', 'businessId', 'owner', 'travelDate'],
           properties: {
             _id: {
               type: 'string',
@@ -898,9 +929,15 @@ const options = {
             },
             status: {
               type: 'string',
-              enum: ['pending', 'confirmed', 'cancelled'],
+              enum: ['confirmed', 'cancelled'],
               description: 'Quotation status',
               example: 'confirmed',
+            },
+            serviceStatus: {
+              type: 'string',
+              enum: ['pending', 'denied', 'draft', 'approved'],
+              description: 'Service approval status',
+              example: 'approved',
             },
             owner: {
               type: 'array',
@@ -940,44 +977,7 @@ const options = {
               type: 'array',
               description: 'Array of uploaded documents (max 3)',
               items: {
-                type: 'object',
-                properties: {
-                  originalName: {
-                    type: 'string',
-                    description: 'Original file name',
-                    example: 'contract.pdf',
-                  },
-                  fileName: {
-                    type: 'string',
-                    description: 'Stored file name (UUID)',
-                    example: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890.pdf',
-                  },
-                  url: {
-                    type: 'string',
-                    description: 'Public S3 URL',
-                    example: 'https://karvaan-quotation-documents.s3.ap-south-1.amazonaws.com/quotations/businessId/a1b2c3d4.pdf',
-                  },
-                  key: {
-                    type: 'string',
-                    description: 'S3 object key',
-                    example: 'quotations/businessId/a1b2c3d4.pdf',
-                  },
-                  size: {
-                    type: 'number',
-                    description: 'File size in bytes',
-                    example: 102400,
-                  },
-                  mimeType: {
-                    type: 'string',
-                    description: 'File MIME type',
-                    example: 'application/pdf',
-                  },
-                  uploadedAt: {
-                    type: 'string',
-                    format: 'date-time',
-                    description: 'Upload timestamp',
-                  },
-                },
+                $ref: '#/components/schemas/UploadedDocument',
               },
             },
             createdAt: {

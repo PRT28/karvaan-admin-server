@@ -69,7 +69,7 @@ const QuotationSchema = new Schema<IQuotation>(
     },
     owner: {
       type: [Schema.Types.ObjectId],
-      ref: 'Team',
+      ref: 'User',
     },
     serviceStatus: {
       type: String,

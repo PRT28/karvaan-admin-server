@@ -8,11 +8,14 @@ import {
     getBookingHistoryByCustomer,
     getBookingHistoryByVendor,
     getBookingHistoryByTraveller,
-    getBookingHistoryByTeamMember
+    getBookingHistoryByTeamMember,
+    denyQuotation,
+    approveQuotation
 } from '../controllers/quotation';
 
 import express from 'express';
 import { handleDocumentUploadError } from '../middleware/documentUpload';
+import { checkKarvaanToken } from '../utils/middleware';
 
 const router = express.Router();
 
@@ -32,6 +35,47 @@ const router = express.Router();
  *     tags: [Quotations]
  *     security:
  *       - karvaanToken: []
+ *     parameters:
+ *       - in: query
+ *         name: bookingStartDate
+ *         schema:
+ *           type: string
+ *           format: date
+ *         description: Filter by quotation createdAt start date
+ *       - in: query
+ *         name: bookingEndDate
+ *         schema:
+ *           type: string
+ *           format: date
+ *         description: Filter by quotation createdAt end date
+ *       - in: query
+ *         name: travelStartDate
+ *         schema:
+ *           type: string
+ *           format: date
+ *         description: Filter by travelDate start date
+ *       - in: query
+ *         name: travelEndDate
+ *         schema:
+ *           type: string
+ *           format: date
+ *         description: Filter by travelDate end date
+ *       - in: query
+ *         name: owner
+ *         schema:
+ *           type: string
+ *         description: Filter by owner team member ID
+ *       - in: query
+ *         name: isDeleted
+ *         schema:
+ *           type: boolean
+ *         description: Include soft-deleted records when true
+ *       - in: query
+ *         name: serviceStatus
+ *         schema:
+ *           type: string
+ *           enum: [pending, denied, draft, approved]
+ *         description: Filter by service status
  *     responses:
  *       200:
  *         description: Quotations retrieved successfully
@@ -105,7 +149,7 @@ router.get('/get-quotation/:id', getQuotationById);
  * /quotation/get-quotations-by-party/{id}:
  *   get:
  *     summary: Get quotations by party ID
- *     description: Retrieve all quotations for a specific party (customer or vendor)
+ *     description: Retrieve all quotations for a specific business ID
  *     tags: [Quotations]
  *     security:
  *       - karvaanToken: []
@@ -115,7 +159,7 @@ router.get('/get-quotation/:id', getQuotationById);
  *         required: true
  *         schema:
  *           type: string
- *         description: Party ID (Customer or Vendor ID)
+ *         description: Business ID
  *     responses:
  *       200:
  *         description: Quotations retrieved successfully
@@ -165,6 +209,10 @@ router.get('/get-quotations-by-party/:id', getQuotationsByParty);
  *                 type: string
  *                 enum: [B2B, B2C]
  *                 example: "B2C"
+ *               serviceStatus:
+ *                 type: string
+ *                 enum: [pending, denied, draft, approved]
+ *                 description: Use "draft" to skip required fields validation
  *               customerId:
  *                 type: string
  *                 description: Required for B2C channel
@@ -262,12 +310,25 @@ router.post('/create-quotation', handleDocumentUploadError, createQuotation);
  *             properties:
  *               quotationType:
  *                 type: string
- *                 enum: [flight, train, hotel, activity]
+ *                 enum: [flight, train, hotel, activity, travel, transport-land, transport-maritime, tickets, travel insurance, visas, others]
  *               channel:
  *                 type: string
  *                 enum: [B2B, B2C]
- *               partyId:
+ *               customerId:
  *                 type: string
+ *               vendorId:
+ *                 type: string
+ *               owner:
+ *                 type: array
+ *                 items:
+ *                   type: string
+ *               travelers:
+ *                 type: array
+ *                 items:
+ *                   type: string
+ *               travelDate:
+ *                 type: string
+ *                 format: date
  *               formFields:
  *                 type: object
  *                 additionalProperties: true
@@ -275,7 +336,12 @@ router.post('/create-quotation', handleDocumentUploadError, createQuotation);
  *                 type: number
  *               status:
  *                 type: string
- *                 enum: [pending, confirmed, cancelled]
+ *                 enum: [confirmed, cancelled]
+ *               serviceStatus:
+ *                 type: string
+ *                 enum: [pending, denied, draft, approved]
+ *               remarks:
+ *                 type: string
  *     responses:
  *       200:
  *         description: Quotation updated successfully
@@ -364,7 +430,7 @@ router.delete('/delete-quotation/:id', deleteQuotation);
  *       - Populated customer, vendor, traveller, and owner details
  *
  *       **Query Parameters:**
- *       - status: Filter by quotation status (draft, confirmed, cancelled)
+ *       - status: Filter by quotation status (confirmed, cancelled)
  *       - quotationType: Filter by type (flight, train, hotel, activity, etc.)
  *       - startDate/endDate: Filter by booking date range
  *       - travelStartDate/travelEndDate: Filter by travel date range
@@ -386,7 +452,7 @@ router.delete('/delete-quotation/:id', deleteQuotation);
  *         name: status
  *         schema:
  *           type: string
- *           enum: [pending, confirmed, cancelled]
+ *           enum: [confirmed, cancelled]
  *         description: Filter by quotation status
  *       - in: query
  *         name: quotationType
@@ -516,7 +582,7 @@ router.get('/booking-history/customer/:customerId', getBookingHistoryByCustomer)
  *       - Populated customer, vendor, traveller, and owner details
  *
  *       **Query Parameters:**
- *       - status: Filter by quotation status (draft, confirmed, cancelled)
+ *       - status: Filter by quotation status (confirmed, cancelled)
  *       - quotationType: Filter by type (flight, train, hotel, activity, etc.)
  *       - startDate/endDate: Filter by booking date range
  *       - travelStartDate/travelEndDate: Filter by travel date range
@@ -538,7 +604,7 @@ router.get('/booking-history/customer/:customerId', getBookingHistoryByCustomer)
  *         name: status
  *         schema:
  *           type: string
- *           enum: [pending, confirmed, cancelled]
+ *           enum: [confirmed, cancelled]
  *         description: Filter by quotation status
  *       - in: query
  *         name: quotationType
@@ -669,7 +735,7 @@ router.get('/booking-history/vendor/:vendorId', getBookingHistoryByVendor);
  *       - Populated customer, vendor, traveller, and owner details
  *
  *       **Query Parameters:**
- *       - status: Filter by quotation status (draft, confirmed, cancelled)
+ *       - status: Filter by quotation status (confirmed, cancelled)
  *       - quotationType: Filter by type (flight, train, hotel, activity, etc.)
  *       - startDate/endDate: Filter by booking date range
  *       - travelStartDate/travelEndDate: Filter by travel date range
@@ -691,7 +757,7 @@ router.get('/booking-history/vendor/:vendorId', getBookingHistoryByVendor);
  *         name: status
  *         schema:
  *           type: string
- *           enum: [pending, confirmed, cancelled]
+ *           enum: [confirmed, cancelled]
  *         description: Filter by quotation status
  *       - in: query
  *         name: quotationType
@@ -831,9 +897,9 @@ router.get('/booking-history/traveller/:travellerId', getBookingHistoryByTravell
  *       - `sortOrder`: Sort direction - asc or desc (default: desc)
  *       - `page`: Page number for pagination (default: 1)
  *       - `limit`: Number of records per page (default: 10)
- *     tags: [Quotation]
+ *     tags: [Quotations]
  *     security:
- *       - bearerAuth: []
+ *       - karvaanToken: []
  *     parameters:
  *       - in: path
  *         name: teamMemberId
@@ -846,7 +912,7 @@ router.get('/booking-history/traveller/:travellerId', getBookingHistoryByTravell
  *         name: status
  *         schema:
  *           type: string
- *           enum: [pending, confirmed, cancelled]
+ *           enum: [confirmed, cancelled]
  *         description: Filter quotations by status
  *       - in: query
  *         name: quotationType
@@ -925,7 +991,23 @@ router.get('/booking-history/traveller/:travellerId', getBookingHistoryByTravell
  *                       items:
  *                         $ref: '#/components/schemas/Quotation'
  *                     pagination:
- *                       $ref: '#/components/schemas/PaginationResponse'
+ *                       type: object
+ *                       properties:
+ *                         currentPage:
+ *                           type: integer
+ *                           example: 1
+ *                         totalPages:
+ *                           type: integer
+ *                           example: 5
+ *                         totalCount:
+ *                           type: integer
+ *                           example: 47
+ *                         hasNextPage:
+ *                           type: boolean
+ *                           example: true
+ *                         hasPrevPage:
+ *                           type: boolean
+ *                           example: false
  *                     teamMember:
  *                       type: object
  *                       properties:
@@ -947,5 +1029,109 @@ router.get('/booking-history/traveller/:travellerId', getBookingHistoryByTravell
  *         description: Internal server error
  */
 router.get('/booking-history/team-member/:teamMemberId', getBookingHistoryByTeamMember);
+
+/**
+ * @swagger
+ * /quotation/approve/{id}:
+ *   post:
+ *     summary: Approve a quotation
+ *     description: Approve a quotation via maker-checker validation.
+ *     tags: [Quotations]
+ *     security:
+ *       - karvaanToken: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Quotation ID to approve
+ *     requestBody:
+ *       required: false
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               reason:
+ *                 type: string
+ *                 description: Approval reason or remarks
+ *     responses:
+ *       200:
+ *         description: Quotation approved successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 quotation:
+ *                   $ref: '#/components/schemas/Quotation'
+ *       400:
+ *         description: Invalid request or missing business context
+ *       401:
+ *         description: Unauthorized user
+ *       403:
+ *         description: Not authorized to approve this quotation
+ *       404:
+ *         description: Quotation not found
+ *       500:
+ *         description: Failed to approve quotation
+ */
+router.post('/approve/:id', checkKarvaanToken, approveQuotation);
+
+/**
+ * @swagger
+ * /quotation/deny/{id}:
+ *   post:
+ *     summary: Deny a quotation
+ *     description: Deny a quotation via maker-checker validation.
+ *     tags: [Quotations]
+ *     security:
+ *       - karvaanToken: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Quotation ID to deny
+ *     requestBody:
+ *       required: false
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               reason:
+ *                 type: string
+ *                 description: Denial reason or remarks
+ *     responses:
+ *       200:
+ *         description: Quotation denied successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 quotation:
+ *                   $ref: '#/components/schemas/Quotation'
+ *       400:
+ *         description: Invalid request or missing business context
+ *       401:
+ *         description: Unauthorized user
+ *       403:
+ *         description: Not authorized to deny this quotation
+ *       404:
+ *         description: Quotation not found
+ *       500:
+ *         description: Failed to deny quotation
+ */
+router.post('/deny/:id', checkKarvaanToken, denyQuotation);
 
 export default router;

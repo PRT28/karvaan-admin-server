@@ -1048,3 +1048,45 @@ export const getBusinessRoles = async (req: Request, res: Response): Promise<voi
     });
   }
 };
+
+export const activateBusinessUser = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { userIds } = req.body;
+    await User.updateMany(
+      { _id: { $in: userIds } },
+      { isActive: true }
+    );
+    res.status(200).json({
+      success: true,
+      message: 'Users activated successfully'
+    });
+  } catch (error: any) {
+    console.error('Error activating users:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to activate users',
+      error: error.message
+    });
+  }
+};
+
+export const deactivateBusinessUser = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { userIds } = req.body;
+    await User.updateMany(
+      { _id: { $in: userIds } },
+      { isActive: false }
+    );
+    res.status(200).json({
+      success: true,
+      message: 'Users deactivated successfully'
+    });
+  } catch (error: any) {
+    console.error('Error deactivating users:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to deactivate users',
+      error: error.message
+    });
+  }
+};

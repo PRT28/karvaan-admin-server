@@ -873,11 +873,15 @@ export const approveQuotation = async (req: Request, res: Response): Promise<voi
       return;
     }
 
+    console.log(req.user, 'User')
+
     const quotation = await Quotation.findOne(filter).select('owner businessId');
     if (!quotation) {
       res.status(404).json({ success: false, message: 'Quotation not found' });
       return;
     }
+
+    console.log(quotation, 'Quotation')
 
     const ownerIds = Array.isArray(quotation.owner) ? quotation.owner : [];
     if (ownerIds.length === 0) {
@@ -885,12 +889,16 @@ export const approveQuotation = async (req: Request, res: Response): Promise<voi
       return;
     }
 
+    console.log(quotation.businessId, 'Business ID')
+
     const checkerGroup = await MakerCheckerGroup.findOne({
       businessId: quotation.businessId,
       type: 'booking',
       checkers: userId,
       makers: { $in: ownerIds },
     }).select('_id');
+
+    console.log(checkerGroup, 'Checker Group')
 
     if (!checkerGroup) {
       res.status(403).json({ success: false, message: 'Not authorized to approve this quotation' });

@@ -18,7 +18,9 @@ import {
     getCurrentUser,
     resetPassword,
     resetPasswordRequest,
-    getBusinessRoles
+    getBusinessRoles,
+    activateBusinessUser,
+    deactivateBusinessUser
 } from "../controllers/auth";
 import express from "express";
 
@@ -931,6 +933,130 @@ router.post("/reset-password", checkKarvaanToken, resetPassword);
  */
 router.post("/reset-password-request", resetPasswordRequest);
 
+/**
+ * @swagger
+ * /auth/business/roles:
+ *   get:
+ *     summary: Get business roles with users
+ *     description: Retrieve all roles for the authenticated user's business along with assigned users.
+ *     tags: [Authentication]
+ *     security:
+ *       - karvaanToken: []
+ *     responses:
+ *       200:
+ *         description: Roles retrieved successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 output:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       id:
+ *                         type: string
+ *                         description: Role ID
+ *                       name:
+ *                         type: string
+ *                         description: Role name
+ *                       permissions:
+ *                         $ref: '#/components/schemas/Permissions'
+ *                       users:
+ *                         type: array
+ *                         items:
+ *                           $ref: '#/components/schemas/User'
+ *       404:
+ *         description: Roles not found
+ *       500:
+ *         description: Failed to fetch roles
+ */
 router.get("/business/roles", checkKarvaanToken, getBusinessRoles);
+
+/**
+ * @swagger
+ * /auth/business/users/activate:
+ *   patch:
+ *     summary: Activate business users
+ *     description: Activate multiple users by ID for the authenticated user's business.
+ *     tags: [Authentication]
+ *     security:
+ *       - karvaanToken: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [userIds]
+ *             properties:
+ *               userIds:
+ *                 type: array
+ *                 items:
+ *                   type: string
+ *                 description: List of user IDs to activate
+ *     responses:
+ *       200:
+ *         description: Users activated successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 message:
+ *                   type: string
+ *                   example: "Users activated successfully"
+ *       500:
+ *         description: Failed to activate users
+ */
+router.patch("/business/users/activate", checkKarvaanToken, activateBusinessUser);
+
+/**
+ * @swagger
+ * /auth/business/users/deactivate:
+ *   patch:
+ *     summary: Deactivate business users
+ *     description: Deactivate multiple users by ID for the authenticated user's business.
+ *     tags: [Authentication]
+ *     security:
+ *       - karvaanToken: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [userIds]
+ *             properties:
+ *               userIds:
+ *                 type: array
+ *                 items:
+ *                   type: string
+ *                 description: List of user IDs to deactivate
+ *     responses:
+ *       200:
+ *         description: Users deactivated successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 message:
+ *                   type: string
+ *                   example: "Users deactivated successfully"
+ *       500:
+ *         description: Failed to deactivate users
+ */
+router.patch("/business/users/deactivate", checkKarvaanToken, deactivateBusinessUser);
 
 export default router;
