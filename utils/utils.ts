@@ -71,7 +71,7 @@ export function generateSecurePassword() {
 
   const allChars = upper + lower + numbers + symbols;
 
-  const cryptoObj = window.crypto || require("crypto").webcrypto;
+  const cryptoObj = require("crypto").webcrypto;
   const randomValues = new Uint32Array(16);
   cryptoObj.getRandomValues(randomValues);
 

@@ -204,6 +204,7 @@ export const createNewRole = async (req: Request, res: Response): Promise<void> 
 
 export const createOrUpdateUser = async (req: Request, res: Response): Promise<void> => {
   try {
+
     const {
       name,
       email,
@@ -211,11 +212,10 @@ export const createOrUpdateUser = async (req: Request, res: Response): Promise<v
       phoneCode,
       roleId,
       _id,
-      userType,
-      businessId,
       password,
       isActive,
       resetPasswordRequired,
+      autoCreate
     } = req.body;
 
     if (_id) {
@@ -225,22 +225,12 @@ export const createOrUpdateUser = async (req: Request, res: Response): Promise<v
         return;
       }
 
-      const targetUserType = userType ?? existingUser.userType;
-      const targetBusinessId =
-        targetUserType === 'super_admin'
-          ? null
-          : businessId ??
-            existingUser.businessId ??
-            req.user?.businessInfo?.businessId ??
-            req.user?.businessId;
 
       if (name !== undefined) existingUser.name = name;
       if (email !== undefined) existingUser.email = email;
       if (mobile !== undefined) existingUser.mobile = mobile;
       if (phoneCode !== undefined) existingUser.phoneCode = phoneCode;
       if (roleId !== undefined) existingUser.roleId = roleId;
-      if (userType !== undefined) existingUser.userType = userType;
-      if (targetBusinessId !== undefined) existingUser.businessId = targetBusinessId;
       if (isActive !== undefined) existingUser.isActive = isActive;
       if (resetPasswordRequired !== undefined) {
         existingUser.resetPasswordRequired = resetPasswordRequired;
@@ -248,14 +238,6 @@ export const createOrUpdateUser = async (req: Request, res: Response): Promise<v
 
       if (password) {
         existingUser.password = await bcrypt.hash(password, 10);
-      }
-
-      if (existingUser.userType !== 'super_admin' && !existingUser.businessId) {
-        res.status(400).json({
-          message: 'businessId is required for business users',
-          success: false,
-        });
-        return;
       }
 
       const data = await existingUser.save();
@@ -275,21 +257,8 @@ export const createOrUpdateUser = async (req: Request, res: Response): Promise<v
       return;
     }
 
-    const resolvedUserType = userType || 'business_user';
-    const resolvedBusinessId =
-      resolvedUserType === 'super_admin'
-        ? null
-        : businessId || req.user?.businessInfo?.businessId || req.user?.businessId;
 
-    if (resolvedUserType !== 'super_admin' && !resolvedBusinessId) {
-      res.status(400).json({
-        message: 'businessId is required for business users',
-        success: false,
-      });
-      return;
-    }
-
-    const rawPassword = password || generateSecurePassword();
+    const rawPassword = autoCreate ? generateSecurePassword() : password || generateSecurePassword();
     const hashedPassword = await bcrypt.hash(rawPassword, 10);
 
     const data = await User.create({
@@ -298,8 +267,7 @@ export const createOrUpdateUser = async (req: Request, res: Response): Promise<v
       mobile,
       phoneCode,
       roleId,
-      userType: resolvedUserType,
-      businessId: resolvedBusinessId,
+      businessId: req.user?.businessInfo?.businessId,
       password: hashedPassword,
       isActive,
       resetPasswordRequired: password ? Boolean(resetPasswordRequired) : true,
