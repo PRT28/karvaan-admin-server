@@ -4,7 +4,7 @@ export type MakerCheckerGroupType = 'booking' | 'finance';
 
 export interface IMakerCheckerGroup extends Document {
   name: string;
-  status: boolean;
+  active: boolean;
   makers: mongoose.Types.ObjectId[];
   checkers: mongoose.Types.ObjectId[];
   businessId: mongoose.Types.ObjectId;
@@ -15,7 +15,7 @@ export interface IMakerCheckerGroup extends Document {
 
 const makerCheckerGroupSchema = new Schema<IMakerCheckerGroup>({
   name: { type: String, required: true },
-  status: { type: Boolean, default: true },
+  active: { type: Boolean, default: true },
   makers: [{ type: Schema.Types.ObjectId, ref: 'User', required: true }],
   checkers: [{ type: Schema.Types.ObjectId, ref: 'User', required: true }],
   type: {

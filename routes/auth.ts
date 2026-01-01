@@ -20,7 +20,8 @@ import {
     resetPasswordRequest,
     getBusinessRoles,
     activateBusinessUser,
-    deactivateBusinessUser
+    deactivateBusinessUser,
+    updateBusinessRole
 } from "../controllers/auth";
 import express from "express";
 
@@ -1058,5 +1059,7 @@ router.patch("/business/users/activate", checkKarvaanToken, activateBusinessUser
  *         description: Failed to deactivate users
  */
 router.patch("/business/users/deactivate", checkKarvaanToken, deactivateBusinessUser);
+
+router.patch("/business/roles/update", checkKarvaanToken, updateBusinessRole);
 
 export default router;

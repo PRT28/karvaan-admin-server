@@ -204,58 +204,112 @@ export const createNewRole = async (req: Request, res: Response): Promise<void> 
 
 export const createOrUpdateUser = async (req: Request, res: Response): Promise<void> => {
   try {
-    const { mobile, email, roleId, gender, phoneCode, userId } = req.body;
-    if (!mobile || !email || !roleId || !gender || !phoneCode) {
-        res.status(400).json({ message: 'All fields (phoneNumber, email, roleId, gender, phoneCode) are required' });
-        return;
-    }
-    if (userId) {
-      const existingUser = await User.findById(userId);
+    const {
+      name,
+      email,
+      mobile,
+      phoneCode,
+      roleId,
+      _id,
+      userType,
+      businessId,
+      password,
+      isActive,
+      resetPasswordRequired,
+    } = req.body;
+
+    if (_id) {
+      const existingUser = await User.findById(_id);
       if (!existingUser) {
-        res.status(400).json({ message: 'User does not exists with this ID' });
+        res.status(404).json({ message: 'User does not exist with this ID', success: false });
         return;
       }
-        existingUser.mobile = mobile;
-        existingUser.email = email;
-        existingUser.roleId = roleId;
-        existingUser.phoneCode = phoneCode;
-        existingUser.name = existingUser.name;
-        existingUser.save().then(data => {
-            res.status(200).json({
-                message: 'User updated successfully',
-                data,
-                success: true,
-            });
-        }).catch(error => {
-            console.error(error);
-            res.status(500).json({
-                message: 'Failed to update user',
-                error: error,
-                success: false,
-            });
+
+      const targetUserType = userType ?? existingUser.userType;
+      const targetBusinessId =
+        targetUserType === 'super_admin'
+          ? null
+          : businessId ??
+            existingUser.businessId ??
+            req.user?.businessInfo?.businessId ??
+            req.user?.businessId;
+
+      if (name !== undefined) existingUser.name = name;
+      if (email !== undefined) existingUser.email = email;
+      if (mobile !== undefined) existingUser.mobile = mobile;
+      if (phoneCode !== undefined) existingUser.phoneCode = phoneCode;
+      if (roleId !== undefined) existingUser.roleId = roleId;
+      if (userType !== undefined) existingUser.userType = userType;
+      if (targetBusinessId !== undefined) existingUser.businessId = targetBusinessId;
+      if (isActive !== undefined) existingUser.isActive = isActive;
+      if (resetPasswordRequired !== undefined) {
+        existingUser.resetPasswordRequired = resetPasswordRequired;
+      }
+
+      if (password) {
+        existingUser.password = await bcrypt.hash(password, 10);
+      }
+
+      if (existingUser.userType !== 'super_admin' && !existingUser.businessId) {
+        res.status(400).json({
+          message: 'businessId is required for business users',
+          success: false,
         });
-    } else {
-        User.insertOne({
-            mobile,
-            email,
-            roleId,
-            gender,
-            phoneCode,
-            }).then(data => {
-            res.status(201).json({
-                message: 'User created successfully',
-                data,
-                success: true,
-            })
-        }).catch(error => {
-            console.error(error);
-            res.status(500).json({
-                message: 'Failed to create user',
-                error: error,
-                success: false,
-            });
-        });
+        return;
+      }
+
+      const data = await existingUser.save();
+      res.status(200).json({
+        message: 'User updated successfully',
+        data,
+        success: true,
+      });
+      return;
     }
+
+    if (!name || !email || !mobile || !phoneCode || !roleId) {
+      res.status(400).json({
+        message: 'name, email, mobile, phoneCode, and roleId are required',
+        success: false,
+      });
+      return;
+    }
+
+    const resolvedUserType = userType || 'business_user';
+    const resolvedBusinessId =
+      resolvedUserType === 'super_admin'
+        ? null
+        : businessId || req.user?.businessInfo?.businessId || req.user?.businessId;
+
+    if (resolvedUserType !== 'super_admin' && !resolvedBusinessId) {
+      res.status(400).json({
+        message: 'businessId is required for business users',
+        success: false,
+      });
+      return;
+    }
+
+    const rawPassword = password || generateSecurePassword();
+    const hashedPassword = await bcrypt.hash(rawPassword, 10);
+
+    const data = await User.create({
+      name,
+      email,
+      mobile,
+      phoneCode,
+      roleId,
+      userType: resolvedUserType,
+      businessId: resolvedBusinessId,
+      password: hashedPassword,
+      isActive,
+      resetPasswordRequired: password ? Boolean(resetPasswordRequired) : true,
+    });
+
+    res.status(201).json({
+      message: 'User created successfully',
+      data,
+      success: true,
+    });
   } catch (error: any) {
     console.error(error);
     res.status(500).json({ message: 'Internal server error', error: error.message, success: false });
@@ -1051,9 +1105,9 @@ export const getBusinessRoles = async (req: Request, res: Response): Promise<voi
 
 export const activateBusinessUser = async (req: Request, res: Response): Promise<void> => {
   try {
-    const { userIds } = req.body;
+    const { ids } = req.body;
     await User.updateMany(
-      { _id: { $in: userIds } },
+      { _id: { $in: ids } },
       { isActive: true }
     );
     res.status(200).json({
@@ -1072,9 +1126,9 @@ export const activateBusinessUser = async (req: Request, res: Response): Promise
 
 export const deactivateBusinessUser = async (req: Request, res: Response): Promise<void> => {
   try {
-    const { userIds } = req.body;
+    const { ids } = req.body;
     await User.updateMany(
-      { _id: { $in: userIds } },
+      { _id: { $in: ids } },
       { isActive: false }
     );
     res.status(200).json({
@@ -1086,6 +1140,24 @@ export const deactivateBusinessUser = async (req: Request, res: Response): Promi
     res.status(500).json({
       success: false,
       message: 'Failed to deactivate users',
+      error: error.message
+    });
+  }
+};
+
+export const updateBusinessRole = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { _id, roleName, permission } = req.body;
+    await Role.findByIdAndUpdate(_id, { roleName, permission });
+    res.status(200).json({
+      success: true,
+      message: 'Role updated successfully'
+    });
+  } catch (error: any) {
+    console.error('Error updating role:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to update role',
       error: error.message
     });
   }
