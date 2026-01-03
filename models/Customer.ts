@@ -31,6 +31,7 @@ export interface ICustomer extends Document {
   isDeleted: boolean;
   customId: string;
   documents: ICustomerDocument[];
+  remarks: String;
 }
 
 const customerSchema = new Schema<ICustomer>({
@@ -64,6 +65,7 @@ const customerSchema = new Schema<ICustomer>({
     type: Boolean,
     default: false
   },
+  remarks: { type: String },
   documents: {
     type: [{
       originalName: { type: String, required: true },

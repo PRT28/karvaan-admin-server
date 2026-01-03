@@ -21,7 +21,8 @@ import {
     getBusinessRoles,
     activateBusinessUser,
     deactivateBusinessUser,
-    updateBusinessRole
+    updateBusinessRole,
+    deleteBusinessRole
 } from "../controllers/auth";
 import express from "express";
 
@@ -1061,5 +1062,7 @@ router.patch("/business/users/activate", checkKarvaanToken, activateBusinessUser
 router.patch("/business/users/deactivate", checkKarvaanToken, deactivateBusinessUser);
 
 router.patch("/business/roles/update", checkKarvaanToken, updateBusinessRole);
+
+router.delete("/business/roles/delete/:id", checkKarvaanToken, deleteBusinessRole);
 
 export default router;

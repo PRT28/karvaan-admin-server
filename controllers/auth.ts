@@ -1130,3 +1130,31 @@ export const updateBusinessRole = async (req: Request, res: Response): Promise<v
     });
   }
 };
+
+export const deleteBusinessRole = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { id } = req.params;
+
+    if (!id) {
+      res.status(400).json({
+        success: false,
+        message: 'Role ID is required'
+      });
+      return;
+    }
+
+
+    await Role.findByIdAndDelete(id);
+    res.status(200).json({
+      success: true,
+      message: 'Role updated successfully'
+    });
+  } catch (error: any) {
+    console.error('Error updating role:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to update role',
+      error: error.message
+    });
+  }
+};
