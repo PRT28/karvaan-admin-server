@@ -123,7 +123,8 @@ QuotationSchema.index({ businessId: 1, quotationType: 1 });
 QuotationSchema.index({ businessId: 1, channel: 1 });
 QuotationSchema.index({ businessId: 1, customerId: 1 });
 QuotationSchema.index({ businessId: 1, vendorId: 1 });
-QuotationSchema.index({ businessId: 1, travelers: 1 });
+QuotationSchema.index({ businessId: 1, adultTravelers: 1 });
+QuotationSchema.index({ businessId: 1, childTravelers: 1 });
 QuotationSchema.index({ businessId: 1, customId: 1 }, { unique: true, sparse: true });
 
 // Static method to find quotations by business

@@ -102,13 +102,25 @@ export const createQuotation = async (req: Request, res: Response): Promise<void
 
     // Validate required fields
 
+      // formFields
     if (typeof quotationData.formFields === "string") {
-        quotationData.formFields = JSON.parse(quotationData.formFields);
-      }
+      quotationData.formFields = JSON.parse(quotationData.formFields);
+    }
 
-    if (typeof quotationData.travelers === "string") {
-        quotationData.travelers = JSON.parse(quotationData.travelers);
-      }
+    // secondaryOwner
+    if (typeof quotationData.secondaryOwner === "string") {
+      quotationData.secondaryOwner = JSON.parse(quotationData.secondaryOwner);
+    }
+
+    // adultTravelers
+    if (typeof quotationData.adultTravelers === "string") {
+      quotationData.adultTravelers = JSON.parse(quotationData.adultTravelers);
+    }
+
+    // childTravelers
+    if (typeof quotationData.childTravelers === "string") {
+      quotationData.childTravelers = JSON.parse(quotationData.childTravelers);
+    }
 
     
 
@@ -275,7 +287,12 @@ export const getAllQuotations = async (req: Request, res: Response) => {
       })
       .populate('customerId', 'name email phone companyName')
       .populate('vendorId', 'companyName contactPerson email phone')
-      .populate('travelers', 'name email phone')
+      .populate('adultTravelers', 'name email phone')
+      .populate({
+        path: "childTravelers.id",
+        model: "Traveller",
+        select: "name email phone",
+      })
       .populate('primaryOwner', 'name email')
       .populate('secondaryOwner', 'name email')
       .sort({ createdAt: -1 });
@@ -419,7 +436,12 @@ export const getBookingHistoryByCustomer = async (req: Request, res: Response): 
     const quotations = await Quotation.find(filter)
       .populate('customerId', 'name email phone companyName')
       .populate('vendorId', 'companyName contactPerson email phone')
-      .populate('travelers', 'name email phone')
+      .populate('adultTravelers', 'name email phone')
+      .populate({
+        path: "childTravelers.id",
+        model: "Traveller",
+        select: "name email phone",
+      })
       .populate('primaryOwner', 'name email')
       .populate('secondaryOwner', 'name email')
       .populate('businessId', 'businessName')
@@ -549,7 +571,12 @@ export const getBookingHistoryByVendor = async (req: Request, res: Response): Pr
     const quotations = await Quotation.find(filter)
       .populate('customerId', 'name email phone companyName')
       .populate('vendorId', 'companyName contactPerson email phone')
-      .populate('travelers', 'name email phone')
+      .populate('adultTravelers', 'name email phone')
+      .populate({
+        path: "childTravelers.id",
+        model: "Traveller",
+        select: "name email phone",
+      })
       .populate('primaryOwner', 'name email')
       .populate('secondaryOwner', 'name email')
       .populate('businessId', 'businessName')
@@ -679,7 +706,12 @@ export const getBookingHistoryByTraveller = async (req: Request, res: Response):
     const quotations = await Quotation.find(filter)
       .populate('customerId', 'name email phone companyName')
       .populate('vendorId', 'companyName contactPerson email phone')
-      .populate('travelers', 'name email phone')
+      .populate('adultTravelers', 'name email phone')
+      .populate({
+        path: "childTravelers.id",
+        model: "Traveller",
+        select: "name email phone",
+      })
       .populate('primaryOwner', 'name email')
       .populate('secondaryOwner', 'name email')
       .populate('businessId', 'businessName')
@@ -809,7 +841,12 @@ export const getBookingHistoryByTeamMember = async (req: Request, res: Response)
     const quotations = await Quotation.find(filter)
       .populate('customerId', 'name email phone companyName')
       .populate('vendorId', 'companyName contactPerson email phone')
-      .populate('travelers', 'name email phone')
+      .populate('adultTravelers', 'name email phone')
+      .populate({
+        path: "childTravelers.id",
+        model: "Traveller",
+        select: "name email phone",
+      })
       .populate('primaryOwner', 'name email')
       .populate('secondaryOwner', 'name email')
       .populate('businessId', 'businessName')
