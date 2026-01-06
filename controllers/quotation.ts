@@ -67,14 +67,6 @@ export const createQuotation = async (req: Request, res: Response): Promise<void
 
     console.log(typeof quotationData.formFields, typeof quotationData.travellers, quotationData)
 
-    if (!quotationData.owner || !Array.isArray(quotationData.owner) || quotationData.owner.length === 0) {
-      res.status(400).json({
-        success: false,
-        message: 'owner array with at least one team member ID is required'
-      });
-      return;
-    }
-
     if (!quotationData.travelDate) {
       res.status(400).json({
         success: false,
@@ -235,7 +227,7 @@ export const deleteQuotation = async (req: Request, res: Response): Promise<void
 
 export const getAllQuotations = async (req: Request, res: Response) => {
   try {
-    const { bookingStartDate, bookingEndDate, travelStartDate, travelEndDate, owner, isDeleted, serviceStatus } = req.query;
+    const { bookingStartDate, bookingEndDate, travelStartDate, travelEndDate, primaryOwner, secondaryOwner, isDeleted, serviceStatus } = req.query;
 
     // Build business filter - exclude deleted quotations by default
     const businessFilter: any = {};
@@ -255,8 +247,12 @@ export const getAllQuotations = async (req: Request, res: Response) => {
     if (travelStartDate) travelDateFilter.$gte = new Date(travelStartDate as string);
     if (travelEndDate) travelDateFilter.$lte = new Date(travelEndDate as string);
 
-    if (owner) {
-      businessFilter.owner = owner;
+    if (primaryOwner) {
+      businessFilter.primaryOwner = primaryOwner;
+    }
+
+    if (secondaryOwner) {
+      businessFilter.secondaryOwner = secondaryOwner;
     }
 
     const query: any = { ...businessFilter };
@@ -280,7 +276,8 @@ export const getAllQuotations = async (req: Request, res: Response) => {
       .populate('customerId', 'name email phone companyName')
       .populate('vendorId', 'companyName contactPerson email phone')
       .populate('travelers', 'name email phone')
-      .populate('owner', 'name email')
+      .populate('primaryOwner', 'name email')
+      .populate('secondaryOwner', 'name email')
       .sort({ createdAt: -1 });
 
     res.status(200).json({ success: true, quotations });
@@ -423,7 +420,8 @@ export const getBookingHistoryByCustomer = async (req: Request, res: Response): 
       .populate('customerId', 'name email phone companyName')
       .populate('vendorId', 'companyName contactPerson email phone')
       .populate('travelers', 'name email phone')
-      .populate('owner', 'name email')
+      .populate('primaryOwner', 'name email')
+      .populate('secondaryOwner', 'name email')
       .populate('businessId', 'businessName')
       .sort(sortConfig)
       .skip(skip)
@@ -552,7 +550,8 @@ export const getBookingHistoryByVendor = async (req: Request, res: Response): Pr
       .populate('customerId', 'name email phone companyName')
       .populate('vendorId', 'companyName contactPerson email phone')
       .populate('travelers', 'name email phone')
-      .populate('owner', 'name email')
+      .populate('primaryOwner', 'name email')
+      .populate('secondaryOwner', 'name email')
       .populate('businessId', 'businessName')
       .sort(sortConfig)
       .skip(skip)
@@ -681,7 +680,8 @@ export const getBookingHistoryByTraveller = async (req: Request, res: Response):
       .populate('customerId', 'name email phone companyName')
       .populate('vendorId', 'companyName contactPerson email phone')
       .populate('travelers', 'name email phone')
-      .populate('owner', 'name email')
+      .populate('primaryOwner', 'name email')
+      .populate('secondaryOwner', 'name email')
       .populate('businessId', 'businessName')
       .sort(sortConfig)
       .skip(skip)
@@ -768,7 +768,7 @@ export const getBookingHistoryByTeamMember = async (req: Request, res: Response)
 
     // Build query filter - search for quotations where this team member is in the owner array, exclude deleted
     const filter: any = {
-      owner: teamMemberId,
+      primaryOwner: teamMemberId,
       businessId: teamMember.businessId,
       isDeleted: { $ne: true }
     };
@@ -810,7 +810,8 @@ export const getBookingHistoryByTeamMember = async (req: Request, res: Response)
       .populate('customerId', 'name email phone companyName')
       .populate('vendorId', 'companyName contactPerson email phone')
       .populate('travelers', 'name email phone')
-      .populate('owner', 'name email')
+      .populate('primaryOwner', 'name email')
+      .populate('secondaryOwner', 'name email')
       .populate('businessId', 'businessName')
       .sort(sortConfig)
       .skip(skip)
@@ -875,7 +876,7 @@ export const approveQuotation = async (req: Request, res: Response): Promise<voi
 
     console.log(req.user, 'User')
 
-    const quotation = await Quotation.findOne(filter).select('owner businessId');
+    const quotation = await Quotation.findOne(filter).select('primaryOwner businessId');
     if (!quotation) {
       res.status(404).json({ success: false, message: 'Quotation not found' });
       return;
@@ -944,7 +945,7 @@ export const denyQuotation = async (req: Request, res: Response): Promise<void> 
       return;
     }
 
-    const quotation = await Quotation.findOne(filter).select('owner businessId');
+    const quotation = await Quotation.findOne(filter).select('primaryOwner businessId');
     if (!quotation) {
       res.status(404).json({ success: false, message: 'Quotation not found' });
       return;
