@@ -1014,9 +1014,48 @@ export const updateCompanyDetails = async (req: Request, res: Response): Promise
 
 export const getCurrentUser = async (req: Request, res: Response): Promise<void> => {
   try {
+    const email = req.user?.email;
+    const user = await User.findOne({ email, isActive: true })
+      .populate('roleId', 'roleName permission')
+      .populate('businessId', 'businessName businessType isActive subscriptionPlan');
+    if (!user) {
+      res.status(404).json({ message: 'User not found' });
+      return;
+    }
+
+    // Remove password from response
+    const userResponse = user.toObject();
+    delete (userResponse as any).password;
+    const businessId = (user.businessId as any)?._id || user.businessId;
+    const makerCheckerFilter = businessId ? { businessId } : {};
+    const [
+      isBookingMaker,
+      isBookingChecker,
+      isFinanceMaker,
+      isFinanceChecker,
+    ] = await Promise.all([
+      MakerCheckerGroup.exists({ ...makerCheckerFilter, type: 'booking', makers: user._id }),
+      MakerCheckerGroup.exists({ ...makerCheckerFilter, type: 'booking', checkers: user._id }),
+      MakerCheckerGroup.exists({ ...makerCheckerFilter, type: 'finance', makers: user._id }),
+      MakerCheckerGroup.exists({ ...makerCheckerFilter, type: 'finance', checkers: user._id }),
+    ]);
+    (userResponse as any).isBookingMaker = Boolean(isBookingMaker);
+    (userResponse as any).isBookingChecker = Boolean(isBookingChecker);
+    (userResponse as any).isFinanceMaker = Boolean(isFinanceMaker);
+    (userResponse as any).isFinanceChecker = Boolean(isFinanceChecker);
+
+    // Create JWT token with business information
+    const userData = {
+      ...userResponse,
+      businessInfo: user.businessId ? {
+        businessId: (user.businessId as any)._id,
+        businessName: (user.businessId as any).businessName,
+        businessType: (user.businessId as any).businessType,
+      } : null
+    };
     res.status(200).json({
       success: true,
-      user: req.user
+      user: userData
     });
   } catch (error: any) {
     console.error('Error fetching current user:', error);
