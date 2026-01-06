@@ -26,13 +26,15 @@ export interface IQuotation extends Document {
   status: QuotationStatus;
   createdAt: Date;
   updatedAt: Date;
-  owner: Array<mongoose.Types.ObjectId>;
+  primaryOwner: mongoose.Types.ObjectId;
+  secondaryOwner: Array<mongoose.Types.ObjectId>;
   travelDate: Date;
   customerId: mongoose.Types.ObjectId;
   vendorId: mongoose.Types.ObjectId;
-  travelers: Array<mongoose.Types.ObjectId>;
-  adultTravlers: number;
-  childTravlers: number;
+  adultTravelers: Array<mongoose.Types.ObjectId>;
+  childTravelers: Array<{ id: mongoose.Types.ObjectId, age: number }>;
+  adultNumber: number;
+  childNumber: number;
   remarks: string;
   isDeleted: boolean;
   serviceStatus: string;
@@ -67,7 +69,11 @@ const QuotationSchema = new Schema<IQuotation>(
       enum: [ 'confirmed', 'cancelled'],
       default: 'confirmed',
     },
-    owner: {
+    primaryOwner: {
+      type: Schema.Types.ObjectId,
+      ref: 'User',
+    },
+    secondaryOwner: {
       type: [Schema.Types.ObjectId],
       ref: 'User',
     },
@@ -79,9 +85,13 @@ const QuotationSchema = new Schema<IQuotation>(
     travelDate: { type: Date, required: false },
     customerId: { type: Schema.Types.ObjectId, ref: 'Customer', required: false },
     vendorId: { type: Schema.Types.ObjectId, ref: 'Vendor', required: false },
-    travelers: { type: [Schema.Types.ObjectId], ref: 'Traveller', required: false },
-    adultTravlers: { type: Number, required: false },
-    childTravlers: { type: Number, required: false },
+    adultTravelers: { type: [Schema.Types.ObjectId], ref: 'Traveller', required: false },
+    childTravelers: { type: [{
+      id: { type: Schema.Types.ObjectId, ref: 'Traveller', required: false },
+      age: { type: Number, required: false },
+    }], required: false },
+    adultNumber: { type: Number, required: false },
+    childNumber: { type: Number, required: false },
     remarks: { type: String, required: false },
     isDeleted: { type: Boolean, default: false },
     documents: {

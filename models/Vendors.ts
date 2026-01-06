@@ -30,6 +30,7 @@ export interface IVendor extends Document {
   isDeleted: boolean;
   customId: string;
   documents: IVendorDocument[];
+  remarks: String;
 }
 
 const vendorSchema = new Schema<IVendor>({
@@ -62,6 +63,7 @@ const vendorSchema = new Schema<IVendor>({
     type: Boolean,
     default: false
   },
+  remarks: { type: String },
   documents: {
     type: [{
       originalName: { type: String, required: true },

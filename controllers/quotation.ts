@@ -883,8 +883,8 @@ export const approveQuotation = async (req: Request, res: Response): Promise<voi
 
     console.log(quotation, 'Quotation')
 
-    const ownerIds = Array.isArray(quotation.owner) ? quotation.owner : [];
-    if (ownerIds.length === 0) {
+    const ownerId = quotation.primaryOwner;
+    if (!ownerId) {
       res.status(400).json({ success: false, message: 'Quotation owner is missing' });
       return;
     }
@@ -895,7 +895,7 @@ export const approveQuotation = async (req: Request, res: Response): Promise<voi
       businessId: quotation.businessId,
       type: 'booking',
       checkers: userId,
-      makers: { $in: ownerIds },
+      makers: { $in: ownerId },
     }).select('_id');
 
     console.log(checkerGroup, 'Checker Group')
@@ -950,8 +950,8 @@ export const denyQuotation = async (req: Request, res: Response): Promise<void> 
       return;
     }
 
-    const ownerIds = Array.isArray(quotation.owner) ? quotation.owner : [];
-    if (ownerIds.length === 0) {
+   const ownerId = quotation.primaryOwner;
+    if (!ownerId) {
       res.status(400).json({ success: false, message: 'Quotation owner is missing' });
       return;
     }
@@ -960,7 +960,7 @@ export const denyQuotation = async (req: Request, res: Response): Promise<void> 
       businessId: quotation.businessId,
       type: 'booking',
       checkers: userId,
-      makers: { $in: ownerIds },
+      makers: { $in: ownerId },
     }).select('_id');
 
     if (!checkerGroup) {
