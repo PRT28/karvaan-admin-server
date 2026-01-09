@@ -183,15 +183,100 @@ export const updateQuotation = async (req: Request, res: Response): Promise<void
   try {
     const { id } = req.params;
 
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      res.status(400).json({ success: false, message: 'Invalid quotation ID' });
+      return;
+    }
+
     // Build filter based on user type
     const filter: any = { _id: id };
     if (req.user?.userType !== 'super_admin') {
-      filter.businessId = req.user?.businessInfo?.businessId;
+      const businessId = getBusinessIdFromRequest(req);
+      if (!businessId) {
+        res.status(403).json({ success: false, message: 'Business context missing' });
+        return;
+      }
+      filter.businessId = businessId;
     }
 
     // Don't allow updating businessId through this endpoint
     const updateData = { ...req.body };
     delete updateData.businessId;
+    delete updateData.customId;
+
+    const parseJsonField = (field: keyof typeof updateData, label: string) => {
+      if (typeof updateData[field] === 'string') {
+        try {
+          updateData[field] = JSON.parse(updateData[field] as string);
+        } catch (error) {
+          res.status(400).json({
+            success: false,
+            message: `Invalid ${label} JSON format`
+          });
+          return false;
+        }
+      }
+      return true;
+    };
+
+    if (!parseJsonField('formFields', 'formFields')) return;
+    if (!parseJsonField('secondaryOwner', 'secondaryOwner')) return;
+    if (!parseJsonField('adultTravelers', 'adultTravelers')) return;
+    if (!parseJsonField('childTravelers', 'childTravelers')) return;
+    if (!parseJsonField('documents', 'documents')) return;
+
+    if (typeof updateData.travelDate === 'string') {
+      const travelDate = new Date(updateData.travelDate);
+      if (isNaN(travelDate.getTime())) {
+        res.status(400).json({
+          success: false,
+          message: 'Invalid travelDate format. Please provide a valid date.'
+        });
+        return;
+      }
+      updateData.travelDate = travelDate;
+    }
+
+    if (updateData.totalAmount !== undefined && updateData.totalAmount !== null) {
+      updateData.totalAmount = Number(updateData.totalAmount);
+      if (isNaN(updateData.totalAmount)) {
+        res.status(400).json({
+          success: false,
+          message: 'totalAmount must be a valid number'
+        });
+        return;
+      }
+    }
+
+    const hasDocumentsInBody = Object.prototype.hasOwnProperty.call(updateData, 'documents');
+    let existingDocuments = Array.isArray(updateData.documents) ? updateData.documents : [];
+
+    if (req.files && Array.isArray(req.files) && req.files.length > 0) {
+      const businessIdForUploads = getBusinessIdFromRequest(req);
+      if (!hasDocumentsInBody) {
+        const existingQuotation = await Quotation.findOne(filter).select('documents');
+        if (!existingQuotation) {
+          res.status(404).json({ success: false, message: 'Quotation not found' });
+          return;
+        }
+        existingDocuments = existingQuotation.documents || [];
+      }
+
+      if (req.files.length + existingDocuments.length > 3) {
+        res.status(400).json({
+          success: false,
+          message: 'Maximum 3 documents are allowed per quotation'
+        });
+        return;
+      }
+
+      const uploadedDocuments = await uploadMultipleToS3(
+        req.files as Express.Multer.File[],
+        `quotations/${businessIdForUploads ?? 'unknown-business'}`
+      );
+
+      updateData.documents = [...existingDocuments, ...uploadedDocuments];
+    }
 
     const updated = await Quotation.findOneAndUpdate(filter, updateData, { new: true })
       .populate('businessId')

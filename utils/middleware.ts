@@ -20,11 +20,9 @@ export const checkKarvaanToken = async (req: Request, res: Response, next: NextF
     return;
   }
 
-  console.log(token, 'token');
 
   try {
     const decoded = jwt.verify(token, process.env.JWT_SECRET as string) as any;
-    console.log(decoded);
     if (!decoded) {
       res.status(401).json({
         success: false,

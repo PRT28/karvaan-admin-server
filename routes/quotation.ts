@@ -368,7 +368,7 @@ router.post('/create-quotation', handleDocumentUploadError, createQuotation);
  *             schema:
  *               $ref: '#/components/schemas/ErrorResponse'
  */
-router.put('/update-quotation/:id', updateQuotation);
+router.put('/update-quotation/:id', handleDocumentUploadError, updateQuotation);
 
 /**
  * @swagger

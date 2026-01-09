@@ -1039,6 +1039,10 @@ export const getCurrentUser = async (req: Request, res: Response): Promise<void>
       MakerCheckerGroup.exists({ ...makerCheckerFilter, type: 'finance', makers: user._id }),
       MakerCheckerGroup.exists({ ...makerCheckerFilter, type: 'finance', checkers: user._id }),
     ]);
+
+    console.log(user._id);
+
+    console.log(isBookingMaker, isBookingChecker, isFinanceMaker, isFinanceChecker, 'Maker Checker');
     (userResponse as any).isBookingMaker = Boolean(isBookingMaker);
     (userResponse as any).isBookingChecker = Boolean(isBookingChecker);
     (userResponse as any).isFinanceMaker = Boolean(isFinanceMaker);
