@@ -13,6 +13,7 @@ export interface IProfileImage {
 export interface IBusiness extends Document {
   businessName: string;
   businessType: string;
+  currency: string;
   email: string;
   phone: string;
   address: {
@@ -62,6 +63,11 @@ const businessSchema = new Schema<IBusiness>({
     required: true,
     trim: true,
     maxlength: 100,
+  },
+  currency: {
+    type: String,
+    required: true,
+    default: 'INR',
   },
   businessType: {
     type: String,

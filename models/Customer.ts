@@ -1,5 +1,5 @@
 import mongoose, { Schema, model, Document } from 'mongoose';
-import Team from './Team';
+import User from './User';
 
 export type Tiers = 'tier1' | 'tier2' | 'tier3' | 'tier4' | 'tier5';
 
@@ -56,7 +56,7 @@ const customerSchema = new Schema<ICustomer>({
     index: true
   },
   createdAt: { type: Date, default: Date.now },
-  ownerId: { type: Schema.Types.ObjectId, ref: 'Team', required: true },
+  ownerId: { type: Schema.Types.ObjectId, ref: 'User', required: true },
   tier: {
     type: String,
     enum: ['tier1', 'tier2', 'tier3', 'tier4', 'tier5'],
@@ -99,6 +99,6 @@ customerSchema.statics.findByBusiness = function(businessId: string) {
 
 const Customer = model<ICustomer>('Customer', customerSchema);
 
-console.log('Team model:', Team.modelName);
+console.log('User model:', User.modelName);
 
 export default Customer;
