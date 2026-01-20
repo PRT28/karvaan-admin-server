@@ -7,7 +7,33 @@ import Quotation, { IQuotation } from '../models/Quotation';
 
 type LedgerEntryType = 'opening' | 'quotation' | 'payment';
 
-const getBusinessId = (req: Request) => req.user?.businessId || req.user?._id;
+const toObjectId = (value: unknown) => {
+  if (value instanceof mongoose.Types.ObjectId) return value;
+  if (value === null || value === undefined) return null;
+  const stringValue = String(value);
+  if (!mongoose.isValidObjectId(stringValue)) return null;
+  return new mongoose.Types.ObjectId(stringValue);
+};
+
+const toObjectIdStrict = (value: unknown) => {
+  const result = toObjectId(value);
+  if (!result) {
+    throw new Error('Invalid ObjectId');
+  }
+  return result;
+};
+
+const getBusinessId = (req: Request) =>
+  toObjectId(req.user?.businessId || req.user?.businessInfo?.businessId || req.user?._id);
+
+const requireBusinessId = (req: Request, res: Response) => {
+  const businessId = req.user?.businessInfo?.businessId;
+  if (!businessId) {
+    res.status(401).json({ message: 'Unauthorized user' });
+    return null;
+  }
+  return businessId;
+};
 
 const getQuotationAmountForParty = (quotation: IQuotation, party: PartyType) => {
   const baseAmount = Number(quotation.totalAmount ?? 0);
@@ -39,6 +65,7 @@ const buildAllocationPayload = (
     quotationId: new mongoose.Types.ObjectId(allocation.quotationId),
     amount: Number(allocation.amount),
     amountType,
+    appliedAt: new Date(),
   }));
 };
 
@@ -127,7 +154,8 @@ const getUnsettledQuotations = async (
 
 export const listCustomerClosingBalances = async (req: Request, res: Response) => {
   try {
-    const businessId = getBusinessId(req);
+    const businessId = requireBusinessId(req, res);
+    if (!businessId) return;
     const customers = await Customer.find({ businessId, isDeleted: { $ne: true } }).sort({ createdAt: -1 });
 
     const quotationTotals = await Quotation.aggregate([
@@ -181,7 +209,8 @@ export const listCustomerClosingBalances = async (req: Request, res: Response) =
 
 export const listVendorClosingBalances = async (req: Request, res: Response) => {
   try {
-    const businessId = getBusinessId(req);
+    const businessId = requireBusinessId(req, res);
+    if (!businessId) return;
     const vendors = await Vendor.find({ businessId, isDeleted: { $ne: true } }).sort({ createdAt: -1 });
 
     const quotationTotals = await Quotation.aggregate([
@@ -235,7 +264,8 @@ export const listVendorClosingBalances = async (req: Request, res: Response) => 
 
 export const getCustomerLedger = async (req: Request, res: Response) => {
   try {
-    const businessId = getBusinessId(req);
+    const businessId = requireBusinessId(req, res);
+    if (!businessId) return;
     const { id } = req.params;
     if (!mongoose.isValidObjectId(id)) {
       res.status(400).json({ message: 'Invalid customer ID' });
@@ -254,7 +284,7 @@ export const getCustomerLedger = async (req: Request, res: Response) => {
       isDeleted: { $ne: true },
     }).sort({ createdAt: -1 });
 
-    const payments = await Payments.find(getPaymentMatch(businessId, 'customer', customer._id)).sort({ paymentDate: -1 });
+    const payments = await Payments.find(getPaymentMatch(businessId, 'customer', toObjectIdStrict(customer._id))).sort({ paymentDate: -1 });
 
     const entries: Array<{
       type: LedgerEntryType;
@@ -281,7 +311,7 @@ export const getCustomerLedger = async (req: Request, res: Response) => {
         entryType: 'debit',
         date: quotation.createdAt || new Date(),
         amount: getQuotationAmountForParty(quotation, 'customer'),
-        referenceId: quotation._id,
+        referenceId: toObjectIdStrict(quotation._id),
         notes: quotation.remarks,
       });
     });
@@ -292,7 +322,7 @@ export const getCustomerLedger = async (req: Request, res: Response) => {
         entryType: payment.entryType,
         date: payment.paymentDate || payment.createdAt,
         amount: payment.amount,
-        referenceId: payment._id,
+        referenceId: toObjectIdStrict(payment._id),
         notes: payment.internalNotes,
         allocations: payment.allocations,
       });
@@ -326,7 +356,8 @@ export const getCustomerLedger = async (req: Request, res: Response) => {
 
 export const getVendorLedger = async (req: Request, res: Response) => {
   try {
-    const businessId = getBusinessId(req);
+    const businessId = requireBusinessId(req, res);
+    if (!businessId) return;
     const { id } = req.params;
     if (!mongoose.isValidObjectId(id)) {
       res.status(400).json({ message: 'Invalid vendor ID' });
@@ -345,7 +376,7 @@ export const getVendorLedger = async (req: Request, res: Response) => {
       isDeleted: { $ne: true },
     }).sort({ createdAt: -1 });
 
-    const payments = await Payments.find(getPaymentMatch(businessId, 'vendor', vendor._id)).sort({ paymentDate: -1 });
+    const payments = await Payments.find(getPaymentMatch(businessId, 'vendor', toObjectIdStrict(vendor._id))).sort({ paymentDate: -1 });
 
     const entries: Array<{
       type: LedgerEntryType;
@@ -372,7 +403,7 @@ export const getVendorLedger = async (req: Request, res: Response) => {
         entryType: 'credit',
         date: quotation.createdAt || new Date(),
         amount: getQuotationAmountForParty(quotation, 'vendor'),
-        referenceId: quotation._id,
+        referenceId: toObjectIdStrict(quotation._id),
         notes: quotation.remarks,
       });
     });
@@ -383,7 +414,7 @@ export const getVendorLedger = async (req: Request, res: Response) => {
         entryType: payment.entryType,
         date: payment.paymentDate || payment.createdAt,
         amount: payment.amount,
-        referenceId: payment._id,
+        referenceId: toObjectIdStrict(payment._id),
         notes: payment.internalNotes,
         allocations: payment.allocations,
       });
@@ -417,7 +448,8 @@ export const getVendorLedger = async (req: Request, res: Response) => {
 
 export const getCustomerUnsettledQuotations = async (req: Request, res: Response) => {
   try {
-    const businessId = getBusinessId(req);
+    const businessId = requireBusinessId(req, res);
+    if (!businessId) return;
     const { id } = req.params;
     if (!mongoose.isValidObjectId(id)) {
       res.status(400).json({ message: 'Invalid customer ID' });
@@ -433,7 +465,8 @@ export const getCustomerUnsettledQuotations = async (req: Request, res: Response
 
 export const getVendorUnsettledQuotations = async (req: Request, res: Response) => {
   try {
-    const businessId = getBusinessId(req);
+    const businessId = requireBusinessId(req, res);
+    if (!businessId) return;
     const { id } = req.params;
     if (!mongoose.isValidObjectId(id)) {
       res.status(400).json({ message: 'Invalid vendor ID' });
@@ -449,7 +482,8 @@ export const getVendorUnsettledQuotations = async (req: Request, res: Response) 
 
 export const createCustomerPayment = async (req: Request, res: Response) => {
   try {
-    const businessId = getBusinessId(req);
+    const businessId = requireBusinessId(req, res);
+    if (!businessId) return;
     const { id } = req.params;
     if (!mongoose.isValidObjectId(id)) {
       res.status(400).json({ message: 'Invalid customer ID' });
@@ -499,7 +533,8 @@ export const createCustomerPayment = async (req: Request, res: Response) => {
 
 export const createVendorPayment = async (req: Request, res: Response) => {
   try {
-    const businessId = getBusinessId(req);
+    const businessId = requireBusinessId(req, res);
+    if (!businessId) return;
     const { id } = req.params;
     if (!mongoose.isValidObjectId(id)) {
       res.status(400).json({ message: 'Invalid vendor ID' });
@@ -549,7 +584,8 @@ export const createVendorPayment = async (req: Request, res: Response) => {
 
 export const createPaymentForQuotation = async (req: Request, res: Response) => {
   try {
-    const businessId = getBusinessId(req);
+    const businessId = requireBusinessId(req, res);
+    if (!businessId) return;
     const { id } = req.params;
     if (!mongoose.isValidObjectId(id)) {
       res.status(400).json({ message: 'Invalid quotation ID' });
@@ -628,7 +664,8 @@ export const createPaymentForQuotation = async (req: Request, res: Response) => 
 
 export const getQuotationLedger = async (req: Request, res: Response) => {
   try {
-    const businessId = getBusinessId(req);
+    const businessId = requireBusinessId(req, res);
+    if (!businessId) return;
     const { id } = req.params;
     if (!mongoose.isValidObjectId(id)) {
       res.status(400).json({ message: 'Invalid quotation ID' });
@@ -685,7 +722,8 @@ export const getQuotationLedger = async (req: Request, res: Response) => {
 
 export const updatePayment = async (req: Request, res: Response) => {
   try {
-    const businessId = getBusinessId(req);
+    const businessId = requireBusinessId(req, res);
+    if (!businessId) return;
     const { id } = req.params;
     if (!mongoose.isValidObjectId(id)) {
       res.status(400).json({ message: 'Invalid payment ID' });
@@ -734,7 +772,8 @@ export const updatePayment = async (req: Request, res: Response) => {
 
 export const deletePayment = async (req: Request, res: Response) => {
   try {
-    const businessId = getBusinessId(req);
+    const businessId = requireBusinessId(req, res);
+    if (!businessId) return;
     const { id } = req.params;
     if (!mongoose.isValidObjectId(id)) {
       res.status(400).json({ message: 'Invalid payment ID' });
@@ -756,5 +795,47 @@ export const deletePayment = async (req: Request, res: Response) => {
   } catch (err: unknown) {
     const errorMessage = err instanceof Error ? err.message : 'Something went wrong';
     res.status(500).json({ error: 'Failed to delete payment', message: errorMessage });
+  }
+};
+
+export const listPayments = async (req: Request, res: Response) => {
+  try {
+    const businessId = requireBusinessId(req, res);
+    if (!businessId) return;
+    const { party, partyId, status, isDeleted, startDate, endDate } = req.query;
+
+    const filter: any = { businessId };
+    if (party && (party === 'customer' || party === 'vendor')) {
+      filter.party = party;
+    }
+    if (partyId && mongoose.isValidObjectId(String(partyId))) {
+      filter.partyId = new mongoose.Types.ObjectId(String(partyId));
+    }
+    if (status && ['pending', 'approved', 'denied'].includes(String(status))) {
+      filter.status = status;
+    }
+    if (isDeleted !== undefined) {
+      filter.isDeleted = String(isDeleted) === 'true';
+    } else {
+      filter.isDeleted = { $ne: true };
+    }
+    if (startDate || endDate) {
+      filter.paymentDate = {};
+      if (startDate) {
+        filter.paymentDate.$gte = new Date(String(startDate));
+      }
+      if (endDate) {
+        filter.paymentDate.$lte = new Date(String(endDate));
+      }
+    }
+
+    const payments = await Payments.find(filter)
+      .populate('bankId')
+      .sort({ paymentDate: -1, createdAt: -1 });
+
+    res.status(200).json({ payments });
+  } catch (err: unknown) {
+    const errorMessage = err instanceof Error ? err.message : 'Something went wrong';
+    res.status(500).json({ error: 'Failed to fetch payments', message: errorMessage });
   }
 };

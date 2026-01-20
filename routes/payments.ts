@@ -12,6 +12,7 @@ import {
   getQuotationLedger,
   updatePayment,
   deletePayment,
+  listPayments,
 } from '../controllers/payments';
 
 const router = express.Router();
@@ -25,6 +26,7 @@ const router = express.Router();
 
 router.get('/customers/closing-balance', listCustomerClosingBalances);
 router.get('/vendors/closing-balance', listVendorClosingBalances);
+router.get('/', listPayments);
 
 router.get('/customers/:id/ledger', getCustomerLedger);
 router.get('/vendors/:id/ledger', getVendorLedger);

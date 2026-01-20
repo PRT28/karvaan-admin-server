@@ -35,6 +35,8 @@ export interface IPayments extends Document {
   internalNotes: string;
   allocations: IPaymentAllocation[];
   unallocatedAmount: number;
+  createdAt: Date;
+  updatedAt: Date;
 }
 
 const paymentSchema = new Schema<IPayments>({
