@@ -5,8 +5,9 @@ import Customer from '../models/Customer';
 import Team from '../models/Team';
 import Vendor from '../models/Vendors';
 import Logs from '../models/Logs';
+import Payments from '../models/Payments';
 
-type SupportedType = 'booking' | 'customer' | 'team' | 'vendor' | 'task';
+type SupportedType = 'booking' | 'customer' | 'team' | 'vendor' | 'task' | 'paymentIn' | 'paymentOut';
 
 const LETTERS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
 const DIGITS = '0123456789';
@@ -18,6 +19,8 @@ const prefixMap: Record<SupportedType, string> = {
   team: 'TE',
   vendor: 'VE',
   task: 'TA',
+  paymentIn: 'PI',
+  paymentOut: 'PO',
 };
 
 const shuffle = (chars: string[]): string[] => {
@@ -61,6 +64,12 @@ const typeModelMap: Record<SupportedType, { exists: (businessId: mongoose.Types.
   },
   task: {
     exists: async (businessId, customId) => !!(await Logs.exists({ businessId, customId })),
+  },
+  paymentIn: {
+    exists: async (businessId, customId) => !!(await Payments.exists({ businessId, customId, entryType: 'credit' })),
+  },
+  paymentOut: {
+    exists: async (businessId, customId) => !!(await Payments.exists({ businessId, customId, entryType: 'debit' })),
   },
 };
 
