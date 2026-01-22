@@ -170,7 +170,7 @@ export const listCustomerClosingBalances = async (req: Request, res: Response) =
     ]);
 
     const paymentTotals = await Payments.aggregate([
-      { $match: { businessId, party: 'customer', isDeleted: { $ne: true } } },
+      { $match: { businessId, party: 'Customer', isDeleted: { $ne: true } } },
       { $group: { _id: { partyId: '$partyId', entryType: '$entryType' }, totalAmount: { $sum: '$amount' } } }
     ]);
 
@@ -293,7 +293,7 @@ export const getCustomerLedger = async (req: Request, res: Response) => {
     }).sort({ createdAt: 1 });
 
     const allocationTotals = await Payments.aggregate([
-      { $match: { businessId, party: 'customer', isDeleted: { $ne: true } } },
+      { $match: { businessId, party: 'Customer', isDeleted: { $ne: true } } },
       { $unwind: '$allocations' },
       { $match: { 'allocations.quotationId': { $in: quotations.map((q) => q._id) } } },
       { $group: { _id: '$allocations.quotationId', totalAllocated: { $sum: '$allocations.amount' } } }
@@ -591,7 +591,7 @@ export const createCustomerPayment = async (req: Request, res: Response) => {
     );
 
     const payment = await Payments.create({
-      party: 'customer',
+      party: 'Customer',
       partyId: new mongoose.Types.ObjectId(id),
       businessId,
       bankId,
@@ -642,7 +642,7 @@ export const createVendorPayment = async (req: Request, res: Response) => {
     );
 
     const payment = await Payments.create({
-      party: 'vendor',
+      party: 'Vendor',
       partyId: new mongoose.Types.ObjectId(id),
       businessId,
       bankId,
@@ -688,7 +688,7 @@ export const createPaymentForQuotation = async (req: Request, res: Response) => 
     let resolvedPartyId: mongoose.Types.ObjectId | null = null;
 
     if (quotation.customerId && quotation.vendorId) {
-      if (!party || !['customer', 'vendor'].includes(party)) {
+      if (!party || !['Customer', 'Vendor'].includes(party)) {
         res.status(400).json({ message: 'party is required when quotation has both customer and vendor' });
         return;
       }
@@ -885,7 +885,7 @@ export const listPayments = async (req: Request, res: Response) => {
     const { party, partyId, status, isDeleted, startDate, endDate } = req.query;
 
     const filter: any = { businessId };
-    if (party && (party === 'customer' || party === 'vendor')) {
+    if (party && (party === 'Customer' || party === 'Vendor')) {
       filter.party = party;
     }
     if (partyId && mongoose.isValidObjectId(String(partyId))) {
