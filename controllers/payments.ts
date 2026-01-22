@@ -37,7 +37,7 @@ const requireBusinessId = (req: Request, res: Response) => {
 
 const getQuotationAmountForParty = (quotation: IQuotation, party: PartyType) => {
   const baseAmount = Number(quotation.totalAmount ?? 0);
-  if (party !== 'vendor') return baseAmount;
+  if (party !== 'Vendor') return baseAmount;
 
   const formFields: any = quotation.formFields;
   if (!formFields) return baseAmount;
@@ -60,7 +60,7 @@ const buildAllocationPayload = (
   party: PartyType
 ) => {
   if (!allocations || allocations.length === 0) return [];
-  const amountType: PaymentAmountType = party === 'vendor' ? 'cost' : 'selling';
+  const amountType: PaymentAmountType = party === 'Vendor' ? 'cost' : 'selling';
   return allocations.map((allocation) => ({
     quotationId: new mongoose.Types.ObjectId(allocation.quotationId),
     amount: Number(allocation.amount),
@@ -100,7 +100,7 @@ const validatePartyQuotationLinks = async (
     businessId,
     isDeleted: { $ne: true },
   };
-  if (party === 'customer') {
+  if (party === 'Customer') {
     filter.customerId = partyId;
   } else {
     filter.vendorId = partyId;
@@ -117,7 +117,7 @@ const getUnsettledQuotations = async (
   partyId: mongoose.Types.ObjectId
 ) => {
   const quotationFilter: any = { businessId, isDeleted: { $ne: true } };
-  if (party === 'customer') {
+  if (party === 'Customer') {
     quotationFilter.customerId = partyId;
   } else {
     quotationFilter.vendorId = partyId;
@@ -304,7 +304,7 @@ export const getCustomerLedger = async (req: Request, res: Response) => {
       allocationMap.set(String(item._id), Number(item.totalAllocated || 0));
     });
 
-    const payments = await Payments.find(getPaymentMatch(businessId, 'customer', toObjectIdStrict(customer._id))).sort({ paymentDate: -1 });
+    const payments = await Payments.find(getPaymentMatch(businessId, 'Customer', toObjectIdStrict(customer._id))).sort({ paymentDate: -1 });
 
     const entries: Array<{
       type: LedgerEntryType;
@@ -336,12 +336,12 @@ export const getCustomerLedger = async (req: Request, res: Response) => {
         entryType: 'debit',
         date: quotation.createdAt || new Date(),
         data: quotation,
-        amount: getQuotationAmountForParty(quotation, 'customer'),
+        amount: getQuotationAmountForParty(quotation, 'Customer'),
         referenceId: toObjectIdStrict(quotation._id),
         customId: quotation.customId,
         notes: quotation.remarks,
         paymentStatus: (() => {
-          const totalAmount = getQuotationAmountForParty(quotation, 'customer');
+          const totalAmount = getQuotationAmountForParty(quotation, 'Customer');
           const allocated = allocationMap.get(String(quotation._id)) || 0;
           if (totalAmount <= 0 || allocated <= 0) return 'none';
           if (allocated >= totalAmount) return 'paid';
@@ -349,7 +349,7 @@ export const getCustomerLedger = async (req: Request, res: Response) => {
         })(),
         allocatedAmount: allocationMap.get(String(quotation._id)) || 0,
         outstandingAmount: (() => {
-          const totalAmount = getQuotationAmountForParty(quotation, 'customer');
+          const totalAmount = getQuotationAmountForParty(quotation, 'Customer');
           const allocated = allocationMap.get(String(quotation._id)) || 0;
           return totalAmount - allocated;
         })(),
@@ -433,7 +433,7 @@ export const getVendorLedger = async (req: Request, res: Response) => {
       allocationMap.set(String(item._id), Number(item.totalAllocated || 0));
     });
 
-    const payments = await Payments.find(getPaymentMatch(businessId, 'vendor', toObjectIdStrict(vendor._id))).sort({ paymentDate: -1 });
+    const payments = await Payments.find(getPaymentMatch(businessId, 'Vendor', toObjectIdStrict(vendor._id))).sort({ paymentDate: -1 });
 
     const entries: Array<{
       type: LedgerEntryType;
@@ -463,12 +463,12 @@ export const getVendorLedger = async (req: Request, res: Response) => {
         type: 'quotation',
         entryType: 'credit',
         date: quotation.createdAt || new Date(),
-        amount: getQuotationAmountForParty(quotation, 'vendor'),
+        amount: getQuotationAmountForParty(quotation, 'Vendor'),
         referenceId: toObjectIdStrict(quotation._id),
         customId: quotation.customId,
         notes: quotation.remarks,
         paymentStatus: (() => {
-          const totalAmount = getQuotationAmountForParty(quotation, 'vendor');
+          const totalAmount = getQuotationAmountForParty(quotation, 'Vendor');
           const allocated = allocationMap.get(String(quotation._id)) || 0;
           if (totalAmount <= 0 || allocated <= 0) return 'none';
           if (allocated >= totalAmount) return 'paid';
@@ -476,7 +476,7 @@ export const getVendorLedger = async (req: Request, res: Response) => {
         })(),
         allocatedAmount: allocationMap.get(String(quotation._id)) || 0,
         outstandingAmount: (() => {
-          const totalAmount = getQuotationAmountForParty(quotation, 'vendor');
+          const totalAmount = getQuotationAmountForParty(quotation, 'Vendor');
           const allocated = allocationMap.get(String(quotation._id)) || 0;
           return totalAmount - allocated;
         })(),
@@ -535,7 +535,7 @@ export const getCustomerUnsettledQuotations = async (req: Request, res: Response
       res.status(400).json({ message: 'Invalid customer ID' });
       return;
     }
-    const unsettled = await getUnsettledQuotations(businessId, 'customer', new mongoose.Types.ObjectId(id));
+    const unsettled = await getUnsettledQuotations(businessId, 'Customer', new mongoose.Types.ObjectId(id));
     res.status(200).json({ quotations: unsettled });
   } catch (err: unknown) {
     const errorMessage = err instanceof Error ? err.message : 'Something went wrong';
@@ -552,7 +552,7 @@ export const getVendorUnsettledQuotations = async (req: Request, res: Response) 
       res.status(400).json({ message: 'Invalid vendor ID' });
       return;
     }
-    const unsettled = await getUnsettledQuotations(businessId, 'vendor', new mongoose.Types.ObjectId(id));
+    const unsettled = await getUnsettledQuotations(businessId, 'Vendor', new mongoose.Types.ObjectId(id));
     res.status(200).json({ quotations: unsettled });
   } catch (err: unknown) {
     const errorMessage = err instanceof Error ? err.message : 'Something went wrong';
@@ -576,7 +576,7 @@ export const createCustomerPayment = async (req: Request, res: Response) => {
       return;
     }
 
-    const allocationPayload = buildAllocationPayload(allocations, 'customer');
+    const allocationPayload = buildAllocationPayload(allocations, 'Customer');
     const allocationTotal = sumAllocationAmount(allocationPayload);
     if (allocationTotal > Number(amount)) {
       res.status(400).json({ message: 'Allocation total exceeds payment amount' });
@@ -584,7 +584,7 @@ export const createCustomerPayment = async (req: Request, res: Response) => {
     }
 
     await validatePartyQuotationLinks(
-      'customer',
+      'Customer',
       new mongoose.Types.ObjectId(id),
       businessId,
       allocationPayload
@@ -627,7 +627,7 @@ export const createVendorPayment = async (req: Request, res: Response) => {
       return;
     }
 
-    const allocationPayload = buildAllocationPayload(allocations, 'vendor');
+    const allocationPayload = buildAllocationPayload(allocations, 'Vendor');
     const allocationTotal = sumAllocationAmount(allocationPayload);
     if (allocationTotal > Number(amount)) {
       res.status(400).json({ message: 'Allocation total exceeds payment amount' });
@@ -635,7 +635,7 @@ export const createVendorPayment = async (req: Request, res: Response) => {
     }
 
     await validatePartyQuotationLinks(
-      'vendor',
+      'Vendor',
       new mongoose.Types.ObjectId(id),
       businessId,
       allocationPayload
@@ -694,9 +694,9 @@ export const createPaymentForQuotation = async (req: Request, res: Response) => 
       }
       resolvedParty = party;
     } else if (quotation.customerId) {
-      resolvedParty = 'customer';
+      resolvedParty = 'Customer';
     } else if (quotation.vendorId) {
-      resolvedParty = 'vendor';
+      resolvedParty = 'Vendor';
     }
 
     if (!resolvedParty) {
@@ -704,7 +704,7 @@ export const createPaymentForQuotation = async (req: Request, res: Response) => 
       return;
     }
 
-    resolvedPartyId = resolvedParty === 'customer'
+    resolvedPartyId = resolvedParty === 'Customer'
       ? new mongoose.Types.ObjectId(quotation.customerId)
       : new mongoose.Types.ObjectId(quotation.vendorId);
 
@@ -758,7 +758,7 @@ export const getQuotationLedger = async (req: Request, res: Response) => {
       return;
     }
 
-    const party: PartyType | null = quotation.customerId ? 'customer' : quotation.vendorId ? 'vendor' : null;
+    const party: PartyType | null = quotation.customerId ? 'Customer' : quotation.vendorId ? 'Vendor' : null;
     if (!party) {
       res.status(400).json({ message: 'Quotation is missing customer or vendor' });
       return;
@@ -910,7 +910,9 @@ export const listPayments = async (req: Request, res: Response) => {
     }
 
     const payments = await Payments.find(filter)
-      .populate('bankId')
+      .populate("bankId")
+      .populate({ path: "allocations.quotationId", select: "customId" })
+      .populate({ path: "partyId", select: "name companyName"})
       .sort({ paymentDate: -1, createdAt: -1 });
 
     res.status(200).json({ payments });

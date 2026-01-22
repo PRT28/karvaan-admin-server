@@ -1,8 +1,9 @@
 import mongoose, { Schema, model, Document } from 'mongoose';
 
-export type PartyType = 'customer' | 'vendor';
+export type PartyType = 'Customer' | 'Vendor';
 export type PaymentAmountType = 'selling' | 'cost';
 export type PaymentEntryType = 'credit' | 'debit';
+export type PaymentType = 'card' | 'upi' | 'imps' | 'neft' | 'rtgs' | 'cheque' | 'cash';
 
 export interface IPaymentDocument {
   originalName: string;
@@ -32,6 +33,7 @@ export interface IPayments extends Document {
   status: 'pending' | 'approved' | 'denied';
   paymentDate: Date;
   documents: IPaymentDocument[];
+  paymentType: PaymentType;
   internalNotes: string;
   allocations: IPaymentAllocation[];
   unallocatedAmount: number;
@@ -43,7 +45,7 @@ export interface IPayments extends Document {
 const paymentSchema = new Schema<IPayments>({
   party: {
     type: String,
-    enum: ['customer', 'vendor'],
+    enum: ['Customer', 'Vendor'],
     required: true,
   },
   isDeleted: {
@@ -53,12 +55,19 @@ const paymentSchema = new Schema<IPayments>({
   partyId: {
     type: Schema.Types.ObjectId,
     required: true,
+    refPath: "party",
   },
   businessId: {
     type: Schema.Types.ObjectId,
     ref: 'Business',
     required: true,
     index: true
+  },
+  paymentType: {
+    type: String,
+    enum: ['card', 'upi', 'imps', 'neft', 'rtgs', 'cheque', 'cash'],
+    required: true,
+    default: 'cash',
   },
   bankId: {
     type: Schema.Types.ObjectId,
@@ -111,7 +120,7 @@ const paymentSchema = new Schema<IPayments>({
     validate: {
       validator: function(allocations: IPaymentAllocation[]) {
         if (!allocations || allocations.length === 0) return true;
-        const expected = this.party === 'vendor' ? 'cost' : 'selling';
+        const expected = this.party === 'Vendor' ? 'cost' : 'selling';
         return allocations.every(allocation => allocation.amountType === expected);
       },
       message: 'Allocation amountType must match payment party'
