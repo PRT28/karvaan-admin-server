@@ -156,7 +156,13 @@ export const listCustomerClosingBalances = async (req: Request, res: Response) =
   try {
     const businessId = requireBusinessId(req, res);
     if (!businessId) return;
-    const customers = await Customer.find({ businessId, isDeleted: { $ne: true } }).sort({ createdAt: -1 });
+    const customers = await Customer
+                              .find({ businessId, isDeleted: { $ne: true } })
+                              .populate({
+                                path: 'ownerId',
+                                select: 'name email phone',
+                              })
+                              .sort({ createdAt: -1 });
 
     const quotationTotals = await Quotation.aggregate([
       { $match: { businessId, isDeleted: { $ne: true }, customerId: { $ne: null } } },
@@ -211,7 +217,9 @@ export const listVendorClosingBalances = async (req: Request, res: Response) => 
   try {
     const businessId = requireBusinessId(req, res);
     if (!businessId) return;
-    const vendors = await Vendor.find({ businessId, isDeleted: { $ne: true } }).sort({ createdAt: -1 });
+    const vendors = await Vendor
+                            .find({ businessId, isDeleted: { $ne: true } })
+                            .sort({ createdAt: -1 });
 
     const quotationTotals = await Quotation.aggregate([
       { $match: { businessId, isDeleted: { $ne: true }, vendorId: { $ne: null } } },
@@ -282,7 +290,19 @@ export const getCustomerLedger = async (req: Request, res: Response) => {
       businessId,
       customerId: customer._id,
       isDeleted: { $ne: true },
-    }).sort({ createdAt: -1 });
+    }).sort({ createdAt: 1 });
+
+    const allocationTotals = await Payments.aggregate([
+      { $match: { businessId, party: 'customer', isDeleted: { $ne: true } } },
+      { $unwind: '$allocations' },
+      { $match: { 'allocations.quotationId': { $in: quotations.map((q) => q._id) } } },
+      { $group: { _id: '$allocations.quotationId', totalAllocated: { $sum: '$allocations.amount' } } }
+    ]);
+
+    const allocationMap = new Map<string, number>();
+    allocationTotals.forEach((item) => {
+      allocationMap.set(String(item._id), Number(item.totalAllocated || 0));
+    });
 
     const payments = await Payments.find(getPaymentMatch(businessId, 'customer', toObjectIdStrict(customer._id))).sort({ paymentDate: -1 });
 
@@ -290,10 +310,15 @@ export const getCustomerLedger = async (req: Request, res: Response) => {
       type: LedgerEntryType;
       entryType: 'credit' | 'debit';
       date: Date;
+      data?: Record<string, any>;
       amount: number;
       referenceId?: mongoose.Types.ObjectId;
       notes?: string;
       allocations?: any[];
+      customId?: string;
+      paymentStatus?: 'none' | 'partial' | 'paid';
+      allocatedAmount?: number;
+      outstandingAmount?: number;
     }> = [];
 
     if (customer.openingBalance && customer.balanceType) {
@@ -310,9 +335,24 @@ export const getCustomerLedger = async (req: Request, res: Response) => {
         type: 'quotation',
         entryType: 'debit',
         date: quotation.createdAt || new Date(),
+        data: quotation,
         amount: getQuotationAmountForParty(quotation, 'customer'),
         referenceId: toObjectIdStrict(quotation._id),
+        customId: quotation.customId,
         notes: quotation.remarks,
+        paymentStatus: (() => {
+          const totalAmount = getQuotationAmountForParty(quotation, 'customer');
+          const allocated = allocationMap.get(String(quotation._id)) || 0;
+          if (totalAmount <= 0 || allocated <= 0) return 'none';
+          if (allocated >= totalAmount) return 'paid';
+          return 'partial';
+        })(),
+        allocatedAmount: allocationMap.get(String(quotation._id)) || 0,
+        outstandingAmount: (() => {
+          const totalAmount = getQuotationAmountForParty(quotation, 'customer');
+          const allocated = allocationMap.get(String(quotation._id)) || 0;
+          return totalAmount - allocated;
+        })(),
       });
     });
 
@@ -323,9 +363,14 @@ export const getCustomerLedger = async (req: Request, res: Response) => {
         date: payment.paymentDate || payment.createdAt,
         amount: payment.amount,
         referenceId: toObjectIdStrict(payment._id),
+        customId: payment.customId,
         notes: payment.internalNotes,
         allocations: payment.allocations,
       });
+    });
+
+    entries.sort((a, b) => {
+      return b.date.getTime() - a.date.getTime();
     });
 
     const totals = entries.reduce(
@@ -374,7 +419,19 @@ export const getVendorLedger = async (req: Request, res: Response) => {
       businessId,
       vendorId: vendor._id,
       isDeleted: { $ne: true },
-    }).sort({ createdAt: -1 });
+    }).sort({ createdAt: 1 });
+
+    const allocationTotals = await Payments.aggregate([
+      { $match: { businessId, party: 'vendor', isDeleted: { $ne: true } } },
+      { $unwind: '$allocations' },
+      { $match: { 'allocations.quotationId': { $in: quotations.map((q) => q._id) } } },
+      { $group: { _id: '$allocations.quotationId', totalAllocated: { $sum: '$allocations.amount' } } }
+    ]);
+
+    const allocationMap = new Map<string, number>();
+    allocationTotals.forEach((item) => {
+      allocationMap.set(String(item._id), Number(item.totalAllocated || 0));
+    });
 
     const payments = await Payments.find(getPaymentMatch(businessId, 'vendor', toObjectIdStrict(vendor._id))).sort({ paymentDate: -1 });
 
@@ -384,8 +441,12 @@ export const getVendorLedger = async (req: Request, res: Response) => {
       date: Date;
       amount: number;
       referenceId?: mongoose.Types.ObjectId;
+      customId?: string;
       notes?: string;
       allocations?: any[];
+      paymentStatus?: 'none' | 'partial' | 'paid';
+      allocatedAmount?: number;
+      outstandingAmount?: number;
     }> = [];
 
     if (vendor.openingBalance && vendor.balanceType) {
@@ -404,7 +465,21 @@ export const getVendorLedger = async (req: Request, res: Response) => {
         date: quotation.createdAt || new Date(),
         amount: getQuotationAmountForParty(quotation, 'vendor'),
         referenceId: toObjectIdStrict(quotation._id),
+        customId: quotation.customId,
         notes: quotation.remarks,
+        paymentStatus: (() => {
+          const totalAmount = getQuotationAmountForParty(quotation, 'vendor');
+          const allocated = allocationMap.get(String(quotation._id)) || 0;
+          if (totalAmount <= 0 || allocated <= 0) return 'none';
+          if (allocated >= totalAmount) return 'paid';
+          return 'partial';
+        })(),
+        allocatedAmount: allocationMap.get(String(quotation._id)) || 0,
+        outstandingAmount: (() => {
+          const totalAmount = getQuotationAmountForParty(quotation, 'vendor');
+          const allocated = allocationMap.get(String(quotation._id)) || 0;
+          return totalAmount - allocated;
+        })(),
       });
     });
 
@@ -415,9 +490,14 @@ export const getVendorLedger = async (req: Request, res: Response) => {
         date: payment.paymentDate || payment.createdAt,
         amount: payment.amount,
         referenceId: toObjectIdStrict(payment._id),
+        customId: payment.customId,
         notes: payment.internalNotes,
         allocations: payment.allocations,
       });
+    });
+
+    entries.sort((a, b) => {
+      return b.date.getTime() - a.date.getTime();
     });
 
     const totals = entries.reduce(

@@ -17,6 +17,7 @@ import travellerRoutes from './routes/traveller';
 import helperRoutes from './routes/helper';
 import makerCheckerGroupRoutes from './routes/makerCheckerGroup';
 import paymentRoutes from './routes/payments';
+import bankRoutes from './routes/bank';
 
 configDotenv();
 
@@ -38,6 +39,7 @@ app.use('/traveller', checkKarvaanToken, travellerRoutes);
 app.use('/helper', checkKarvaanToken, helperRoutes);
 app.use('/maker-checker-group', checkKarvaanToken, makerCheckerGroupRoutes);
 app.use('/payments', checkKarvaanToken, paymentRoutes);
+app.use('/bank', checkKarvaanToken, bankRoutes);
 
 /**
  * @swagger

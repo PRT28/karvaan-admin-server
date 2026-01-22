@@ -35,6 +35,7 @@ export interface IPayments extends Document {
   internalNotes: string;
   allocations: IPaymentAllocation[];
   unallocatedAmount: number;
+  customId: string;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -81,6 +82,10 @@ const paymentSchema = new Schema<IPayments>({
   paymentDate: {
     type: Date,
     default: Date.now,
+  },
+  customId: {
+    type: String,
+    index: true,
   },
   documents: {
     type: [{

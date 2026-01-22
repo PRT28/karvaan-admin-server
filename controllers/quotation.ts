@@ -5,6 +5,7 @@ import Vendor from '../models/Vendors';
 import Traveller from '../models/Traveller';
 import Team from '../models/Team';
 import mongoose from 'mongoose';
+import Payments from '../models/Payments';
 import { uploadMultipleToS3, UploadedDocument } from '../utils/s3';
 import MakerCheckerGroup from '../models/MakerCheckerGroup';
 
@@ -31,6 +32,35 @@ const getUserIdFromRequest = (req: Request): string | undefined => {
     return (userId as any)._id.toString();
   }
   return undefined;
+};
+
+const normalizeObjectId = (value: unknown) => {
+  if (!value) return value;
+  if (value instanceof mongoose.Types.ObjectId) return value;
+  if (mongoose.isValidObjectId(String(value))) {
+    return new mongoose.Types.ObjectId(String(value));
+  }
+  return value;
+};
+
+const getQuotationAmountForParty = (quotation: any, party: 'customer' | 'vendor') => {
+  const baseAmount = Number(quotation.totalAmount ?? 0);
+  if (party !== 'vendor') return baseAmount;
+
+  const formFields: any = quotation.formFields;
+  if (!formFields) return baseAmount;
+
+  const candidateKeys = ['costAmount', 'costPrice', 'vendorCost', 'purchaseAmount'];
+  for (const key of candidateKeys) {
+    const rawValue = formFields instanceof Map ? formFields.get(key) : formFields?.[key];
+    if (rawValue === undefined || rawValue === null) continue;
+    const numericValue = Number(rawValue);
+    if (!Number.isNaN(numericValue)) {
+      return numericValue;
+    }
+  }
+
+  return baseAmount;
 };
 
 export const createQuotation = async (req: Request, res: Response): Promise<void> => {
@@ -380,9 +410,68 @@ export const getAllQuotations = async (req: Request, res: Response) => {
       })
       .populate('primaryOwner', 'name email')
       .populate('secondaryOwner', 'name email')
-      .sort({ createdAt: -1 });
+      .sort({ createdAt: -1 })
+      .lean();
 
-    res.status(200).json({ success: true, quotations });
+    const quotationIds = quotations
+      .map((quotation) => quotation?._id)
+      .filter((id) => mongoose.isValidObjectId(String(id)))
+      .map((id) => new mongoose.Types.ObjectId(String(id)));
+
+    const paymentBaseMatch: any = { isDeleted: { $ne: true } };
+    if (businessFilter.businessId) {
+      paymentBaseMatch.businessId = normalizeObjectId(businessFilter.businessId);
+    }
+
+    const [customerAllocations, vendorAllocations] = await Promise.all([
+      Payments.aggregate([
+        { $match: { ...paymentBaseMatch, party: 'customer' } },
+        { $unwind: '$allocations' },
+        { $match: { 'allocations.quotationId': { $in: quotationIds } } },
+        { $group: { _id: '$allocations.quotationId', totalAllocated: { $sum: '$allocations.amount' } } }
+      ]),
+      Payments.aggregate([
+        { $match: { ...paymentBaseMatch, party: 'vendor' } },
+        { $unwind: '$allocations' },
+        { $match: { 'allocations.quotationId': { $in: quotationIds } } },
+        { $group: { _id: '$allocations.quotationId', totalAllocated: { $sum: '$allocations.amount' } } }
+      ])
+    ]);
+
+    const customerAllocationMap = new Map<string, number>();
+    customerAllocations.forEach((item) => {
+      customerAllocationMap.set(String(item._id), Number(item.totalAllocated || 0));
+    });
+
+    const vendorAllocationMap = new Map<string, number>();
+    vendorAllocations.forEach((item) => {
+      vendorAllocationMap.set(String(item._id), Number(item.totalAllocated || 0));
+    });
+
+    const getPaymentStatus = (allocated: number, total: number) => {
+      if (total <= 0) return 'none';
+      if (allocated <= 0) return 'none';
+      if (allocated >= total) return 'paid';
+      return 'partial';
+    };
+
+    const quotationsWithPayments = quotations.map((quotation) => {
+      const quotationId = String(quotation._id);
+      const customerAmount = quotation.customerId ? getQuotationAmountForParty(quotation, 'customer') : 0;
+      const vendorAmount = quotation.vendorId ? getQuotationAmountForParty(quotation, 'vendor') : 0;
+      const customerAllocated = customerAllocationMap.get(quotationId) || 0;
+      const vendorAllocated = vendorAllocationMap.get(quotationId) || 0;
+
+      return {
+        ...quotation,
+        customerPaymentDone: Boolean(quotation.customerId) && customerAllocated >= customerAmount,
+        vendorPaymentDone: Boolean(quotation.vendorId) && vendorAllocated >= vendorAmount,
+        customerPaymentStatus: quotation.customerId ? getPaymentStatus(customerAllocated, customerAmount) : 'not_applicable',
+        vendorPaymentStatus: quotation.vendorId ? getPaymentStatus(vendorAllocated, vendorAmount) : 'not_applicable'
+      };
+    });
+
+    res.status(200).json({ success: true, quotations: quotationsWithPayments });
   } catch (err) {
     res.status(500).json({ success: false, message: 'Failed to fetch quotations', error: (err as Error).message });
   }

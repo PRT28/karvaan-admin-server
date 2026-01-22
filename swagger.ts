@@ -800,6 +800,58 @@ const options = {
           },
         },
 
+        // Bank Schema
+        Bank: {
+          type: 'object',
+          required: ['name', 'accountNumber', 'businessId', 'ifscCode', 'accountType'],
+          properties: {
+            _id: {
+              type: 'string',
+              description: 'Bank ID',
+              example: '507f1f77bcf86cd799439030',
+            },
+            name: {
+              type: 'string',
+              description: 'Bank name',
+              example: 'HDFC Bank',
+            },
+            accountNumber: {
+              type: 'string',
+              description: 'Bank account number',
+              example: '1234567890',
+            },
+            businessId: {
+              type: 'string',
+              description: 'Reference to Business',
+              example: '507f1f77bcf86cd799439020',
+            },
+            ifscCode: {
+              type: 'string',
+              description: 'IFSC code',
+              example: 'HDFC0000123',
+            },
+            accountType: {
+              type: 'string',
+              enum: ['savings', 'current'],
+              description: 'Account type',
+              example: 'current',
+            },
+            isDeleted: {
+              type: 'boolean',
+              description: 'Soft delete flag',
+              example: false,
+            },
+            createdAt: {
+              type: 'string',
+              format: 'date-time',
+            },
+            updatedAt: {
+              type: 'string',
+              format: 'date-time',
+            },
+          },
+        },
+
         // Traveller Schema
         Traveller: {
           type: 'object',
