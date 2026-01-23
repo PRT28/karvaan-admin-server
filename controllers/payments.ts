@@ -4,6 +4,7 @@ import Payments, { PartyType, PaymentAmountType } from '../models/Payments';
 import Customer from '../models/Customer';
 import Vendor from '../models/Vendors';
 import Quotation, { IQuotation } from '../models/Quotation';
+import { UploadedDocument, uploadMultipleToS3 } from '../utils/s3';
 
 type LedgerEntryType = 'opening' | 'quotation' | 'payment';
 
@@ -56,12 +57,14 @@ const getQuotationAmountForParty = (quotation: IQuotation, party: PartyType) => 
 };
 
 const buildAllocationPayload = (
-  allocations: Array<{ quotationId: string; amount: number }> | undefined,
+  allocations: string | undefined,
   party: PartyType
 ) => {
-  if (!allocations || allocations.length === 0) return [];
+  const alloc: Array<{ quotationId: string; amount: number }> = JSON.parse(allocations || '[]');
+  if (!alloc || alloc.length === 0) return [];
   const amountType: PaymentAmountType = party === 'Vendor' ? 'cost' : 'selling';
-  return allocations.map((allocation) => ({
+ 
+  return alloc.map((allocation) => ({
     quotationId: new mongoose.Types.ObjectId(allocation.quotationId),
     amount: Number(allocation.amount),
     amountType,
@@ -361,6 +364,7 @@ export const getCustomerLedger = async (req: Request, res: Response) => {
       entries.push({
         type: 'payment',
         entryType: payment.entryType,
+        data: payment,
         date: payment.paymentDate || payment.createdAt,
         amount: payment.amount,
         referenceId: toObjectIdStrict(payment._id),
@@ -507,6 +511,7 @@ export const getVendorLedger = async (req: Request, res: Response) => {
         type: 'payment',
         entryType: payment.entryType,
         date: payment.paymentDate || payment.createdAt,
+        data: payment,
         amount: payment.amount,
         referenceId: toObjectIdStrict(payment._id),
         customId: payment.customId,
@@ -594,6 +599,278 @@ export const getVendorUnsettledQuotations = async (req: Request, res: Response) 
   }
 };
 
+export const getCustomerUnallocatedPayments = async (req: Request, res: Response) => {
+  try {
+    const businessId = requireBusinessId(req, res);
+    if (!businessId) return;
+    const { id } = req.params;
+    if (!mongoose.isValidObjectId(id)) {
+      res.status(400).json({ message: 'Invalid customer ID' });
+      return;
+    }
+
+    const payments = await Payments.find({
+      businessId,
+      party: 'customer',
+      partyId: new mongoose.Types.ObjectId(id),
+      isDeleted: { $ne: true },
+      unallocatedAmount: { $gt: 0 },
+    })
+      .populate('bankId')
+      .sort({ paymentDate: -1, createdAt: -1 });
+
+    res.status(200).json({ payments });
+  } catch (err: unknown) {
+    const errorMessage = err instanceof Error ? err.message : 'Something went wrong';
+    res.status(500).json({ error: 'Failed to fetch unallocated customer payments', message: errorMessage });
+  }
+};
+
+export const getVendorUnallocatedPayments = async (req: Request, res: Response) => {
+  try {
+    const businessId = requireBusinessId(req, res);
+    if (!businessId) return;
+    const { id } = req.params;
+    if (!mongoose.isValidObjectId(id)) {
+      res.status(400).json({ message: 'Invalid vendor ID' });
+      return;
+    }
+
+    const payments = await Payments.find({
+      businessId,
+      party: 'vendor',
+      partyId: new mongoose.Types.ObjectId(id),
+      isDeleted: { $ne: true },
+      unallocatedAmount: { $gt: 0 },
+    })
+      .populate('bankId')
+      .sort({ paymentDate: -1, createdAt: -1 });
+
+    res.status(200).json({ payments });
+  } catch (err: unknown) {
+    const errorMessage = err instanceof Error ? err.message : 'Something went wrong';
+    res.status(500).json({ error: 'Failed to fetch unallocated vendor payments', message: errorMessage });
+  }
+};
+
+const allocatePaymentToQuotation = async (
+  req: Request,
+  res: Response,
+  party: PartyType
+) => {
+  try {
+    const businessId = requireBusinessId(req, res);
+    if (!businessId) return;
+    const { paymentId } = req.params;
+    const { quotationId, amount } = req.body;
+
+    if (!mongoose.isValidObjectId(paymentId)) {
+      res.status(400).json({ message: 'Invalid payment ID' });
+      return;
+    }
+
+    if (!quotationId || !mongoose.isValidObjectId(quotationId)) {
+      res.status(400).json({ message: 'Valid quotationId is required' });
+      return;
+    }
+
+    const allocationAmount = Number(amount);
+    if (!Number.isFinite(allocationAmount) || allocationAmount <= 0) {
+      res.status(400).json({ message: 'Allocation amount must be greater than 0' });
+      return;
+    }
+
+    const payment = await Payments.findOne({
+      _id: paymentId,
+      businessId,
+      party,
+      isDeleted: { $ne: true },
+    });
+
+    if (!payment) {
+      res.status(404).json({ message: 'Payment not found' });
+      return;
+    }
+
+    const unallocatedAmount = Number(payment.unallocatedAmount || 0);
+    if (allocationAmount > unallocatedAmount) {
+      res.status(400).json({ message: 'Allocation amount exceeds unallocated amount' });
+      return;
+    }
+
+    const allocationPayload = buildAllocationPayload(
+      JSON.stringify([{ quotationId, amount: allocationAmount }]),
+      party
+    );
+
+    await validatePartyQuotationLinks(
+      party,
+      payment.partyId,
+      businessId,
+      allocationPayload
+    );
+
+    payment.allocations = [...(payment.allocations || []), ...allocationPayload];
+    payment.unallocatedAmount = unallocatedAmount - allocationAmount;
+
+    await payment.save();
+
+    res.status(200).json({ payment });
+  } catch (err: unknown) {
+    const errorMessage = err instanceof Error ? err.message : 'Something went wrong';
+    res.status(500).json({ error: 'Failed to allocate payment', message: errorMessage });
+  }
+};
+
+export const allocateCustomerPaymentToQuotation = async (req: Request, res: Response) =>
+  allocatePaymentToQuotation(req, res, 'Customer');
+
+export const allocateVendorPaymentToQuotation = async (req: Request, res: Response) =>
+  allocatePaymentToQuotation(req, res, 'Vendor');
+
+const allocatePaymentsToQuotation = async (
+  req: Request,
+  res: Response,
+  party: PartyType
+) => {
+  const businessId = requireBusinessId(req, res);
+  if (!businessId) return;
+  const { quotationId } = req.params;
+  const { allocations } = req.body;
+
+  if (!quotationId || !mongoose.isValidObjectId(quotationId)) {
+    res.status(400).json({ message: 'Valid quotationId is required' });
+    return;
+  }
+
+  if (!Array.isArray(allocations) || allocations.length === 0) {
+    res.status(400).json({ message: 'Allocations are required' });
+    return;
+  }
+
+  const uniquePaymentIds = new Set<string>();
+  for (const allocation of allocations) {
+    if (!allocation?.paymentId || !mongoose.isValidObjectId(allocation.paymentId)) {
+      res.status(400).json({ message: 'Valid paymentId is required for each allocation' });
+      return;
+    }
+    const allocationAmount = Number(allocation.amount);
+    if (!Number.isFinite(allocationAmount) || allocationAmount <= 0) {
+      res.status(400).json({ message: 'Allocation amount must be greater than 0' });
+      return;
+    }
+    uniquePaymentIds.add(String(allocation.paymentId));
+  }
+
+  if (uniquePaymentIds.size !== allocations.length) {
+    res.status(400).json({ message: 'Duplicate paymentId entries are not allowed' });
+    return;
+  }
+
+  const session = await mongoose.startSession();
+  try {
+    let updatedPayments: any[] = [];
+
+    await session.withTransaction(async () => {
+      const quotation = await Quotation.findOne({
+        _id: quotationId,
+        businessId,
+        isDeleted: { $ne: true },
+      })
+        .select('customerId vendorId')
+        .session(session);
+
+      if (!quotation) {
+        throw new Error('Quotation not found');
+      }
+
+      const expectedPartyId = party === 'Customer' ? quotation.customerId : quotation.vendorId;
+      if (!expectedPartyId) {
+        throw new Error('Quotation is missing customer or vendor');
+      }
+
+      const paymentIds = allocations.map((allocation: any) => allocation.paymentId);
+      const payments = await Payments.find({
+        _id: { $in: paymentIds },
+        businessId,
+        party,
+        isDeleted: { $ne: true },
+      }).session(session);
+
+      if (payments.length !== allocations.length) {
+        throw new Error('One or more payments not found');
+      }
+
+      const paymentMap = new Map<string, typeof payments[number]>();
+      payments.forEach((payment) => {
+        paymentMap.set(String(payment._id), payment);
+      });
+
+      for (const allocation of allocations) {
+        const payment = paymentMap.get(String(allocation.paymentId));
+        if (!payment) {
+          throw new Error('Payment not found');
+        }
+        if (String(payment.partyId) !== String(expectedPartyId)) {
+          throw new Error('Payment party does not match quotation party');
+        }
+        const allocationAmount = Number(allocation.amount);
+        const unallocatedAmount = Number(payment.unallocatedAmount || 0);
+        if (allocationAmount > unallocatedAmount) {
+          throw new Error('Allocation amount exceeds unallocated amount');
+        }
+      }
+
+      updatedPayments = [];
+      for (const allocation of allocations) {
+        const payment = paymentMap.get(String(allocation.paymentId));
+        if (!payment) continue;
+
+        const allocationAmount = Number(allocation.amount);
+        const allocationPayload = buildAllocationPayload(
+          JSON.stringify([{ quotationId, amount: allocationAmount }]),
+          party
+        );
+
+        payment.allocations = [...(payment.allocations || []), ...allocationPayload];
+        payment.unallocatedAmount = Number(payment.unallocatedAmount || 0) - allocationAmount;
+
+        await payment.save({ session });
+        updatedPayments.push(payment);
+      }
+    });
+
+    res.status(200).json({ payments: updatedPayments });
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : 'Something went wrong';
+    if (message === 'Quotation not found') {
+      res.status(404).json({ message });
+      return;
+    }
+    if (message === 'One or more payments not found' || message === 'Payment not found') {
+      res.status(404).json({ message });
+      return;
+    }
+    if (
+      message === 'Quotation is missing customer or vendor' ||
+      message === 'Payment party does not match quotation party' ||
+      message === 'Allocation amount exceeds unallocated amount'
+    ) {
+      res.status(400).json({ message });
+      return;
+    }
+    res.status(500).json({ error: 'Failed to allocate payments', message });
+  } finally {
+    session.endSession();
+  }
+};
+
+export const allocateCustomerPaymentsToQuotation = async (req: Request, res: Response) =>
+  allocatePaymentsToQuotation(req, res, 'Customer');
+
+export const allocateVendorPaymentsToQuotation = async (req: Request, res: Response) =>
+  allocatePaymentsToQuotation(req, res, 'Vendor');
+
 export const createCustomerPayment = async (req: Request, res: Response) => {
   try {
     const businessId = requireBusinessId(req, res);
@@ -604,7 +881,7 @@ export const createCustomerPayment = async (req: Request, res: Response) => {
       return;
     }
 
-    const { bankId, amount, entryType, paymentDate, status, internalNotes, allocations } = req.body;
+    const { bankId, amount, entryType, paymentDate, status, internalNotes, allocations, customId } = req.body;
     if (!bankId || !mongoose.isValidObjectId(bankId)) {
       res.status(400).json({ message: 'Valid bankId is required' });
       return;
@@ -615,6 +892,35 @@ export const createCustomerPayment = async (req: Request, res: Response) => {
     if (allocationTotal > Number(amount)) {
       res.status(400).json({ message: 'Allocation total exceeds payment amount' });
       return;
+    }
+
+    let uploadedDocuments: UploadedDocument[] = [];
+    if (req.files && Array.isArray(req.files) && req.files.length > 0) {
+      console.log(`📁 Uploading ${req.files.length} document(s) to S3...`);
+
+      if (req.files.length > 3) {
+        res.status(400).json({
+          success: false,
+          message: 'Maximum 3 documents are allowed per quotation'
+        });
+        return;
+      }
+
+      try {
+        uploadedDocuments = await uploadMultipleToS3(
+          req.files as Express.Multer.File[],
+          `payments/${req.user?.businessInfo?.businessId}`
+        );
+        console.log(`✅ ${uploadedDocuments.length} document(s) uploaded successfully`);
+      } catch (uploadError) {
+        console.error('❌ Error uploading documents to S3:', uploadError);
+        res.status(500).json({
+          success: false,
+          message: 'Failed to upload documents',
+          error: (uploadError as Error).message
+        });
+        return;
+      }
     }
 
     await validatePartyQuotationLinks(
@@ -633,7 +939,9 @@ export const createCustomerPayment = async (req: Request, res: Response) => {
       entryType,
       status,
       paymentDate,
+      documents: uploadedDocuments,
       internalNotes,
+      customId,
       allocations: allocationPayload,
       unallocatedAmount: Number(amount) - allocationTotal,
     });
@@ -655,7 +963,7 @@ export const createVendorPayment = async (req: Request, res: Response) => {
       return;
     }
 
-    const { bankId, amount, entryType, paymentDate, status, internalNotes, allocations } = req.body;
+    const { bankId, amount, entryType, paymentDate, status, internalNotes, allocations, customId } = req.body;
     if (!bankId || !mongoose.isValidObjectId(bankId)) {
       res.status(400).json({ message: 'Valid bankId is required' });
       return;
@@ -675,6 +983,35 @@ export const createVendorPayment = async (req: Request, res: Response) => {
       allocationPayload
     );
 
+    let uploadedDocuments: UploadedDocument[] = [];
+    if (req.files && Array.isArray(req.files) && req.files.length > 0) {
+      console.log(`📁 Uploading ${req.files.length} document(s) to S3...`);
+
+      if (req.files.length > 3) {
+        res.status(400).json({
+          success: false,
+          message: 'Maximum 3 documents are allowed per quotation'
+        });
+        return;
+      }
+
+      try {
+        uploadedDocuments = await uploadMultipleToS3(
+          req.files as Express.Multer.File[],
+          `payments/${req.user?.businessInfo?.businessId}`
+        );
+        console.log(`✅ ${uploadedDocuments.length} document(s) uploaded successfully`);
+      } catch (uploadError) {
+        console.error('❌ Error uploading documents to S3:', uploadError);
+        res.status(500).json({
+          success: false,
+          message: 'Failed to upload documents',
+          error: (uploadError as Error).message
+        });
+        return;
+      }
+    }
+
     const payment = await Payments.create({
       party: 'Vendor',
       partyId: new mongoose.Types.ObjectId(id),
@@ -682,8 +1019,10 @@ export const createVendorPayment = async (req: Request, res: Response) => {
       bankId,
       amount: Number(amount),
       entryType,
+      documents: uploadedDocuments,
       status,
       paymentDate,
+      customId,
       internalNotes,
       allocations: allocationPayload,
       unallocatedAmount: Number(amount) - allocationTotal,
@@ -749,11 +1088,40 @@ export const createPaymentForQuotation = async (req: Request, res: Response) => 
     }
 
     const allocationPayload = buildAllocationPayload(
-      [{ quotationId: id, amount: allocationTotal }],
+      JSON.stringify([{ quotationId: id, amount: allocationTotal }]),
       resolvedParty
     );
 
     await validatePartyQuotationLinks(resolvedParty, resolvedPartyId, businessId, allocationPayload);
+
+    let uploadedDocuments: UploadedDocument[] = [];
+    if (req.files && Array.isArray(req.files) && req.files.length > 0) {
+      console.log(`📁 Uploading ${req.files.length} document(s) to S3...`);
+
+      if (req.files.length > 3) {
+        res.status(400).json({
+          success: false,
+          message: 'Maximum 3 documents are allowed per quotation'
+        });
+        return;
+      }
+
+      try {
+        uploadedDocuments = await uploadMultipleToS3(
+          req.files as Express.Multer.File[],
+          `payments/${req.user?.businessInfo?.businessId}`
+        );
+        console.log(`✅ ${uploadedDocuments.length} document(s) uploaded successfully`);
+      } catch (uploadError) {
+        console.error('❌ Error uploading documents to S3:', uploadError);
+        res.status(500).json({
+          success: false,
+          message: 'Failed to upload documents',
+          error: (uploadError as Error).message
+        });
+        return;
+      }
+    }
 
     const payment = await Payments.create({
       party: resolvedParty,
@@ -762,6 +1130,7 @@ export const createPaymentForQuotation = async (req: Request, res: Response) => 
       bankId,
       amount: Number(amount),
       entryType,
+      documents: uploadedDocuments,
       status,
       paymentDate,
       internalNotes,
