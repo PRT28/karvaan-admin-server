@@ -319,6 +319,7 @@ export const getCustomerLedger = async (req: Request, res: Response) => {
       paymentStatus?: 'none' | 'partial' | 'paid';
       allocatedAmount?: number;
       outstandingAmount?: number;
+      closingBalance?: { amount: number; balanceType: 'credit' | 'debit' };
     }> = [];
 
     if (customer.openingBalance && customer.balanceType) {
@@ -369,10 +370,6 @@ export const getCustomerLedger = async (req: Request, res: Response) => {
       });
     });
 
-    entries.sort((a, b) => {
-      return b.date.getTime() - a.date.getTime();
-    });
-
     const totals = entries.reduce(
       (acc, entry) => {
         acc[entry.entryType] += entry.amount;
@@ -383,13 +380,32 @@ export const getCustomerLedger = async (req: Request, res: Response) => {
 
     const closing = computeClosingBalance(totals.debit, totals.credit);
 
+    const sortedEntries = entries
+      .slice()
+      .sort((a, b) => {
+        if (a.type === 'opening' && b.type !== 'opening') return -1;
+        if (b.type === 'opening' && a.type !== 'opening') return 1;
+        return a.date.getTime() - b.date.getTime();
+      });
+
+    let runningDebit = 0;
+    let runningCredit = 0;
+    sortedEntries.forEach((entry) => {
+      if (entry.entryType === 'debit') {
+        runningDebit += entry.amount;
+      } else {
+        runningCredit += entry.amount;
+      }
+      entry.closingBalance = computeClosingBalance(runningDebit, runningCredit);
+    });
+
     res.status(200).json({
       party: { type: 'customer', id: customer._id, name: customer.name },
       openingBalance: {
         amount: Number(customer.openingBalance || 0),
         balanceType: customer.balanceType || null,
       },
-      entries,
+      entries: sortedEntries.reverse(),
       totals,
       closingBalance: closing,
     });
@@ -439,6 +455,7 @@ export const getVendorLedger = async (req: Request, res: Response) => {
       type: LedgerEntryType;
       entryType: 'credit' | 'debit';
       date: Date;
+      data?: Record<string, any>;
       amount: number;
       referenceId?: mongoose.Types.ObjectId;
       customId?: string;
@@ -447,6 +464,7 @@ export const getVendorLedger = async (req: Request, res: Response) => {
       paymentStatus?: 'none' | 'partial' | 'paid';
       allocatedAmount?: number;
       outstandingAmount?: number;
+      closingBalance?: { amount: number; balanceType: 'credit' | 'debit' };
     }> = [];
 
     if (vendor.openingBalance && vendor.balanceType) {
@@ -463,6 +481,7 @@ export const getVendorLedger = async (req: Request, res: Response) => {
         type: 'quotation',
         entryType: 'credit',
         date: quotation.createdAt || new Date(),
+        data: quotation,
         amount: getQuotationAmountForParty(quotation, 'Vendor'),
         referenceId: toObjectIdStrict(quotation._id),
         customId: quotation.customId,
@@ -496,10 +515,6 @@ export const getVendorLedger = async (req: Request, res: Response) => {
       });
     });
 
-    entries.sort((a, b) => {
-      return b.date.getTime() - a.date.getTime();
-    });
-
     const totals = entries.reduce(
       (acc, entry) => {
         acc[entry.entryType] += entry.amount;
@@ -510,13 +525,32 @@ export const getVendorLedger = async (req: Request, res: Response) => {
 
     const closing = computeClosingBalance(totals.debit, totals.credit);
 
+    const sortedEntries = entries
+      .slice()
+      .sort((a, b) => {
+        if (a.type === 'opening' && b.type !== 'opening') return -1;
+        if (b.type === 'opening' && a.type !== 'opening') return 1;
+        return a.date.getTime() - b.date.getTime();
+      });
+
+    let runningDebit = 0;
+    let runningCredit = 0;
+    sortedEntries.forEach((entry) => {
+      if (entry.entryType === 'debit') {
+        runningDebit += entry.amount;
+      } else {
+        runningCredit += entry.amount;
+      }
+      entry.closingBalance = computeClosingBalance(runningDebit, runningCredit);
+    });
+
     res.status(200).json({
       party: { type: 'vendor', id: vendor._id, name: vendor.companyName },
       openingBalance: {
         amount: Number(vendor.openingBalance || 0),
         balanceType: vendor.balanceType || null,
       },
-      entries,
+      entries: sortedEntries.reverse(),
       totals,
       closingBalance: closing,
     });
