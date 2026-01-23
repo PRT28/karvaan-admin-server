@@ -81,7 +81,7 @@ export const generateCustomId = async (req: Request, res: Response): Promise<voi
       return;
     }
 
-    const normalizedType = type.toLowerCase() as SupportedType;
+    const normalizedType = type as SupportedType;
     if (!typeModelMap[normalizedType]) {
       res.status(400).json({ success: false, message: 'Invalid type. Allowed values: booking, customer, team, vendor, task' });
       return;
