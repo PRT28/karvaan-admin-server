@@ -302,12 +302,18 @@ export const getCustomerLedger = async (req: Request, res: Response) => {
       { $group: { _id: '$allocations.quotationId', totalAllocated: { $sum: '$allocations.amount' } } }
     ]);
 
+
     const allocationMap = new Map<string, number>();
     allocationTotals.forEach((item) => {
       allocationMap.set(String(item._id), Number(item.totalAllocated || 0));
     });
 
-    const payments = await Payments.find(getPaymentMatch(businessId, 'Customer', toObjectIdStrict(customer._id))).sort({ paymentDate: -1 });
+    const payments = await Payments.
+      find(getPaymentMatch(businessId, 'Customer', toObjectIdStrict(customer._id)))
+      .populate('bankId')
+      .populate({ path: "partyId", select: "name companyName"})
+      .populate({ path: 'allocations.quotationId', select: 'customId' })
+      .sort({ paymentDate: -1 });
 
     const entries: Array<{
       type: LedgerEntryType;
@@ -453,7 +459,12 @@ export const getVendorLedger = async (req: Request, res: Response) => {
       allocationMap.set(String(item._id), Number(item.totalAllocated || 0));
     });
 
-    const payments = await Payments.find(getPaymentMatch(businessId, 'Vendor', toObjectIdStrict(vendor._id))).sort({ paymentDate: -1 });
+    const payments = await Payments
+        .find(getPaymentMatch(businessId, 'Vendor', toObjectIdStrict(vendor._id)))
+        .populate('bankId')
+        .populate({ path: "partyId", select: "name companyName"})
+        .populate({ path: 'allocations.quotationId', select: 'customId' })
+        .sort({ paymentDate: -1 });
 
     const entries: Array<{
       type: LedgerEntryType;
