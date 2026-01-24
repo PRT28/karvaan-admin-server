@@ -271,7 +271,7 @@ router.post('/vendors/:id/payments', handleDocumentUploadError, createVendorPaym
 router.post('/quotations/:id/payments', handleDocumentUploadError, createPaymentForQuotation);
 router.get('/quotations/:id/ledger', getQuotationLedger);
 
-router.patch('/payments/:id', updatePayment);
+router.patch('/payments/:id', handleDocumentUploadError, updatePayment);
 router.delete('/payments/:id', deletePayment);
 
 export default router;

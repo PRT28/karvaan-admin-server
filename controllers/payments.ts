@@ -892,7 +892,7 @@ export const createCustomerPayment = async (req: Request, res: Response) => {
       return;
     }
 
-    const { bankId, amount, entryType, paymentDate, status, internalNotes, allocations, customId } = req.body;
+    const { bankId, amount, entryType, paymentDate, status, internalNotes, allocations, customId, paymentType } = req.body;
     if (!bankId || !mongoose.isValidObjectId(bankId)) {
       res.status(400).json({ message: 'Valid bankId is required' });
       return;
@@ -950,6 +950,7 @@ export const createCustomerPayment = async (req: Request, res: Response) => {
       entryType,
       status,
       paymentDate,
+      paymentType,
       documents: uploadedDocuments,
       internalNotes,
       customId,
@@ -974,7 +975,7 @@ export const createVendorPayment = async (req: Request, res: Response) => {
       return;
     }
 
-    const { bankId, amount, entryType, paymentDate, status, internalNotes, allocations, customId } = req.body;
+    const { bankId, amount, entryType, paymentDate, status, internalNotes, allocations, customId, paymentType } = req.body;
     if (!bankId || !mongoose.isValidObjectId(bankId)) {
       res.status(400).json({ message: 'Valid bankId is required' });
       return;
@@ -1033,6 +1034,7 @@ export const createVendorPayment = async (req: Request, res: Response) => {
       documents: uploadedDocuments,
       status,
       paymentDate,
+      paymentType,
       customId,
       internalNotes,
       allocations: allocationPayload,
