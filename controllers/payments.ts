@@ -410,7 +410,7 @@ export const getCustomerLedger = async (req: Request, res: Response) => {
     });
 
     res.status(200).json({
-      party: { type: 'customer', id: customer._id, name: customer.name },
+      party: { type: 'Customer', id: customer._id, name: customer.name },
       openingBalance: {
         amount: Number(customer.openingBalance || 0),
         balanceType: customer.balanceType || null,
@@ -448,7 +448,7 @@ export const getVendorLedger = async (req: Request, res: Response) => {
     }).sort({ createdAt: 1 });
 
     const allocationTotals = await Payments.aggregate([
-      { $match: { businessId, party: 'vendor', isDeleted: { $ne: true } } },
+      { $match: { businessId, party: 'Vendor', isDeleted: { $ne: true } } },
       { $unwind: '$allocations' },
       { $match: { 'allocations.quotationId': { $in: quotations.map((q) => q._id) } } },
       { $group: { _id: '$allocations.quotationId', totalAllocated: { $sum: '$allocations.amount' } } }
@@ -622,7 +622,7 @@ export const getCustomerUnallocatedPayments = async (req: Request, res: Response
 
     const payments = await Payments.find({
       businessId,
-      party: 'customer',
+      party: 'Customer',
       partyId: new mongoose.Types.ObjectId(id),
       isDeleted: { $ne: true },
       unallocatedAmount: { $gt: 0 },
@@ -649,7 +649,7 @@ export const getVendorUnallocatedPayments = async (req: Request, res: Response) 
 
     const payments = await Payments.find({
       businessId,
-      party: 'vendor',
+      party: 'Vendor',
       partyId: new mongoose.Types.ObjectId(id),
       isDeleted: { $ne: true },
       unallocatedAmount: { $gt: 0 },
