@@ -50,7 +50,7 @@ const getQuotationAmountForParty = (quotation: any, party: 'customer' | 'vendor'
   const formFields: any = quotation.formFields;
   if (!formFields) return baseAmount;
 
-  const candidateKeys = ['costAmount', 'costPrice', 'vendorCost', 'purchaseAmount'];
+  const candidateKeys = ['costAmount', 'costprice', 'vendorCost', 'purchaseAmount'];
   for (const key of candidateKeys) {
     const rawValue = formFields instanceof Map ? formFields.get(key) : formFields?.[key];
     if (rawValue === undefined || rawValue === null) continue;
@@ -425,13 +425,13 @@ export const getAllQuotations = async (req: Request, res: Response) => {
 
     const [customerAllocations, vendorAllocations] = await Promise.all([
       Payments.aggregate([
-        { $match: { ...paymentBaseMatch, party: 'customer' } },
+        { $match: { ...paymentBaseMatch, party: 'Customer' } },
         { $unwind: '$allocations' },
         { $match: { 'allocations.quotationId': { $in: quotationIds } } },
         { $group: { _id: '$allocations.quotationId', totalAllocated: { $sum: '$allocations.amount' } } }
       ]),
       Payments.aggregate([
-        { $match: { ...paymentBaseMatch, party: 'vendor' } },
+        { $match: { ...paymentBaseMatch, party: 'Vendor' } },
         { $unwind: '$allocations' },
         { $match: { 'allocations.quotationId': { $in: quotationIds } } },
         { $group: { _id: '$allocations.quotationId', totalAllocated: { $sum: '$allocations.amount' } } }
@@ -449,10 +449,10 @@ export const getAllQuotations = async (req: Request, res: Response) => {
     });
 
     const getPaymentStatus = (allocated: number, total: number) => {
-      if (total <= 0) return 'none';
-      if (allocated <= 0) return 'none';
+      if (total <= 0) return 'pending';
+      if (allocated <= 0) return 'pending';
       if (allocated >= total) return 'paid';
-      return 'partial';
+      return 'partially paid';
     };
 
     const quotationsWithPayments = quotations.map((quotation) => {
@@ -461,11 +461,15 @@ export const getAllQuotations = async (req: Request, res: Response) => {
       const vendorAmount = quotation.vendorId ? getQuotationAmountForParty(quotation, 'vendor') : 0;
       const customerAllocated = customerAllocationMap.get(quotationId) || 0;
       const vendorAllocated = vendorAllocationMap.get(quotationId) || 0;
+      const customerRemainingAmount = Math.max(customerAmount - customerAllocated, 0);
+      const vendorRemainingAmount = Math.max(vendorAmount - vendorAllocated, 0);
 
       return {
         ...quotation,
         customerPaymentDone: Boolean(quotation.customerId) && customerAllocated >= customerAmount,
         vendorPaymentDone: Boolean(quotation.vendorId) && vendorAllocated >= vendorAmount,
+        customerRemainingAmount,
+        vendorRemainingAmount,
         customerPaymentStatus: quotation.customerId ? getPaymentStatus(customerAllocated, customerAmount) : 'not_applicable',
         vendorPaymentStatus: quotation.vendorId ? getPaymentStatus(vendorAllocated, vendorAmount) : 'not_applicable'
       };

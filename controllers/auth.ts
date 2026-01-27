@@ -799,7 +799,7 @@ export const resetPasswordRequest = async (req: Request, res: Response): Promise
   try {
     const { userId, password, autoGeneratePassword, requireReset } = req.body;
 
-    if (!userId || !password) {
+    if (!userId) {
       res.status(400).json({
         success: false,
         message: 'User ID and password are required'

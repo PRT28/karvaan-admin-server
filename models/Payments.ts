@@ -72,7 +72,9 @@ const paymentSchema = new Schema<IPayments>({
   bankId: {
     type: Schema.Types.ObjectId,
     ref: 'Bank',
-    required: true,
+    required: function () {
+      return this.paymentType !== 'cash';
+    },
   },
   amount: {
     type: Number,

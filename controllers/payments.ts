@@ -8,6 +8,22 @@ import { UploadedDocument, uploadMultipleToS3 } from '../utils/s3';
 
 type LedgerEntryType = 'opening' | 'quotation' | 'payment';
 
+type LedgerEntry = {
+  type: LedgerEntryType;
+  entryType: 'credit' | 'debit';
+  date: Date;
+  data?: Record<string, any>;
+  amount: number;
+  referenceId?: mongoose.Types.ObjectId;
+  notes?: string;
+  allocations?: any[];
+  customId?: string;
+  paymentStatus?: 'none' | 'partial' | 'paid';
+  allocatedAmount?: number;
+  outstandingAmount?: number;
+  closingBalance?: { amount: number; balanceType: 'credit' | 'debit' };
+};
+
 const toObjectId = (value: unknown) => {
   if (value instanceof mongoose.Types.ObjectId) return value;
   if (value === null || value === undefined) return null;
@@ -43,7 +59,7 @@ const getQuotationAmountForParty = (quotation: IQuotation, party: PartyType) => 
   const formFields: any = quotation.formFields;
   if (!formFields) return baseAmount;
 
-  const candidateKeys = ['costAmount', 'costPrice', 'vendorCost', 'purchaseAmount'];
+  const candidateKeys = ['costAmount', 'costprice', 'vendorCost', 'purchaseAmount'];
   for (const key of candidateKeys) {
     const rawValue = formFields instanceof Map ? formFields.get(key) : formFields?.[key];
     if (rawValue === undefined || rawValue === null) continue;
@@ -81,6 +97,61 @@ const computeClosingBalance = (totalDebit: number, totalCredit: number) => {
     return { amount: balance, balanceType: 'debit' as const };
   }
   return { amount: Math.abs(balance), balanceType: 'credit' as const };
+};
+
+const appendPaymentEntriesForLedger = (entries: LedgerEntry[], payment: any) => {
+  const paymentAllocations = Array.isArray(payment.allocations) ? payment.allocations : [];
+  const paymentAmount = Number(payment.amount || 0);
+  if (paymentAllocations.length > 0) {
+    const allocatedTotal = sumAllocationAmount(paymentAllocations);
+    paymentAllocations.forEach((allocation: any) => {
+      const allocationAmount = Number(allocation?.amount || 0);
+      if (!Number.isFinite(allocationAmount) || allocationAmount <= 0) return;
+      const appliedAt = allocation?.appliedAt ? new Date(allocation.appliedAt) : null;
+      entries.push({
+        type: 'payment',
+        entryType: payment.entryType,
+        data: { payment, allocation },
+        date: appliedAt || payment.paymentDate || payment.createdAt,
+        amount: allocationAmount,
+        referenceId: toObjectIdStrict(payment._id),
+        customId: payment.customId,
+        notes: payment.internalNotes,
+        allocations: [allocation],
+      });
+    });
+
+    const unallocatedAmount = Number.isFinite(Number(payment.unallocatedAmount))
+      ? Number(payment.unallocatedAmount || 0)
+      : paymentAmount - allocatedTotal;
+    const remaining = Math.max(0, unallocatedAmount);
+    if (remaining > 0) {
+      entries.push({
+        type: 'payment',
+        entryType: payment.entryType,
+        data: payment,
+        date: payment.paymentDate || payment.createdAt,
+        amount: remaining,
+        referenceId: toObjectIdStrict(payment._id),
+        customId: payment.customId,
+        notes: payment.internalNotes,
+        allocations: [],
+      });
+    }
+    return;
+  }
+
+  entries.push({
+    type: 'payment',
+    entryType: payment.entryType,
+    data: payment,
+    date: payment.paymentDate || payment.createdAt,
+    amount: paymentAmount,
+    referenceId: toObjectIdStrict(payment._id),
+    customId: payment.customId,
+    notes: payment.internalNotes,
+    allocations: payment.allocations,
+  });
 };
 
 const getPaymentMatch = (businessId: mongoose.Types.ObjectId, party: PartyType, partyId: mongoose.Types.ObjectId) => ({
@@ -273,9 +344,19 @@ export const listVendorClosingBalances = async (req: Request, res: Response) => 
   }
 };
 
+const normalizeObjectId = (value: unknown) => {
+  if (!value) return value;
+  if (value instanceof mongoose.Types.ObjectId) return value;
+  if (mongoose.isValidObjectId(String(value))) {
+    return new mongoose.Types.ObjectId(String(value));
+  }
+  return value;
+};
+
+
 export const getCustomerLedger = async (req: Request, res: Response) => {
   try {
-    const businessId = requireBusinessId(req, res);
+    const businessId = req.user?.businessInfo?.businessId;
     if (!businessId) return;
     const { id } = req.params;
     if (!mongoose.isValidObjectId(id)) {
@@ -292,15 +373,30 @@ export const getCustomerLedger = async (req: Request, res: Response) => {
     const quotations = await Quotation.find({
       businessId,
       customerId: customer._id,
-      isDeleted: { $ne: true },
+      isDeleted: { $ne: true }
     }).sort({ createdAt: 1 });
 
+    const quotationIds = quotations
+          .map((quotation) => quotation?._id)
+          .filter((id) => mongoose.isValidObjectId(String(id)))
+          .map((id) => new mongoose.Types.ObjectId(String(id)));
+
+    console.log(quotationIds, 'Quotation IDs')
+
+    const paymentBaseMatch: any = { isDeleted: { $ne: true } };
+
+    if (businessId) {
+      paymentBaseMatch.businessId = normalizeObjectId(businessId);
+    }
+
     const allocationTotals = await Payments.aggregate([
-      { $match: { businessId, party: 'Customer', isDeleted: { $ne: true } } },
+      { $match: { ...paymentBaseMatch, party: 'Customer' } },
       { $unwind: '$allocations' },
-      { $match: { 'allocations.quotationId': { $in: quotations.map((q) => q._id) } } },
+      { $match: { 'allocations.quotationId': { $in: quotationIds } } },
       { $group: { _id: '$allocations.quotationId', totalAllocated: { $sum: '$allocations.amount' } } }
     ]);
+
+    console.log(businessId, allocationTotals);
 
 
     const allocationMap = new Map<string, number>();
@@ -315,21 +411,7 @@ export const getCustomerLedger = async (req: Request, res: Response) => {
       .populate({ path: 'allocations.quotationId', select: 'customId' })
       .sort({ paymentDate: -1 });
 
-    const entries: Array<{
-      type: LedgerEntryType;
-      entryType: 'credit' | 'debit';
-      date: Date;
-      data?: Record<string, any>;
-      amount: number;
-      referenceId?: mongoose.Types.ObjectId;
-      notes?: string;
-      allocations?: any[];
-      customId?: string;
-      paymentStatus?: 'none' | 'partial' | 'paid';
-      allocatedAmount?: number;
-      outstandingAmount?: number;
-      closingBalance?: { amount: number; balanceType: 'credit' | 'debit' };
-    }> = [];
+    const entries: LedgerEntry[] = [];
 
     if (customer.openingBalance && customer.balanceType) {
       entries.push({
@@ -367,17 +449,7 @@ export const getCustomerLedger = async (req: Request, res: Response) => {
     });
 
     payments.forEach((payment) => {
-      entries.push({
-        type: 'payment',
-        entryType: payment.entryType,
-        data: payment,
-        date: payment.paymentDate || payment.createdAt,
-        amount: payment.amount,
-        referenceId: toObjectIdStrict(payment._id),
-        customId: payment.customId,
-        notes: payment.internalNotes,
-        allocations: payment.allocations,
-      });
+      appendPaymentEntriesForLedger(entries, payment);
     });
 
     const totals = entries.reduce(
@@ -447,10 +519,23 @@ export const getVendorLedger = async (req: Request, res: Response) => {
       isDeleted: { $ne: true },
     }).sort({ createdAt: 1 });
 
+     const quotationIds = quotations
+          .map((quotation) => quotation?._id)
+          .filter((id) => mongoose.isValidObjectId(String(id)))
+          .map((id) => new mongoose.Types.ObjectId(String(id)));
+
+    console.log(quotationIds, 'Quotation IDs')
+
+    const paymentBaseMatch: any = { isDeleted: { $ne: true } };
+
+    if (businessId) {
+      paymentBaseMatch.businessId = normalizeObjectId(businessId);
+    }
+
     const allocationTotals = await Payments.aggregate([
-      { $match: { businessId, party: 'Vendor', isDeleted: { $ne: true } } },
+      { $match: { ...paymentBaseMatch, party: 'Vendor' } },
       { $unwind: '$allocations' },
-      { $match: { 'allocations.quotationId': { $in: quotations.map((q) => q._id) } } },
+      { $match: { 'allocations.quotationId': { $in: quotationIds } } },
       { $group: { _id: '$allocations.quotationId', totalAllocated: { $sum: '$allocations.amount' } } }
     ]);
 
@@ -466,21 +551,7 @@ export const getVendorLedger = async (req: Request, res: Response) => {
         .populate({ path: 'allocations.quotationId', select: 'customId' })
         .sort({ paymentDate: -1 });
 
-    const entries: Array<{
-      type: LedgerEntryType;
-      entryType: 'credit' | 'debit';
-      date: Date;
-      data?: Record<string, any>;
-      amount: number;
-      referenceId?: mongoose.Types.ObjectId;
-      customId?: string;
-      notes?: string;
-      allocations?: any[];
-      paymentStatus?: 'none' | 'partial' | 'paid';
-      allocatedAmount?: number;
-      outstandingAmount?: number;
-      closingBalance?: { amount: number; balanceType: 'credit' | 'debit' };
-    }> = [];
+    const entries: LedgerEntry[] = [];
 
     if (vendor.openingBalance && vendor.balanceType) {
       entries.push({
@@ -494,7 +565,7 @@ export const getVendorLedger = async (req: Request, res: Response) => {
     quotations.forEach((quotation) => {
       entries.push({
         type: 'quotation',
-        entryType: 'credit',
+        entryType: 'debit',
         date: quotation.createdAt || new Date(),
         data: quotation,
         amount: getQuotationAmountForParty(quotation, 'Vendor'),
@@ -518,17 +589,7 @@ export const getVendorLedger = async (req: Request, res: Response) => {
     });
 
     payments.forEach((payment) => {
-      entries.push({
-        type: 'payment',
-        entryType: payment.entryType,
-        date: payment.paymentDate || payment.createdAt,
-        data: payment,
-        amount: payment.amount,
-        referenceId: toObjectIdStrict(payment._id),
-        customId: payment.customId,
-        notes: payment.internalNotes,
-        allocations: payment.allocations,
-      });
+      appendPaymentEntriesForLedger(entries, payment);
     });
 
     const totals = entries.reduce(
@@ -893,7 +954,7 @@ export const createCustomerPayment = async (req: Request, res: Response) => {
     }
 
     const { bankId, amount, entryType, paymentDate, status, internalNotes, allocations, customId, paymentType } = req.body;
-    if (!bankId || !mongoose.isValidObjectId(bankId)) {
+    if (!bankId || (!mongoose.isValidObjectId(bankId) && bankId !== 'cash')) {
       res.status(400).json({ message: 'Valid bankId is required' });
       return;
     }
@@ -945,7 +1006,7 @@ export const createCustomerPayment = async (req: Request, res: Response) => {
       party: 'Customer',
       partyId: new mongoose.Types.ObjectId(id),
       businessId,
-      bankId,
+      bankId: bankId === 'cash' ? null : bankId,
       amount: Number(amount),
       entryType,
       status,
@@ -976,7 +1037,7 @@ export const createVendorPayment = async (req: Request, res: Response) => {
     }
 
     const { bankId, amount, entryType, paymentDate, status, internalNotes, allocations, customId, paymentType } = req.body;
-    if (!bankId || !mongoose.isValidObjectId(bankId)) {
+    if (!bankId || (!mongoose.isValidObjectId(bankId) && bankId !== 'cash')) {
       res.status(400).json({ message: 'Valid bankId is required' });
       return;
     }
@@ -1028,7 +1089,7 @@ export const createVendorPayment = async (req: Request, res: Response) => {
       party: 'Vendor',
       partyId: new mongoose.Types.ObjectId(id),
       businessId,
-      bankId,
+      bankId: bankId === 'cash' ? null : bankId,
       amount: Number(amount),
       entryType,
       documents: uploadedDocuments,
