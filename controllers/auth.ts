@@ -373,7 +373,7 @@ export const loginWithPassword = async (req: Request, res: Response): Promise<vo
 
     const user = await User.findOne({ email, isActive: true })
       .select('+password')
-      .populate('businessId', 'businessName isActive subscriptionPlan subscriptionExpiry')
+      .populate('businessId', 'businessName isActive currency subscriptionPlan subscriptionExpiry')
       .populate('roleId', 'name permissions');
     console.log('User found:', user ? 'YES' : 'NO', user);
 
@@ -1017,7 +1017,7 @@ export const getCurrentUser = async (req: Request, res: Response): Promise<void>
     const email = req.user?.email;
     const user = await User.findOne({ email, isActive: true })
       .populate('roleId', 'roleName permission')
-      .populate('businessId', 'businessName businessType isActive subscriptionPlan');
+      .populate('businessId', 'businessName businessType isActive subscriptionPlan currency');
     if (!user) {
       res.status(404).json({ message: 'User not found' });
       return;

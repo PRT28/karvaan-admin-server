@@ -32,7 +32,7 @@ export interface IPayments extends Document {
   entryType: PaymentEntryType;
   status: 'pending' | 'approved' | 'denied';
   paymentBreakdown?: boolean;
-  amountCurreny: string;
+  amountCurrency: string;
   amountRoe?: number;
   amountNotes?: string;
   bankCharges?: number;
@@ -96,7 +96,7 @@ const paymentSchema = new Schema<IPayments>({
     type: Boolean,
     default: false,
   },
-  amountCurreny: {
+  amountCurrency: {
     type: String,
     required: true,
   },
