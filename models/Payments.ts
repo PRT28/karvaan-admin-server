@@ -31,6 +31,18 @@ export interface IPayments extends Document {
   amount: number;
   entryType: PaymentEntryType;
   status: 'pending' | 'approved' | 'denied';
+  paymentBreakdown?: boolean;
+  amountCurreny: string;
+  amountRoe?: number;
+  amountNotes?: string;
+  bankCharges?: number;
+  bankChargesRoe?: number;
+  bankChargesCurrency?: string;
+  bankChargesNotes?: string;
+  cashback?: number;
+  cashbackRoe?: number;
+  cashbackCurrency?: string;
+  cashbackNotes?: string;
   paymentDate: Date;
   documents: IPaymentDocument[];
   paymentType: PaymentType;
@@ -79,6 +91,54 @@ const paymentSchema = new Schema<IPayments>({
   amount: {
     type: Number,
     required: true,
+  },
+  paymentBreakdown: {
+    type: Boolean,
+    default: false,
+  },
+  amountCurreny: {
+    type: String,
+    required: true,
+  },
+  amountRoe: {
+    type: Number,
+    required: false,
+  },
+  amountNotes: {
+    type: String,
+    required: false,
+  },
+  bankCharges: {
+    type: Number,
+    default: 0,
+  },
+  bankChargesRoe: {
+    type: Number,
+    required: false
+  },
+  bankChargesCurrency: {
+    type: String,
+    required: false
+  },
+  bankChargesNotes: {
+    type: String,
+    required: false
+  },
+  cashback: {
+    type: Number,
+    required: false
+  },
+  cashbackRoe: {
+    type: Number,
+    required: false
+  },
+  cashbackCurrency: {
+    type: String,
+    required: false
+  },
+  cashbackNotes: {
+    type: String,
+    required: false
   },
   entryType: {
     type: String,

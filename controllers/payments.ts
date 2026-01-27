@@ -228,7 +228,7 @@ const getUnsettledQuotations = async (
 
 export const listCustomerClosingBalances = async (req: Request, res: Response) => {
   try {
-    const businessId = requireBusinessId(req, res);
+    const businessId = req.user?.businessInfo?.businessId;
     if (!businessId) return;
     const customers = await Customer
                               .find({ businessId, isDeleted: { $ne: true } })
@@ -239,12 +239,12 @@ export const listCustomerClosingBalances = async (req: Request, res: Response) =
                               .sort({ createdAt: -1 });
 
     const quotationTotals = await Quotation.aggregate([
-      { $match: { businessId, isDeleted: { $ne: true }, customerId: { $ne: null } } },
+      { $match: { businessId: normalizeObjectId(businessId), isDeleted: { $ne: true }, customerId: { $ne: null } } },
       { $group: { _id: '$customerId', totalAmount: { $sum: '$totalAmount' } } }
     ]);
 
     const paymentTotals = await Payments.aggregate([
-      { $match: { businessId, party: 'Customer', isDeleted: { $ne: true } } },
+      { $match: { businessId: normalizeObjectId(businessId), party: 'Customer', isDeleted: { $ne: true } } },
       { $group: { _id: { partyId: '$partyId', entryType: '$entryType' }, totalAmount: { $sum: '$amount' } } }
     ]);
 
@@ -289,21 +289,24 @@ export const listCustomerClosingBalances = async (req: Request, res: Response) =
 
 export const listVendorClosingBalances = async (req: Request, res: Response) => {
   try {
-    const businessId = requireBusinessId(req, res);
+    const businessId = req.user?.businessInfo?.businessId;
     if (!businessId) return;
     const vendors = await Vendor
                             .find({ businessId, isDeleted: { $ne: true } })
                             .sort({ createdAt: -1 });
 
     const quotationTotals = await Quotation.aggregate([
-      { $match: { businessId, isDeleted: { $ne: true }, vendorId: { $ne: null } } },
+      { $match: { businessId: normalizeObjectId(businessId), isDeleted: { $ne: true }, vendorId: { $ne: null } } },
       { $group: { _id: '$vendorId', totalAmount: { $sum: '$totalAmount' } } }
     ]);
 
     const paymentTotals = await Payments.aggregate([
-      { $match: { businessId, party: 'vendor', isDeleted: { $ne: true } } },
+      { $match: { businessId: normalizeObjectId(businessId), party: 'Vendor', isDeleted: { $ne: true } } },
       { $group: { _id: { partyId: '$partyId', entryType: '$entryType' }, totalAmount: { $sum: '$amount' } } }
     ]);
+
+    console.log(paymentTotals, 'Payment Totals');
+    console.log(quotationTotals, 'Quotation Totals');
 
     const quotationMap = new Map<string, number>();
     quotationTotals.forEach((item) => quotationMap.set(String(item._id), Number(item.totalAmount || 0)));
@@ -953,7 +956,29 @@ export const createCustomerPayment = async (req: Request, res: Response) => {
       return;
     }
 
-    const { bankId, amount, entryType, paymentDate, status, internalNotes, allocations, customId, paymentType } = req.body;
+    const { 
+      bankId,
+      amount,
+      entryType,
+      paymentDate,
+      status,
+      internalNotes,
+      allocations,
+      customId,
+      paymentType,
+      paymentBreakdown,
+      amountCurreny,
+      amountRoe,
+      amountNotes,
+      bankCharges,
+      bankChargesRoe,
+      bankChargesCurrency,
+      bankChargesNotes,
+      cashback,
+      cashbackRoe,
+      cashbackCurrency,
+      cashbackNotes,
+    } = req.body;
     if (!bankId || (!mongoose.isValidObjectId(bankId) && bankId !== 'cash')) {
       res.status(400).json({ message: 'Valid bankId is required' });
       return;
@@ -1017,6 +1042,18 @@ export const createCustomerPayment = async (req: Request, res: Response) => {
       customId,
       allocations: allocationPayload,
       unallocatedAmount: Number(amount) - allocationTotal,
+      paymentBreakdown,
+      amountCurreny,
+      amountRoe,
+      amountNotes,
+      bankCharges,
+      bankChargesRoe,
+      bankChargesCurrency,
+      bankChargesNotes,
+      cashback,
+      cashbackRoe,
+      cashbackCurrency,
+      cashbackNotes,
     });
 
     res.status(201).json({ payment });
@@ -1036,7 +1073,29 @@ export const createVendorPayment = async (req: Request, res: Response) => {
       return;
     }
 
-    const { bankId, amount, entryType, paymentDate, status, internalNotes, allocations, customId, paymentType } = req.body;
+    const { 
+      bankId,
+      amount,
+      entryType,
+      paymentDate,
+      status,
+      internalNotes,
+      allocations,
+      customId,
+      paymentType,
+      paymentBreakdown,
+      amountCurreny,
+      amountRoe,
+      amountNotes,
+      bankCharges,
+      bankChargesRoe,
+      bankChargesCurrency,
+      bankChargesNotes,
+      cashback,
+      cashbackRoe,
+      cashbackCurrency,
+      cashbackNotes,
+    } = req.body;
     if (!bankId || (!mongoose.isValidObjectId(bankId) && bankId !== 'cash')) {
       res.status(400).json({ message: 'Valid bankId is required' });
       return;
@@ -1100,6 +1159,18 @@ export const createVendorPayment = async (req: Request, res: Response) => {
       internalNotes,
       allocations: allocationPayload,
       unallocatedAmount: Number(amount) - allocationTotal,
+      paymentBreakdown,
+      amountCurreny,
+      amountRoe,
+      amountNotes,
+      bankCharges,
+      bankChargesRoe,
+      bankChargesCurrency,
+      bankChargesNotes,
+      cashback,
+      cashbackRoe,
+      cashbackCurrency,
+      cashbackNotes,
     });
 
     res.status(201).json({ payment });
