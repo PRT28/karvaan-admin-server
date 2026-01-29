@@ -6,8 +6,9 @@ import Team from '../models/Team';
 import Vendor from '../models/Vendors';
 import Logs from '../models/Logs';
 import Payments from '../models/Payments';
+import Limitless from '../models/Limitless';
 
-type SupportedType = 'booking' | 'customer' | 'team' | 'vendor' | 'task' | 'paymentIn' | 'paymentOut';
+type SupportedType = 'booking' | 'customer' | 'team' | 'vendor' | 'task' | 'paymentIn' | 'paymentOut' | 'limitless';
 
 const LETTERS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
 const DIGITS = '0123456789';
@@ -21,6 +22,7 @@ const prefixMap: Record<SupportedType, string> = {
   task: 'TA',
   paymentIn: 'PI',
   paymentOut: 'PO',
+  limitless: 'LI',
 };
 
 const shuffle = (chars: string[]): string[] => {
@@ -70,6 +72,9 @@ const typeModelMap: Record<SupportedType, { exists: (businessId: mongoose.Types.
   },
   paymentOut: {
     exists: async (businessId, customId) => !!(await Payments.exists({ businessId, customId, entryType: 'debit' })),
+  },
+  limitless: {
+    exists: async (businessId, customId) => !!(await Limitless.exists({ businessId, customId, isDeleted: false })),
   },
 };
 

@@ -1043,6 +1043,155 @@ const options = {
           },
         },
 
+        // Limitless Schema
+        Limitless: {
+          type: 'object',
+          properties: {
+            _id: {
+              type: 'string',
+              description: 'Limitless booking ID',
+              example: '507f1f77bcf86cd799439017',
+            },
+            customId: {
+              type: 'string',
+              description: 'Custom ID unique within the business',
+              example: 'LI-1A2B3',
+            },
+            businessId: {
+              type: 'string',
+              description: 'Reference to Business',
+              example: '507f1f77bcf86cd799439020',
+            },
+            customerId: {
+              type: 'string',
+              description: 'Reference to Customer',
+              example: '507f1f77bcf86cd799439013',
+            },
+            primaryOwner: {
+              type: 'string',
+              description: 'Primary owner (Team member ID)',
+              example: '507f1f77bcf86cd799439016',
+            },
+            secondaryOwner: {
+              type: 'array',
+              items: {
+                type: 'string',
+              },
+              description: 'Secondary owners (Team member IDs)',
+              example: ['507f1f77bcf86cd799439016'],
+            },
+            totalAmount: {
+              type: 'number',
+              description: 'Total amount',
+              example: 1500.0,
+            },
+            roe: {
+              type: 'number',
+              description: 'Rate of exchange',
+              example: 83.25,
+            },
+            currency: {
+              type: 'string',
+              description: 'Currency code',
+              example: 'USD',
+            },
+            status: {
+              type: 'string',
+              enum: ['confirmed', 'cancelled'],
+              description: 'Booking status',
+              example: 'confirmed',
+            },
+            serviceStatus: {
+              type: 'string',
+              enum: ['pending', 'denied', 'draft', 'approved'],
+              description: 'Service approval status',
+              example: 'approved',
+            },
+            travelDate: {
+              type: 'string',
+              format: 'date',
+              description: 'Travel date',
+              example: '2024-06-15',
+            },
+            bookingDate: {
+              type: 'string',
+              format: 'date',
+              description: 'Booking date',
+              example: '2024-06-01',
+            },
+            adultTravelers: {
+              type: 'array',
+              items: {
+                type: 'string',
+              },
+              description: 'Adult traveller IDs',
+            },
+            childTravelers: {
+              type: 'array',
+              description: 'Child travellers with ages',
+              items: {
+                type: 'object',
+                properties: {
+                  id: { type: 'string' },
+                  age: { type: 'number' },
+                },
+              },
+            },
+            adultNumber: {
+              type: 'number',
+              description: 'Number of adults',
+              example: 2,
+            },
+            childNumber: {
+              type: 'number',
+              description: 'Number of children',
+              example: 1,
+            },
+            limitlessDestinations: {
+              type: 'array',
+              items: {
+                type: 'string',
+              },
+              description: 'Destinations list',
+            },
+            limitlessTitle: {
+              type: 'string',
+              description: 'Limitless title',
+              example: 'Europe Summer Getaway',
+            },
+            description: {
+              type: 'string',
+              description: 'Description',
+              example: 'Multi-city travel plan',
+            },
+            remarks: {
+              type: 'string',
+              description: 'Additional remarks',
+              example: 'Special requirements noted',
+            },
+            isDeleted: {
+              type: 'boolean',
+              description: 'Soft delete flag',
+              example: false,
+            },
+            documents: {
+              type: 'array',
+              description: 'Array of uploaded documents (max 3)',
+              items: {
+                $ref: '#/components/schemas/UploadedDocument',
+              },
+            },
+            createdAt: {
+              type: 'string',
+              format: 'date-time',
+            },
+            updatedAt: {
+              type: 'string',
+              format: 'date-time',
+            },
+          },
+        },
+
         // Logs Schema
         Logs: {
           type: 'object',
