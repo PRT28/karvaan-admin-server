@@ -1460,7 +1460,7 @@ export const listPayments = async (req: Request, res: Response) => {
 
     const payments = await Payments.find(filter)
       .populate("bankId")
-      .populate({ path: "allocations.quotationId", select: "customId" })
+      .populate({ path: "allocations.quotationId", select: "customId quotationType" })
       .populate({ path: "partyId", select: "name companyName"})
       .sort({ paymentDate: -1, createdAt: -1 });
 
