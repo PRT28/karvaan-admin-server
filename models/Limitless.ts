@@ -4,6 +4,14 @@ export type LimitlessStatus = 'confirmed' | 'cancelled';
 
 export type ServiceStatus = 'pending' | 'denied' | 'draft' | 'approved';
 
+interface IRooms {
+  roomCategory: string;
+  bedType: string;
+  adults: number;
+  children: number;
+  mealPlan: string;
+}
+
 export interface ILimitlessDocument {
   originalName: string;
   fileName: string;
@@ -12,6 +20,56 @@ export interface ILimitlessDocument {
   size: number;
   mimeType: string;
   uploadedAt: Date;
+}
+
+export interface IFlightDetails {
+  pnr: string;
+  flightNumber: string;
+  bookingDate: Date;
+  travelDate: Date;
+  cabinBagsNum: number;
+  cabinBagsWeight: number;
+  checkInBagNum: number;
+  checkInBagWeight: number;
+  vendor: mongoose.Types.ObjectId;
+  advancedPricing: boolean;
+  costPrice: number;
+  vendorPrice: number;
+  incentive: number;
+  commmission: number;
+  airlineName: string;
+  origin: string;
+  destination: string;
+  etd: Date;
+  eta: Date;
+}
+
+export interface IHotelDetails {
+  bookingDate: Date;
+  travelDate: Date;
+  checkInDate: string;
+  checkOutDate: string;
+  checkOutTime: string;
+  checkInTime: string;
+  vendor: mongoose.Types.ObjectId;
+  costPrice: number;
+  vendorPrice: number;
+  incentive: number;
+  commmission: number;
+  accomodationType: string;
+  confirmationNumber: string;
+  pax: number;
+  rooms: IRooms[];
+}
+
+export interface IVisaDetails {
+  confirmationNumber: string;
+  vendor: mongoose.Types.ObjectId;
+  costPrice: number;
+  vendorPrice: number;
+  incentive: number;
+  commmission: number;
+  description: string;
 }
 
 export interface ILimitless extends Document {
@@ -39,6 +97,10 @@ export interface ILimitless extends Document {
   isDeleted: boolean;
   serviceStatus: string;
   documents: ILimitlessDocument[];
+  flights: Array<IFlightDetails | mongoose.Types.ObjectId>;
+  hotels: Array<IHotelDetails | mongoose.Types.ObjectId>;
+  visas: IVisaDetails | mongoose.Types.ObjectId;
+  insurance: any;
 }
 
 const LimitlessSchema = new Schema<ILimitless>(
@@ -107,6 +169,26 @@ const LimitlessSchema = new Schema<ILimitless>(
         },
         message: 'Maximum 3 documents are allowed per quotation'
       }
+    },
+    flights: {
+      type: [Schema.Types.Mixed as any],
+      default: [],
+      required: false,
+    },
+    hotels: {
+      type: [Schema.Types.Mixed as any],
+      default: [],
+      required: false,
+    },
+    visas: {
+      type: Schema.Types.Mixed as any,
+      default: {},
+      required: false,
+    },
+    insurance: {
+      type: Schema.Types.Mixed as any,
+      default: {},
+      required: false,
     },
   },
   { timestamps: true }

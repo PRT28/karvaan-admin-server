@@ -82,6 +82,40 @@ const parseNumberField = (data: Record<string, any>, field: string, res: Respons
   return true;
 };
 
+const buildLimitlessAccessFilter = (
+  req: Request,
+  res: Response,
+  id: string
+): Record<string, any> | null => {
+  if (!mongoose.Types.ObjectId.isValid(id)) {
+    res.status(400).json({ success: false, message: 'Invalid limitless ID' });
+    return null;
+  }
+
+  const filter: any = { _id: id, isDeleted: { $ne: true } };
+  if (req.user?.userType !== 'super_admin') {
+    const businessId = getBusinessIdFromRequest(req);
+    if (!businessId) {
+      res.status(403).json({ success: false, message: 'Business context missing' });
+      return null;
+    }
+    filter.businessId = businessId;
+  }
+
+  return filter;
+};
+
+const normalizeArrayPayload = (data: Record<string, any>, singleKey: string, pluralKey: string): any[] | null => {
+  const pluralValue = data[pluralKey];
+  if (Array.isArray(pluralValue)) return pluralValue;
+  if (pluralValue !== undefined) return [pluralValue];
+
+  const singleValue = data[singleKey];
+  if (singleValue !== undefined) return [singleValue];
+
+  return null;
+};
+
 export const createLimitless = async (req: Request, res: Response): Promise<void> => {
   try {
     const limitlessData = { ...req.body };
@@ -370,6 +404,444 @@ export const getLimitlessById = async (req: Request, res: Response): Promise<voi
     res.status(500).json({
       success: false,
       message: 'Failed to fetch limitless booking',
+      error: (err as Error).message,
+    });
+  }
+};
+
+export const addLimitlessFlights = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { id } = req.params;
+    const filter = buildLimitlessAccessFilter(req, res, id);
+    if (!filter) return;
+
+    const data = { ...req.body };
+    if (!parseJsonField(data, 'flight', 'flight', res)) return;
+    if (!parseJsonField(data, 'flights', 'flights', res)) return;
+
+    const flightsToAdd = normalizeArrayPayload(data, 'flight', 'flights');
+    if (!flightsToAdd || flightsToAdd.length === 0) {
+      res.status(400).json({ success: false, message: 'Flight data is required' });
+      return;
+    }
+
+    const updated = await Limitless.findOneAndUpdate(
+      filter,
+      { $push: { flights: { $each: flightsToAdd } } },
+      { new: true }
+    );
+
+    if (!updated) {
+      res.status(404).json({ success: false, message: 'Limitless booking not found' });
+      return;
+    }
+
+    res.status(200).json({ success: true, flights: updated.flights });
+  } catch (err) {
+    res.status(500).json({
+      success: false,
+      message: 'Failed to add flights',
+      error: (err as Error).message,
+    });
+  }
+};
+
+export const getLimitlessFlights = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { id } = req.params;
+    const filter = buildLimitlessAccessFilter(req, res, id);
+    if (!filter) return;
+
+    const limitless = await Limitless.findOne(filter).select('flights');
+    if (!limitless) {
+      res.status(404).json({ success: false, message: 'Limitless booking not found' });
+      return;
+    }
+
+    res.status(200).json({ success: true, flights: limitless.flights || [] });
+  } catch (err) {
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch flights',
+      error: (err as Error).message,
+    });
+  }
+};
+
+export const updateLimitlessFlight = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { id, index } = req.params;
+    const filter = buildLimitlessAccessFilter(req, res, id);
+    if (!filter) return;
+
+    const idx = Number(index);
+    if (!Number.isInteger(idx) || idx < 0) {
+      res.status(400).json({ success: false, message: 'Invalid flight index' });
+      return;
+    }
+
+    const data = { ...req.body };
+    if (!parseJsonField(data, 'flight', 'flight', res)) return;
+    const flightUpdate = data.flight ?? data;
+    if (!flightUpdate || Object.keys(flightUpdate).length === 0) {
+      res.status(400).json({ success: false, message: 'Flight data is required' });
+      return;
+    }
+
+    const limitless = await Limitless.findOne(filter).select('flights');
+    if (!limitless) {
+      res.status(404).json({ success: false, message: 'Limitless booking not found' });
+      return;
+    }
+
+    const flights = Array.isArray(limitless.flights) ? limitless.flights : [];
+    if (idx >= flights.length) {
+      res.status(404).json({ success: false, message: 'Flight not found' });
+      return;
+    }
+
+    flights[idx] = flightUpdate;
+    limitless.flights = flights;
+    limitless.markModified('flights');
+    await limitless.save();
+
+    res.status(200).json({ success: true, flights: limitless.flights });
+  } catch (err) {
+    res.status(500).json({
+      success: false,
+      message: 'Failed to update flight',
+      error: (err as Error).message,
+    });
+  }
+};
+
+export const deleteLimitlessFlight = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { id, index } = req.params;
+    const filter = buildLimitlessAccessFilter(req, res, id);
+    if (!filter) return;
+
+    const idx = Number(index);
+    if (!Number.isInteger(idx) || idx < 0) {
+      res.status(400).json({ success: false, message: 'Invalid flight index' });
+      return;
+    }
+
+    const limitless = await Limitless.findOne(filter).select('flights');
+    if (!limitless) {
+      res.status(404).json({ success: false, message: 'Limitless booking not found' });
+      return;
+    }
+
+    const flights = Array.isArray(limitless.flights) ? limitless.flights : [];
+    if (idx >= flights.length) {
+      res.status(404).json({ success: false, message: 'Flight not found' });
+      return;
+    }
+
+    flights.splice(idx, 1);
+    limitless.flights = flights;
+    limitless.markModified('flights');
+    await limitless.save();
+
+    res.status(200).json({ success: true, flights: limitless.flights });
+  } catch (err) {
+    res.status(500).json({
+      success: false,
+      message: 'Failed to delete flight',
+      error: (err as Error).message,
+    });
+  }
+};
+
+export const addLimitlessHotels = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { id } = req.params;
+    const filter = buildLimitlessAccessFilter(req, res, id);
+    if (!filter) return;
+
+    const data = { ...req.body };
+    if (!parseJsonField(data, 'hotel', 'hotel', res)) return;
+    if (!parseJsonField(data, 'hotels', 'hotels', res)) return;
+
+    const hotelsToAdd = normalizeArrayPayload(data, 'hotel', 'hotels');
+    if (!hotelsToAdd || hotelsToAdd.length === 0) {
+      res.status(400).json({ success: false, message: 'Hotel data is required' });
+      return;
+    }
+
+    const updated = await Limitless.findOneAndUpdate(
+      filter,
+      { $push: { hotels: { $each: hotelsToAdd } } },
+      { new: true }
+    );
+
+    if (!updated) {
+      res.status(404).json({ success: false, message: 'Limitless booking not found' });
+      return;
+    }
+
+    res.status(200).json({ success: true, hotels: updated.hotels });
+  } catch (err) {
+    res.status(500).json({
+      success: false,
+      message: 'Failed to add hotels',
+      error: (err as Error).message,
+    });
+  }
+};
+
+export const getLimitlessHotels = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { id } = req.params;
+    const filter = buildLimitlessAccessFilter(req, res, id);
+    if (!filter) return;
+
+    const limitless = await Limitless.findOne(filter).select('hotels');
+    if (!limitless) {
+      res.status(404).json({ success: false, message: 'Limitless booking not found' });
+      return;
+    }
+
+    res.status(200).json({ success: true, hotels: limitless.hotels || [] });
+  } catch (err) {
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch hotels',
+      error: (err as Error).message,
+    });
+  }
+};
+
+export const updateLimitlessHotel = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { id, index } = req.params;
+    const filter = buildLimitlessAccessFilter(req, res, id);
+    if (!filter) return;
+
+    const idx = Number(index);
+    if (!Number.isInteger(idx) || idx < 0) {
+      res.status(400).json({ success: false, message: 'Invalid hotel index' });
+      return;
+    }
+
+    const data = { ...req.body };
+    if (!parseJsonField(data, 'hotel', 'hotel', res)) return;
+    const hotelUpdate = data.hotel ?? data;
+    if (!hotelUpdate || Object.keys(hotelUpdate).length === 0) {
+      res.status(400).json({ success: false, message: 'Hotel data is required' });
+      return;
+    }
+
+    const limitless = await Limitless.findOne(filter).select('hotels');
+    if (!limitless) {
+      res.status(404).json({ success: false, message: 'Limitless booking not found' });
+      return;
+    }
+
+    const hotels = Array.isArray(limitless.hotels) ? limitless.hotels : [];
+    if (idx >= hotels.length) {
+      res.status(404).json({ success: false, message: 'Hotel not found' });
+      return;
+    }
+
+    hotels[idx] = hotelUpdate;
+    limitless.hotels = hotels;
+    limitless.markModified('hotels');
+    await limitless.save();
+
+    res.status(200).json({ success: true, hotels: limitless.hotels });
+  } catch (err) {
+    res.status(500).json({
+      success: false,
+      message: 'Failed to update hotel',
+      error: (err as Error).message,
+    });
+  }
+};
+
+export const deleteLimitlessHotel = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { id, index } = req.params;
+    const filter = buildLimitlessAccessFilter(req, res, id);
+    if (!filter) return;
+
+    const idx = Number(index);
+    if (!Number.isInteger(idx) || idx < 0) {
+      res.status(400).json({ success: false, message: 'Invalid hotel index' });
+      return;
+    }
+
+    const limitless = await Limitless.findOne(filter).select('hotels');
+    if (!limitless) {
+      res.status(404).json({ success: false, message: 'Limitless booking not found' });
+      return;
+    }
+
+    const hotels = Array.isArray(limitless.hotels) ? limitless.hotels : [];
+    if (idx >= hotels.length) {
+      res.status(404).json({ success: false, message: 'Hotel not found' });
+      return;
+    }
+
+    hotels.splice(idx, 1);
+    limitless.hotels = hotels;
+    limitless.markModified('hotels');
+    await limitless.save();
+
+    res.status(200).json({ success: true, hotels: limitless.hotels });
+  } catch (err) {
+    res.status(500).json({
+      success: false,
+      message: 'Failed to delete hotel',
+      error: (err as Error).message,
+    });
+  }
+};
+
+export const setLimitlessVisa = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { id } = req.params;
+    const filter = buildLimitlessAccessFilter(req, res, id);
+    if (!filter) return;
+
+    const data = { ...req.body };
+    if (!parseJsonField(data, 'visa', 'visa', res)) return;
+    const visaPayload = data.visa ?? data;
+    if (!visaPayload || Object.keys(visaPayload).length === 0) {
+      res.status(400).json({ success: false, message: 'Visa data is required' });
+      return;
+    }
+
+    const updated = await Limitless.findOneAndUpdate(filter, { visas: visaPayload }, { new: true });
+    if (!updated) {
+      res.status(404).json({ success: false, message: 'Limitless booking not found' });
+      return;
+    }
+
+    res.status(200).json({ success: true, visas: updated.visas });
+  } catch (err) {
+    res.status(500).json({
+      success: false,
+      message: 'Failed to save visa',
+      error: (err as Error).message,
+    });
+  }
+};
+
+export const getLimitlessVisa = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { id } = req.params;
+    const filter = buildLimitlessAccessFilter(req, res, id);
+    if (!filter) return;
+
+    const limitless = await Limitless.findOne(filter).select('visas');
+    if (!limitless) {
+      res.status(404).json({ success: false, message: 'Limitless booking not found' });
+      return;
+    }
+
+    res.status(200).json({ success: true, visas: limitless.visas ?? null });
+  } catch (err) {
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch visa',
+      error: (err as Error).message,
+    });
+  }
+};
+
+export const deleteLimitlessVisa = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { id } = req.params;
+    const filter = buildLimitlessAccessFilter(req, res, id);
+    if (!filter) return;
+
+    const updated = await Limitless.findOneAndUpdate(filter, { $unset: { visas: 1 } }, { new: true });
+    if (!updated) {
+      res.status(404).json({ success: false, message: 'Limitless booking not found' });
+      return;
+    }
+
+    res.status(200).json({ success: true, visas: null });
+  } catch (err) {
+    res.status(500).json({
+      success: false,
+      message: 'Failed to delete visa',
+      error: (err as Error).message,
+    });
+  }
+};
+
+export const setLimitlessInsurance = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { id } = req.params;
+    const filter = buildLimitlessAccessFilter(req, res, id);
+    if (!filter) return;
+
+    const data = { ...req.body };
+    if (!parseJsonField(data, 'insurance', 'insurance', res)) return;
+    const insurancePayload = data.insurance ?? data;
+    if (!insurancePayload || Object.keys(insurancePayload).length === 0) {
+      res.status(400).json({ success: false, message: 'Insurance data is required' });
+      return;
+    }
+
+    const updated = await Limitless.findOneAndUpdate(filter, { insurance: insurancePayload }, { new: true });
+    if (!updated) {
+      res.status(404).json({ success: false, message: 'Limitless booking not found' });
+      return;
+    }
+
+    res.status(200).json({ success: true, insurance: updated.insurance });
+  } catch (err) {
+    res.status(500).json({
+      success: false,
+      message: 'Failed to save insurance',
+      error: (err as Error).message,
+    });
+  }
+};
+
+export const getLimitlessInsurance = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { id } = req.params;
+    const filter = buildLimitlessAccessFilter(req, res, id);
+    if (!filter) return;
+
+    const limitless = await Limitless.findOne(filter).select('insurance');
+    if (!limitless) {
+      res.status(404).json({ success: false, message: 'Limitless booking not found' });
+      return;
+    }
+
+    res.status(200).json({ success: true, insurance: limitless.insurance ?? null });
+  } catch (err) {
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch insurance',
+      error: (err as Error).message,
+    });
+  }
+};
+
+export const deleteLimitlessInsurance = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { id } = req.params;
+    const filter = buildLimitlessAccessFilter(req, res, id);
+    if (!filter) return;
+
+    const updated = await Limitless.findOneAndUpdate(filter, { $unset: { insurance: 1 } }, { new: true });
+    if (!updated) {
+      res.status(404).json({ success: false, message: 'Limitless booking not found' });
+      return;
+    }
+
+    res.status(200).json({ success: true, insurance: null });
+  } catch (err) {
+    res.status(500).json({
+      success: false,
+      message: 'Failed to delete insurance',
       error: (err as Error).message,
     });
   }

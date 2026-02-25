@@ -10,6 +10,20 @@ import {
   getLimitlessHistoryByTeamMember,
   approveLimitless,
   denyLimitless,
+  addLimitlessFlights,
+  getLimitlessFlights,
+  updateLimitlessFlight,
+  deleteLimitlessFlight,
+  addLimitlessHotels,
+  getLimitlessHotels,
+  updateLimitlessHotel,
+  deleteLimitlessHotel,
+  setLimitlessVisa,
+  getLimitlessVisa,
+  deleteLimitlessVisa,
+  setLimitlessInsurance,
+  getLimitlessInsurance,
+  deleteLimitlessInsurance,
 } from '../controllers/limitless';
 
 import express from 'express';
@@ -119,6 +133,26 @@ router.get('/get-all-limitless', getAllLimitless);
  *         description: Limitless booking not found
  */
 router.get('/get-limitless/:id', getLimitlessById);
+
+router.post('/:id/flights', addLimitlessFlights);
+router.get('/:id/flights', getLimitlessFlights);
+router.put('/:id/flights/:index', updateLimitlessFlight);
+router.delete('/:id/flights/:index', deleteLimitlessFlight);
+
+router.post('/:id/hotels', addLimitlessHotels);
+router.get('/:id/hotels', getLimitlessHotels);
+router.put('/:id/hotels/:index', updateLimitlessHotel);
+router.delete('/:id/hotels/:index', deleteLimitlessHotel);
+
+router.post('/:id/visa', setLimitlessVisa);
+router.get('/:id/visa', getLimitlessVisa);
+router.put('/:id/visa', setLimitlessVisa);
+router.delete('/:id/visa', deleteLimitlessVisa);
+
+router.post('/:id/insurance', setLimitlessInsurance);
+router.get('/:id/insurance', getLimitlessInsurance);
+router.put('/:id/insurance', setLimitlessInsurance);
+router.delete('/:id/insurance', deleteLimitlessInsurance);
 
 /**
  * @swagger

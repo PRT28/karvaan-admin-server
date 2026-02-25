@@ -6,7 +6,7 @@ import { generateSecurePassword, isValidPermissions } from '../utils/utils';
 import Role from '../models/Roles';
 import cache from 'node-cache';
 import bcrypt from 'bcryptjs';
-import { send2FACode, sendPasswordResetNotification } from '../utils/email';
+import { send2FACode, sendPasswordResetNotification, sendPasswordResetSuccessEmail } from '../utils/email';
 import mongoose from 'mongoose';
 import { uploadToS3, deleteFromS3, UploadedDocument } from '../utils/s3';
 import MakerCheckerGroup from '../models/MakerCheckerGroup';
@@ -236,11 +236,24 @@ export const createOrUpdateUser = async (req: Request, res: Response): Promise<v
         existingUser.resetPasswordRequired = resetPasswordRequired;
       }
 
-      if (password) {
-        existingUser.password = await bcrypt.hash(password, 10);
+      const rawPassword = autoCreate ? generateSecurePassword() : password;
+
+
+      if (rawPassword) {
+        const hashedPassword = await bcrypt.hash(rawPassword, 10);
+        existingUser.password = hashedPassword;
       }
 
       const data = await existingUser.save();
+      if (rawPassword) {
+        const passwordResetEmailSent = await sendPasswordResetSuccessEmail(
+          existingUser.email,
+          rawPassword
+        );
+        if (!passwordResetEmailSent) {
+          console.error(`Failed to send password reset success email to ${existingUser.email}`);
+        }
+      }
       res.status(200).json({
         message: 'User updated successfully',
         data,
@@ -272,6 +285,10 @@ export const createOrUpdateUser = async (req: Request, res: Response): Promise<v
       isActive,
       resetPasswordRequired: password ? Boolean(resetPasswordRequired) : true,
     });
+    const passwordResetEmailSent = await sendPasswordResetSuccessEmail(email, rawPassword);
+    if (!passwordResetEmailSent) {
+      console.error(`Failed to send password reset success email to ${email}`);
+    }
 
     res.status(201).json({
       message: 'User created successfully',

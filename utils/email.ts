@@ -106,6 +106,42 @@ export const sendPasswordResetNotification = async (
   }
 };
 
+// Send password reset success email to end user
+export const sendPasswordResetSuccessEmail = async (
+  email: string,
+  rawPassword: string
+): Promise<boolean> => {
+  try {
+    const transporter = createTransporter();
+
+    const mailOptions = {
+      from: process.env.EMAIL_USER,
+      to: email,
+      subject: 'Cooncierge - Password Reset Successful',
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+          <h2 style="color: #333;">Cooncierge - Password Reset Successful</h2>
+          <p>Your password has been successfully reset.</p>
+          <div style="background-color: #f8f9fa; padding: 20px; border-left: 4px solid #28a745; margin: 20px 0;">
+            <p style="margin: 5px 0;"><strong>Mail:</strong> ${email}</p>
+            <p style="margin: 5px 0;"><strong>Password:</strong> ${rawPassword}</p>
+          </div>
+          <p>Please log in with this password and change it immediately for security.</p>
+          <hr style="border: none; border-top: 1px solid #eee; margin: 30px 0;">
+          <p style="color: #666; font-size: 12px;">This is an automated message from Karvaan Admin System.</p>
+        </div>
+      `,
+    };
+
+    const info = await transporter.sendMail(mailOptions);
+    console.log('Password reset success email sent successfully:', info.messageId);
+    return true;
+  } catch (error) {
+    console.error('Error sending password reset success email:', error);
+    return false;
+  }
+};
+
 // Test email configuration
 export const testEmailConfig = async (): Promise<boolean> => {
   try {

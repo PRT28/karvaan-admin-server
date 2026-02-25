@@ -1364,7 +1364,7 @@ export const updatePayment = async (req: Request, res: Response) => {
       return;
     }
 
-    const { bankId, amount, entryType, paymentDate, status, internalNotes, allocations, paymentType } = req.body;
+    const { bankId, amount, entryType, paymentDate, status, internalNotes, allocations, paymentType, amountCurrency } = req.body;
     if (bankId && !mongoose.isValidObjectId(bankId)) {
       res.status(400).json({ message: 'Valid bankId is required' });
       return;
@@ -1390,6 +1390,7 @@ export const updatePayment = async (req: Request, res: Response) => {
     payment.allocations = allocationPayload || [];
     payment.unallocatedAmount = nextAmount - allocationTotal;
     payment.paymentType = paymentType || payment.paymentType;
+    payment.amountCurrency =  amountCurrency || payment.amountCurrency;
 
     await payment.save();
     res.status(200).json({ payment });
