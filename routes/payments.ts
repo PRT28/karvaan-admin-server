@@ -268,7 +268,105 @@ router.post('/vendors/quotations/:quotationId/allocate-payments', allocateVendor
 router.post('/customers/:id/payments', handleDocumentUploadError, createCustomerPayment);
 router.post('/vendors/:id/payments', handleDocumentUploadError, createVendorPayment);
 
+/**
+ * @swagger
+ * /payments/quotations/{id}/payments:
+ *   post:
+ *     summary: Create a payment directly for a quotation
+ *     description: |
+ *       Creates a payment and allocates it to the given quotation.
+ *
+ *       For quotations with multiple customers:
+ *       - set `party` to `Customer`
+ *       - provide `partyId` (one of quotation customer IDs)
+ *     tags: [Payments]
+ *     security:
+ *       - karvaanToken: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Quotation ID
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         multipart/form-data:
+ *           schema:
+ *             type: object
+ *             required: [bankId, amount, entryType]
+ *             properties:
+ *               bankId:
+ *                 type: string
+ *                 description: Bank ID
+ *               amount:
+ *                 type: number
+ *               entryType:
+ *                 type: string
+ *                 enum: [credit, debit]
+ *               paymentDate:
+ *                 type: string
+ *                 format: date-time
+ *               status:
+ *                 type: string
+ *                 enum: [draft, confirmed, cancelled]
+ *               internalNotes:
+ *                 type: string
+ *               allocationAmount:
+ *                 type: number
+ *                 description: Amount to allocate to this quotation. Defaults to full payment amount.
+ *               party:
+ *                 type: string
+ *                 enum: [Customer, Vendor]
+ *                 description: Required when quotation has both customer and vendor.
+ *               partyId:
+ *                 type: string
+ *                 description: Required when `party=Customer` and quotation has multiple customers.
+ *               documents:
+ *                 type: array
+ *                 items:
+ *                   type: string
+ *                   format: binary
+ *                 description: Up to 3 documents
+ *     responses:
+ *       201:
+ *         description: Payment created successfully
+ *       400:
+ *         description: Validation error
+ *       404:
+ *         description: Quotation not found
+ *       500:
+ *         description: Failed to create quotation payment
+ */
 router.post('/quotations/:id/payments', handleDocumentUploadError, createPaymentForQuotation);
+
+/**
+ * @swagger
+ * /payments/quotations/{id}/ledger:
+ *   get:
+ *     summary: Get quotation ledger
+ *     description: Returns quotation amount, total allocated amount, outstanding amount, and payment allocation entries.
+ *     tags: [Payments]
+ *     security:
+ *       - karvaanToken: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Quotation ID
+ *     responses:
+ *       200:
+ *         description: Quotation ledger fetched successfully
+ *       400:
+ *         description: Invalid quotation ID or missing quotation party
+ *       404:
+ *         description: Quotation not found
+ *       500:
+ *         description: Failed to fetch quotation ledger
+ */
 router.get('/quotations/:id/ledger', getQuotationLedger);
 
 router.patch('/payments/:id', handleDocumentUploadError, updatePayment);

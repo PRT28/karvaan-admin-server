@@ -107,7 +107,7 @@ Once the server is running, you can access the Swagger UI at:
 ### Dynamic Quotation System
 ```json
 {
-  "quotationType": "flight|train|hotel|activity",
+  "quotationType": "flight|accomodation|transportation|ticket|activity|travel insurance|visa|others",
   "channel": "B2B|B2C",
   "formFields": {
     "departure": "New York",

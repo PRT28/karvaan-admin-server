@@ -51,7 +51,7 @@ const logSchema = new Schema<ILogs>({
         type: String,
         index: true,
     },
-    bookingId: { type: Schema.Types.ObjectId, ref: 'Booking' },
+    bookingId: { type: Schema.Types.ObjectId, ref: 'Quotation' },
     logs: [{
         heading: { type: String, required: true },
         description: { type: String, required: true },

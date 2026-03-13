@@ -1,11 +1,16 @@
 import { Request, Response } from 'express';
-import Quotation from '../models/Quotation';
+import Quotation, {
+  getCustomerPricingValidationError,
+  getMissingFormFieldKeys,
+  getPriceInfoValidationError
+} from '../models/Quotation';
 import Customer from '../models/Customer';
 import Vendor from '../models/Vendors';
 import Traveller from '../models/Traveller';
 import Team from '../models/Team';
 import mongoose from 'mongoose';
 import Payments from '../models/Payments';
+import Logs from '../models/Logs';
 import { uploadMultipleToS3, UploadedDocument } from '../utils/s3';
 import MakerCheckerGroup from '../models/MakerCheckerGroup';
 
@@ -43,9 +48,65 @@ const normalizeObjectId = (value: unknown) => {
   return value;
 };
 
-const getQuotationAmountForParty = (quotation: any, party: 'customer' | 'vendor') => {
+const hasCustomers = (quotation: any): boolean => {
+  if (Array.isArray(quotation.customerId)) return quotation.customerId.length > 0;
+  return Boolean(quotation.customerId);
+};
+
+const normalizeCustomerIdsInput = (value: unknown): unknown[] => {
+  if (!value) return [];
+  if (Array.isArray(value)) return value;
+  return [value];
+};
+
+const getQuotationAmountForParty = (
+  quotation: any,
+  party: 'customer' | 'vendor',
+  customerId?: mongoose.Types.ObjectId | string
+) => {
   const baseAmount = Number(quotation.totalAmount ?? 0);
-  if (party !== 'vendor') return baseAmount;
+  if (party === 'customer') {
+    const customerPricing = Array.isArray(quotation.customerPricing) ? quotation.customerPricing : [];
+    if (customerPricing.length > 0) {
+      if (customerId) {
+        const matched = customerPricing.find((entry: any) =>
+          String(entry?.customerId) === String(customerId)
+        );
+        if (matched) {
+          const matchedAmount = Number(matched.sellingPrice);
+          if (!Number.isNaN(matchedAmount)) return matchedAmount;
+        }
+      }
+
+      const summedAmount = customerPricing.reduce(
+        (sum: number, entry: any) => sum + (Number(entry?.sellingPrice) || 0),
+        0
+      );
+      if (!Number.isNaN(summedAmount) && summedAmount > 0) {
+        return summedAmount;
+      }
+    }
+
+    const priceInfo: any = quotation.priceInfo;
+    if (priceInfo) {
+      const directSelling = priceInfo instanceof Map ? priceInfo.get('sellingPrice') : priceInfo?.sellingPrice;
+      const parsedSelling = Number(directSelling);
+      if (!Number.isNaN(parsedSelling)) {
+        return parsedSelling;
+      }
+    }
+
+    return baseAmount;
+  }
+
+  const priceInfo: any = quotation.priceInfo;
+  if (priceInfo) {
+    const directCost = priceInfo instanceof Map ? priceInfo.get('costPrice') : priceInfo?.costPrice;
+    const parsedCost = Number(directCost);
+    if (!Number.isNaN(parsedCost)) {
+      return parsedCost;
+    }
+  }
 
   const formFields: any = quotation.formFields;
   if (!formFields) return baseAmount;
@@ -61,6 +122,45 @@ const getQuotationAmountForParty = (quotation: any, party: 'customer' | 'vendor'
   }
 
   return baseAmount;
+};
+
+const hasValue = (value: any): boolean => {
+  if (value === null || value === undefined) return false;
+  if (typeof value === 'string') return value.trim().length > 0;
+  if (typeof value === 'number') return !Number.isNaN(value);
+  if (typeof value === 'boolean') return true;
+  if (value instanceof Date) return !Number.isNaN(value.getTime());
+  if (value instanceof mongoose.Types.ObjectId) return true;
+  if (Array.isArray(value)) return value.length > 0 && value.some((item) => hasValue(item));
+  if (value instanceof Map) {
+    if (value.size === 0) return false;
+    return Array.from(value.values()).some((item) => hasValue(item));
+  }
+  if (typeof value === 'object') {
+    if ('_id' in value) return hasValue((value as any)._id);
+    const entries = Object.entries(value);
+    if (entries.length === 0) return false;
+    return entries.some(([, item]) => hasValue(item));
+  }
+  return true;
+};
+
+const isBookingDataComplete = (quotation: any): boolean => {
+  const requiredTopLevelFields = [
+    quotation.quotationType,
+    quotation.travelDate,
+    quotation.totalAmount,
+    quotation.primaryOwner,
+    quotation.customerId
+  ];
+
+  const areRequiredTopLevelFieldsPresent = requiredTopLevelFields.every((field) => hasValue(field));
+  const areFormFieldsComplete = hasValue(quotation.formFields);
+  const hasAnyTraveller =
+    (Array.isArray(quotation.adultTravelers) && quotation.adultTravelers.length > 0) ||
+    (Array.isArray(quotation.childTravelers) && quotation.childTravelers.length > 0);
+
+  return areRequiredTopLevelFieldsPresent && areFormFieldsComplete && hasAnyTraveller;
 };
 
 export const createQuotation = async (req: Request, res: Response): Promise<void> => {
@@ -135,6 +235,63 @@ export const createQuotation = async (req: Request, res: Response): Promise<void
       // formFields
     if (typeof quotationData.formFields === "string") {
       quotationData.formFields = JSON.parse(quotationData.formFields);
+    }
+    if (typeof quotationData.customerId === 'string') {
+      const trimmedValue = quotationData.customerId.trim();
+      if (trimmedValue.startsWith('[')) {
+        try {
+          quotationData.customerId = JSON.parse(trimmedValue);
+        } catch (error) {
+          res.status(400).json({
+            success: false,
+            message: 'Invalid customerId JSON format'
+          });
+          return;
+        }
+      } else {
+        quotationData.customerId = [trimmedValue];
+      }
+    } else if (quotationData.customerId !== undefined) {
+      quotationData.customerId = normalizeCustomerIdsInput(quotationData.customerId);
+    }
+    if (typeof quotationData.customerPricing === 'string') {
+      quotationData.customerPricing = JSON.parse(quotationData.customerPricing);
+    }
+    if (typeof quotationData.priceInfo === 'string') {
+      quotationData.priceInfo = JSON.parse(quotationData.priceInfo);
+    }
+
+    const missingCreateFields = getMissingFormFieldKeys(
+      quotationData.quotationType,
+      quotationData.formFields
+    );
+    if (missingCreateFields.length > 0) {
+      res.status(400).json({
+        success: false,
+        message: `Missing required formFields for type "${quotationData.quotationType}": ${missingCreateFields.join(', ')}`
+      });
+      return;
+    }
+
+    const priceInfoError = getPriceInfoValidationError(quotationData.priceInfo);
+    if (priceInfoError) {
+      res.status(400).json({
+        success: false,
+        message: priceInfoError
+      });
+      return;
+    }
+
+    const customerPricingError = getCustomerPricingValidationError(
+      quotationData.customerId,
+      quotationData.customerPricing
+    );
+    if (customerPricingError) {
+      res.status(400).json({
+        success: false,
+        message: customerPricingError
+      });
+      return;
     }
 
     // secondaryOwner
@@ -250,6 +407,8 @@ export const updateQuotation = async (req: Request, res: Response): Promise<void
     };
 
     if (!parseJsonField('formFields', 'formFields')) return;
+    if (!parseJsonField('priceInfo', 'priceInfo')) return;
+    if (!parseJsonField('customerPricing', 'customerPricing')) return;
     if (!parseJsonField('secondaryOwner', 'secondaryOwner')) return;
     if (!parseJsonField('adultTravelers', 'adultTravelers')) return;
     if (!parseJsonField('childTravelers', 'childTravelers')) return;
@@ -273,6 +432,95 @@ export const updateQuotation = async (req: Request, res: Response): Promise<void
         res.status(400).json({
           success: false,
           message: 'totalAmount must be a valid number'
+        });
+        return;
+      }
+    }
+
+    if (typeof updateData.customerId === 'string') {
+      const trimmedCustomerId = updateData.customerId.trim();
+      if (trimmedCustomerId.startsWith('[')) {
+        try {
+          updateData.customerId = JSON.parse(trimmedCustomerId);
+        } catch (error) {
+          res.status(400).json({
+            success: false,
+            message: 'Invalid customerId JSON format'
+          });
+          return;
+        }
+      } else {
+        updateData.customerId = [trimmedCustomerId];
+      }
+    } else if (updateData.customerId !== undefined) {
+      updateData.customerId = normalizeCustomerIdsInput(updateData.customerId);
+    }
+
+    if (
+      Object.prototype.hasOwnProperty.call(updateData, 'quotationType') ||
+      Object.prototype.hasOwnProperty.call(updateData, 'formFields')
+    ) {
+      const existingQuotationForValidation = await Quotation.findOne(filter).select('quotationType formFields');
+      if (!existingQuotationForValidation) {
+        res.status(404).json({ success: false, message: 'Quotation not found' });
+        return;
+      }
+
+      const effectiveQuotationType =
+        (updateData.quotationType as string | undefined) ?? existingQuotationForValidation.quotationType;
+      const effectiveFormFields =
+        Object.prototype.hasOwnProperty.call(updateData, 'formFields')
+          ? updateData.formFields
+          : existingQuotationForValidation.formFields;
+
+      const missingUpdateFields = getMissingFormFieldKeys(effectiveQuotationType, effectiveFormFields);
+      if (missingUpdateFields.length > 0) {
+        res.status(400).json({
+          success: false,
+          message: `Missing required formFields for type "${effectiveQuotationType}": ${missingUpdateFields.join(', ')}`
+        });
+        return;
+      }
+    }
+
+    if (Object.prototype.hasOwnProperty.call(updateData, 'priceInfo')) {
+      const priceInfoError = getPriceInfoValidationError(updateData.priceInfo);
+      if (priceInfoError) {
+        res.status(400).json({
+          success: false,
+          message: priceInfoError
+        });
+        return;
+      }
+    }
+
+    if (
+      Object.prototype.hasOwnProperty.call(updateData, 'customerId') ||
+      Object.prototype.hasOwnProperty.call(updateData, 'customerPricing')
+    ) {
+      const existingQuotationForCustomerPricing = await Quotation.findOne(filter).select('customerId customerPricing');
+      if (!existingQuotationForCustomerPricing) {
+        res.status(404).json({ success: false, message: 'Quotation not found' });
+        return;
+      }
+
+      const effectiveCustomerIds =
+        Object.prototype.hasOwnProperty.call(updateData, 'customerId')
+          ? updateData.customerId
+          : existingQuotationForCustomerPricing.customerId;
+      const effectiveCustomerPricing =
+        Object.prototype.hasOwnProperty.call(updateData, 'customerPricing')
+          ? updateData.customerPricing
+          : existingQuotationForCustomerPricing.customerPricing;
+
+      const customerPricingError = getCustomerPricingValidationError(
+        effectiveCustomerIds,
+        effectiveCustomerPricing
+      );
+      if (customerPricingError) {
+        res.status(400).json({
+          success: false,
+          message: customerPricingError
         });
         return;
       }
@@ -423,7 +671,7 @@ export const getAllQuotations = async (req: Request, res: Response) => {
       paymentBaseMatch.businessId = normalizeObjectId(businessFilter.businessId);
     }
 
-    const [customerAllocations, vendorAllocations] = await Promise.all([
+    const [customerAllocations, vendorAllocations, taskCounts] = await Promise.all([
       Payments.aggregate([
         { $match: { ...paymentBaseMatch, party: 'Customer' } },
         { $unwind: '$allocations' },
@@ -435,6 +683,10 @@ export const getAllQuotations = async (req: Request, res: Response) => {
         { $unwind: '$allocations' },
         { $match: { 'allocations.quotationId': { $in: quotationIds } } },
         { $group: { _id: '$allocations.quotationId', totalAllocated: { $sum: '$allocations.amount' } } }
+      ]),
+      Logs.aggregate([
+        { $match: { bookingId: { $in: quotationIds } } },
+        { $group: { _id: '$bookingId', taskCount: { $sum: 1 } } }
       ])
     ]);
 
@@ -448,6 +700,11 @@ export const getAllQuotations = async (req: Request, res: Response) => {
       vendorAllocationMap.set(String(item._id), Number(item.totalAllocated || 0));
     });
 
+    const taskCountMap = new Map<string, number>();
+    taskCounts.forEach((item) => {
+      taskCountMap.set(String(item._id), Number(item.taskCount || 0));
+    });
+
     const getPaymentStatus = (allocated: number, total: number) => {
       if (total <= 0) return 'pending';
       if (allocated <= 0) return 'pending';
@@ -457,7 +714,8 @@ export const getAllQuotations = async (req: Request, res: Response) => {
 
     const quotationsWithPayments = quotations.map((quotation) => {
       const quotationId = String(quotation._id);
-      const customerAmount = quotation.customerId ? getQuotationAmountForParty(quotation, 'customer') : 0;
+      const customerExists = hasCustomers(quotation);
+      const customerAmount = customerExists ? getQuotationAmountForParty(quotation, 'customer') : 0;
       const vendorAmount = quotation.vendorId ? getQuotationAmountForParty(quotation, 'vendor') : 0;
       const customerAllocated = customerAllocationMap.get(quotationId) || 0;
       const vendorAllocated = vendorAllocationMap.get(quotationId) || 0;
@@ -466,11 +724,13 @@ export const getAllQuotations = async (req: Request, res: Response) => {
 
       return {
         ...quotation,
-        customerPaymentDone: Boolean(quotation.customerId) && customerAllocated >= customerAmount,
+        taskCount: taskCountMap.get(quotationId) || 0,
+        customerPaymentDone: customerExists && customerAllocated >= customerAmount,
         vendorPaymentDone: Boolean(quotation.vendorId) && vendorAllocated >= vendorAmount,
         customerRemainingAmount,
         vendorRemainingAmount,
-        customerPaymentStatus: quotation.customerId ? getPaymentStatus(customerAllocated, customerAmount) : 'not_applicable',
+        isBookingDataComplete: isBookingDataComplete(quotation),
+        customerPaymentStatus: customerExists ? getPaymentStatus(customerAllocated, customerAmount) : 'not_applicable',
         vendorPaymentStatus: quotation.vendorId ? getPaymentStatus(vendorAllocated, vendorAmount) : 'not_applicable'
       };
     });
@@ -841,13 +1101,15 @@ export const getBookingHistoryByTraveller = async (req: Request, res: Response):
       return;
     }
 
-    // Build query filter - search in travelers array, exclude deleted quotations
+    // Build query filter against current traveller fields, exclude deleted quotations
     const filter: any = {
-      travelers: { $in: [travellerId] },
       businessId: traveller.businessId,
-      isDeleted: { $ne: true }
+      isDeleted: { $ne: true },
+      $or: [
+        { adultTravelers: { $in: [travellerId] } },
+        { 'childTravelers.id': travellerId }
+      ]
     };
-
     // Add optional filters
     if (status) {
       filter.status = status;

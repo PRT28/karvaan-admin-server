@@ -15,7 +15,8 @@ export const createLog = async (req: Request, res: Response) => {
       category,
       subCategory,
       bookingId,
-      assignedTo 
+      assignedTo,
+      customId
     } = req.body;
 
     const log = await Logs.create({
@@ -32,6 +33,7 @@ export const createLog = async (req: Request, res: Response) => {
       subCategory,
       bookingId,
       assignedTo,
+      customId,
       logs: [
         {
           heading: 'Task Created',

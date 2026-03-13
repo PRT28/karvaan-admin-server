@@ -931,7 +931,7 @@ const options = {
             },
             quotationType: {
               type: 'string',
-              enum: ['flight', 'train', 'hotel', 'activity', 'travel', 'transport-land', 'transport-maritime', 'tickets', 'travel insurance', 'visas', 'others'],
+              enum: ['flight', 'accomodation', 'transportation', 'ticket', 'activity', 'travel insurance', 'visa', 'others'],
               description: 'Type of quotation',
               example: 'flight',
             },
@@ -947,31 +947,111 @@ const options = {
               example: '507f1f77bcf86cd799439020',
             },
             customerId: {
-              type: 'string',
-              description: 'Reference to Customer',
-              example: '507f1f77bcf86cd799439013',
+              type: 'array',
+              items: {
+                type: 'string',
+              },
+              description: 'Array of customer IDs',
+              example: ['507f1f77bcf86cd799439013', '507f1f77bcf86cd799439099'],
+            },
+            customerPricing: {
+              type: 'array',
+              description: 'Per-customer selling prices',
+              items: {
+                type: 'object',
+                properties: {
+                  customerId: {
+                    type: 'string',
+                    description: 'Customer ID',
+                    example: '507f1f77bcf86cd799439013',
+                  },
+                  sellingPrice: {
+                    type: 'number',
+                    description: 'Selling price for this customer',
+                    example: 12000,
+                  },
+                },
+              },
             },
             vendorId: {
               type: 'string',
               description: 'Reference to Vendor',
               example: '507f1f77bcf86cd799439015',
             },
-            travelers: {
+            adultTravelers: {
               type: 'array',
               items: {
                 type: 'string',
               },
-              description: 'Array of Traveller IDs',
+              description: 'Array of adult traveller IDs',
               example: ['507f1f77bcf86cd799439022'],
+            },
+            childTravelers: {
+              type: 'array',
+              description: 'Array of child traveller objects',
+              items: {
+                type: 'object',
+                properties: {
+                  id: {
+                    type: 'string',
+                    description: 'Traveller ID',
+                    example: '507f1f77bcf86cd799439023',
+                  },
+                  age: {
+                    type: 'number',
+                    description: 'Child age',
+                    example: 8,
+                  },
+                },
+              },
             },
             formFields: {
               type: 'object',
               description: 'Dynamic form fields based on quotation type',
               example: {
-                departure: 'New York',
-                destination: 'London',
-                date: '2024-12-25',
-                passengers: 2,
+                from: 'DEL',
+                to: 'DXB',
+                departureDate: '2026-04-18T05:30:00.000Z',
+                airline: 'Emirates',
+              },
+            },
+            priceInfo: {
+              type: 'object',
+              description: 'Pricing details including base/advanced breakdown',
+              properties: {
+                advancedPricing: {
+                  type: 'boolean',
+                  example: true,
+                },
+                sellingPrice: {
+                  type: 'number',
+                  example: 21000,
+                },
+                costPrice: {
+                  type: 'number',
+                  example: 17000,
+                },
+                costPriceBreakdown: {
+                  type: 'object',
+                  additionalProperties: {
+                    type: 'number',
+                  },
+                  example: {
+                    vendorBasePrice: 16000,
+                    supplierIncentive: 500,
+                    commissionPayout: 500,
+                  },
+                },
+                cancellationBreakdown: {
+                  type: 'object',
+                  additionalProperties: {
+                    type: 'number',
+                  },
+                  example: {
+                    vendorBasePrice: 12000,
+                    supplierIncentive: 200,
+                  },
+                },
               },
             },
             totalAmount: {
@@ -991,12 +1071,17 @@ const options = {
               description: 'Service approval status',
               example: 'approved',
             },
-            owner: {
+            primaryOwner: {
+              type: 'string',
+              description: 'Primary owner team member ID',
+              example: '507f1f77bcf86cd799439016',
+            },
+            secondaryOwner: {
               type: 'array',
               items: {
                 type: 'string',
               },
-              description: 'Array of Team member IDs who own this quotation',
+              description: 'Array of secondary owner team member IDs',
               example: ['507f1f77bcf86cd799439016'],
             },
             travelDate: {
@@ -1005,12 +1090,12 @@ const options = {
               description: 'Travel date',
               example: '2024-06-15',
             },
-            adultTravlers: {
+            adultNumber: {
               type: 'integer',
               description: 'Number of adult travellers',
               example: 2,
             },
-            childTravlers: {
+            childNumber: {
               type: 'integer',
               description: 'Number of child travellers',
               example: 1,

@@ -61,10 +61,15 @@ const router = express.Router();
  *           format: date
  *         description: Filter by travelDate end date
  *       - in: query
- *         name: owner
+ *         name: primaryOwner
  *         schema:
  *           type: string
- *         description: Filter by owner team member ID
+ *         description: Filter by primary owner team member ID
+ *       - in: query
+ *         name: secondaryOwner
+ *         schema:
+ *           type: string
+ *         description: Filter by secondary owner team member ID
  *       - in: query
  *         name: isDeleted
  *         schema:
@@ -199,11 +204,11 @@ router.get('/get-quotations-by-party/:id', getQuotationsByParty);
  *         multipart/form-data:
  *           schema:
  *             type: object
- *             required: [quotationType, channel, formFields, totalAmount, owner, travelDate]
+ *             required: [quotationType, channel, formFields, totalAmount, travelDate]
  *             properties:
  *               quotationType:
  *                 type: string
- *                 enum: [flight, train, hotel, activity, travel, transport-land, transport-maritime, tickets, travel insurance, visas, others]
+ *                 enum: [flight, accomodation, transportation, ticket, activity, travel insurance, visa, others]
  *                 example: "flight"
  *               channel:
  *                 type: string
@@ -214,38 +219,56 @@ router.get('/get-quotations-by-party/:id', getQuotationsByParty);
  *                 enum: [pending, denied, draft, approved]
  *                 description: Use "draft" to skip required fields validation
  *               customerId:
+ *                 oneOf:
+ *                   - type: string
+ *                     description: Single customer ID
+ *                   - type: array
+ *                     items:
+ *                       type: string
+ *                     description: Multiple customer IDs
+ *                 example: ["507f1f77bcf86cd799439013", "507f1f77bcf86cd799439099"]
+ *               customerPricing:
  *                 type: string
- *                 description: Required for B2C channel
- *                 example: "507f1f77bcf86cd799439013"
+ *                 description: JSON stringified array of per-customer selling prices
+ *                 example: '[{"customerId":"507f1f77bcf86cd799439013","sellingPrice":12000},{"customerId":"507f1f77bcf86cd799439099","sellingPrice":9000}]'
  *               vendorId:
  *                 type: string
- *                 description: Required for B2B channel
+ *                 description: Vendor ID
  *                 example: "507f1f77bcf86cd799439014"
  *               formFields:
  *                 type: string
  *                 description: JSON stringified form fields object
- *                 example: '{"departure": "New York", "destination": "London"}'
+ *                 example: '{"from":"DEL","to":"DXB","departureDate":"2026-04-18T05:30:00.000Z","airline":"Emirates"}'
+ *               priceInfo:
+ *                 type: string
+ *                 description: JSON stringified pricing details
+ *                 example: '{"advancedPricing":true,"sellingPrice":21000,"costPrice":17000,"costPriceBreakdown":{"vendorBasePrice":16000,"supplierIncentive":500,"commissionPayout":500},"cancellationBreakdown":{"vendorBasePrice":12000}}'
  *               totalAmount:
  *                 type: number
  *                 example: 1500.00
- *               owner:
- *                 type: array
- *                 items:
- *                   type: string
- *                 description: Array of team member IDs
+ *               primaryOwner:
+ *                 type: string
+ *                 description: Primary owner team member ID
+ *               secondaryOwner:
+ *                 type: string
+ *                 description: JSON stringified array of secondary owner IDs
+ *                 example: '["507f1f77bcf86cd799439016"]'
  *               travelDate:
  *                 type: string
  *                 format: date
  *                 example: "2024-12-25"
- *               travelers:
- *                 type: array
- *                 items:
- *                   type: string
- *                 description: Array of traveller IDs
- *               adultTravlers:
+ *               adultTravelers:
+ *                 type: string
+ *                 description: JSON stringified array of adult traveller IDs
+ *                 example: '["507f1f77bcf86cd799439022"]'
+ *               childTravelers:
+ *                 type: string
+ *                 description: JSON stringified array of child traveller objects
+ *                 example: '[{"id":"507f1f77bcf86cd799439023","age":8}]'
+ *               adultNumber:
  *                 type: integer
  *                 example: 2
- *               childTravlers:
+ *               childNumber:
  *                 type: integer
  *                 example: 1
  *               remarks:
@@ -304,34 +327,72 @@ router.post('/create-quotation', handleDocumentUploadError, createQuotation);
  *     requestBody:
  *       required: true
  *       content:
- *         application/json:
+ *         multipart/form-data:
  *           schema:
  *             type: object
  *             properties:
  *               quotationType:
  *                 type: string
- *                 enum: [flight, train, hotel, activity, travel, transport-land, transport-maritime, tickets, travel insurance, visas, others]
+ *                 enum: [flight, accomodation, transportation, ticket, activity, travel insurance, visa, others]
  *               channel:
  *                 type: string
  *                 enum: [B2B, B2C]
  *               customerId:
- *                 type: string
+ *                 oneOf:
+ *                   - type: string
+ *                   - type: array
+ *                     items:
+ *                       type: string
+ *               customerPricing:
+ *                 oneOf:
+ *                   - type: array
+ *                     items:
+ *                       type: object
+ *                       properties:
+ *                         customerId:
+ *                           type: string
+ *                         sellingPrice:
+ *                           type: number
+ *                   - type: string
  *               vendorId:
  *                 type: string
- *               owner:
- *                 type: array
- *                 items:
- *                   type: string
- *               travelers:
- *                 type: array
- *                 items:
- *                   type: string
+ *               primaryOwner:
+ *                 type: string
+ *               secondaryOwner:
+ *                 oneOf:
+ *                   - type: array
+ *                     items:
+ *                       type: string
+ *                   - type: string
+ *               adultTravelers:
+ *                 oneOf:
+ *                   - type: array
+ *                     items:
+ *                       type: string
+ *                   - type: string
+ *               childTravelers:
+ *                 oneOf:
+ *                   - type: array
+ *                     items:
+ *                       type: object
+ *                       properties:
+ *                         id:
+ *                           type: string
+ *                         age:
+ *                           type: number
+ *                   - type: string
  *               travelDate:
  *                 type: string
  *                 format: date
  *               formFields:
- *                 type: object
- *                 additionalProperties: true
+ *                 oneOf:
+ *                   - type: object
+ *                     additionalProperties: true
+ *                   - type: string
+ *               priceInfo:
+ *                 oneOf:
+ *                   - type: object
+ *                   - type: string
  *               totalAmount:
  *                 type: number
  *               status:
@@ -342,6 +403,11 @@ router.post('/create-quotation', handleDocumentUploadError, createQuotation);
  *                 enum: [pending, denied, draft, approved]
  *               remarks:
  *                 type: string
+ *               documents:
+ *                 type: array
+ *                 items:
+ *                   type: string
+ *                   format: binary
  *     responses:
  *       200:
  *         description: Quotation updated successfully
@@ -431,7 +497,7 @@ router.delete('/delete-quotation/:id', deleteQuotation);
  *
  *       **Query Parameters:**
  *       - status: Filter by quotation status (confirmed, cancelled)
- *       - quotationType: Filter by type (flight, train, hotel, activity, etc.)
+ *       - quotationType: Filter by type (flight, accomodation, transportation, ticket, activity, travel insurance, visa, others)
  *       - startDate/endDate: Filter by booking date range
  *       - travelStartDate/travelEndDate: Filter by travel date range
  *       - sortBy: Sort field (default: createdAt)
@@ -458,7 +524,7 @@ router.delete('/delete-quotation/:id', deleteQuotation);
  *         name: quotationType
  *         schema:
  *           type: string
- *           enum: [flight, train, hotel, activity, travel, transport-land, transport-maritime, tickets, travel insurance, visas, others]
+ *           enum: [flight, accomodation, transportation, ticket, activity, travel insurance, visa, others]
  *         description: Filter by quotation type
  *       - in: query
  *         name: startDate
@@ -583,7 +649,7 @@ router.get('/booking-history/customer/:customerId', getBookingHistoryByCustomer)
  *
  *       **Query Parameters:**
  *       - status: Filter by quotation status (confirmed, cancelled)
- *       - quotationType: Filter by type (flight, train, hotel, activity, etc.)
+ *       - quotationType: Filter by type (flight, accomodation, transportation, ticket, activity, travel insurance, visa, others)
  *       - startDate/endDate: Filter by booking date range
  *       - travelStartDate/travelEndDate: Filter by travel date range
  *       - sortBy: Sort field (default: createdAt)
@@ -610,7 +676,7 @@ router.get('/booking-history/customer/:customerId', getBookingHistoryByCustomer)
  *         name: quotationType
  *         schema:
  *           type: string
- *           enum: [flight, train, hotel, activity, travel, transport-land, transport-maritime, tickets, travel insurance, visas, others]
+ *           enum: [flight, accomodation, transportation, ticket, activity, travel insurance, visa, others]
  *         description: Filter by quotation type
  *       - in: query
  *         name: startDate
@@ -726,7 +792,7 @@ router.get('/booking-history/vendor/:vendorId', getBookingHistoryByVendor);
  *     summary: Get booking history by traveller
  *     description: |
  *       Retrieve booking history (quotations) for a specific traveller with filtering and pagination options.
- *       This endpoint searches for quotations where the traveller is included in the travelers array.
+ *       This endpoint searches for quotations where the traveller is included in `adultTravelers` or `childTravelers.id`.
  *
  *       **Features:**
  *       - Filter by status, quotation type, and date ranges
@@ -736,7 +802,7 @@ router.get('/booking-history/vendor/:vendorId', getBookingHistoryByVendor);
  *
  *       **Query Parameters:**
  *       - status: Filter by quotation status (confirmed, cancelled)
- *       - quotationType: Filter by type (flight, train, hotel, activity, etc.)
+ *       - quotationType: Filter by type (flight, accomodation, transportation, ticket, activity, travel insurance, visa, others)
  *       - startDate/endDate: Filter by booking date range
  *       - travelStartDate/travelEndDate: Filter by travel date range
  *       - sortBy: Sort field (default: createdAt)
@@ -763,7 +829,7 @@ router.get('/booking-history/vendor/:vendorId', getBookingHistoryByVendor);
  *         name: quotationType
  *         schema:
  *           type: string
- *           enum: [flight, train, hotel, activity, travel, transport-land, transport-maritime, tickets, travel insurance, visas, others]
+ *           enum: [flight, accomodation, transportation, ticket, activity, travel insurance, visa, others]
  *         description: Filter by quotation type
  *       - in: query
  *         name: startDate
@@ -879,7 +945,7 @@ router.get('/booking-history/traveller/:travellerId', getBookingHistoryByTravell
  *     summary: Get booking history by team member
  *     description: |
  *       Retrieve booking history (quotations) for a specific team member based on their ownership.
- *       This endpoint searches for quotations where the team member is included in the owner array.
+ *       This endpoint searches for quotations where the team member is either `primaryOwner` or included in `secondaryOwner`.
  *
  *       **Features:**
  *       - Business-scoped access control
@@ -890,7 +956,7 @@ router.get('/booking-history/traveller/:travellerId', getBookingHistoryByTravell
  *
  *       **Query Parameters:**
  *       - `status`: Filter by quotation status (draft, confirmed, cancelled)
- *       - `quotationType`: Filter by quotation type (flight, hotel, train, etc.)
+ *       - `quotationType`: Filter by quotation type (flight, accomodation, transportation, ticket, activity, travel insurance, visa, others)
  *       - `startDate` & `endDate`: Filter by booking date range (createdAt)
  *       - `travelStartDate` & `travelEndDate`: Filter by travel date range
  *       - `sortBy`: Sort field (default: createdAt)
@@ -918,7 +984,7 @@ router.get('/booking-history/traveller/:travellerId', getBookingHistoryByTravell
  *         name: quotationType
  *         schema:
  *           type: string
- *           enum: [flight, train, hotel, activity, travel, transport-land, transport-maritime, tickets, travel insurance, visas, others]
+ *           enum: [flight, accomodation, transportation, ticket, activity, travel insurance, visa, others]
  *         description: Filter quotations by type
  *       - in: query
  *         name: startDate

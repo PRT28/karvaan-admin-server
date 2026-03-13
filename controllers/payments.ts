@@ -52,9 +52,62 @@ const requireBusinessId = (req: Request, res: Response) => {
   return businessId;
 };
 
-const getQuotationAmountForParty = (quotation: IQuotation, party: PartyType) => {
+const getCustomerIds = (quotation: IQuotation | any): string[] => {
+  if (Array.isArray(quotation.customerId)) {
+    return quotation.customerId.map((customerId: any) => String(customerId));
+  }
+  return quotation.customerId ? [String(quotation.customerId)] : [];
+};
+
+const getQuotationAmountForParty = (
+  quotation: IQuotation,
+  party: PartyType,
+  customerId?: mongoose.Types.ObjectId | string
+) => {
   const baseAmount = Number(quotation.totalAmount ?? 0);
-  if (party !== 'Vendor') return baseAmount;
+  if (party === 'Customer') {
+    const customerPricing: any[] = Array.isArray((quotation as any).customerPricing)
+      ? (quotation as any).customerPricing
+      : [];
+
+    if (customerPricing.length > 0) {
+      if (customerId) {
+        const matched = customerPricing.find(
+          (entry: any) => String(entry?.customerId) === String(customerId)
+        );
+        if (matched) {
+          const matchedAmount = Number(matched.sellingPrice);
+          if (!Number.isNaN(matchedAmount)) return matchedAmount;
+        }
+      }
+
+      const summedAmount = customerPricing.reduce(
+        (sum, entry) => sum + (Number(entry?.sellingPrice) || 0),
+        0
+      );
+      if (!Number.isNaN(summedAmount) && summedAmount > 0) return summedAmount;
+    }
+
+    const priceInfo: any = quotation.priceInfo;
+    if (priceInfo) {
+      const directSelling = priceInfo instanceof Map ? priceInfo.get('sellingPrice') : priceInfo?.sellingPrice;
+      const parsedSelling = Number(directSelling);
+      if (!Number.isNaN(parsedSelling)) {
+        return parsedSelling;
+      }
+    }
+
+    return baseAmount;
+  }
+
+  const priceInfo: any = quotation.priceInfo;
+  if (priceInfo) {
+    const directCost = priceInfo instanceof Map ? priceInfo.get('costPrice') : priceInfo?.costPrice;
+    const parsedCost = Number(directCost);
+    if (!Number.isNaN(parsedCost)) {
+      return parsedCost;
+    }
+  }
 
   const formFields: any = quotation.formFields;
   if (!formFields) return baseAmount;
@@ -213,7 +266,11 @@ const getUnsettledQuotations = async (
 
   return quotations
     .map((quotation) => {
-      const quotationAmount = getQuotationAmountForParty(quotation, party);
+      const quotationAmount = getQuotationAmountForParty(
+        quotation,
+        party,
+        party === 'Customer' ? partyId : undefined
+      );
       const allocated = allocationMap.get(String(quotation._id)) || 0;
       const outstanding = quotationAmount - allocated;
       return {
@@ -239,8 +296,14 @@ export const listCustomerClosingBalances = async (req: Request, res: Response) =
                               .sort({ createdAt: -1 });
 
     const quotationTotals = await Quotation.aggregate([
-      { $match: { businessId: normalizeObjectId(businessId), isDeleted: { $ne: true }, customerId: { $ne: null } } },
-      { $group: { _id: '$customerId', totalAmount: { $sum: '$totalAmount' } } }
+      { $match: { businessId: normalizeObjectId(businessId), isDeleted: { $ne: true } } },
+      { $unwind: '$customerPricing' },
+      {
+        $group: {
+          _id: '$customerPricing.customerId',
+          totalAmount: { $sum: '$customerPricing.sellingPrice' }
+        }
+      }
     ]);
 
     const paymentTotals = await Payments.aggregate([
@@ -431,12 +494,12 @@ export const getCustomerLedger = async (req: Request, res: Response) => {
         entryType: 'debit',
         date: quotation.createdAt || new Date(),
         data: quotation,
-        amount: getQuotationAmountForParty(quotation, 'Customer'),
+        amount: getQuotationAmountForParty(quotation, 'Customer', String(customer._id)),
         referenceId: toObjectIdStrict(quotation._id),
         customId: quotation.customId,
         notes: quotation.remarks,
         paymentStatus: (() => {
-          const totalAmount = getQuotationAmountForParty(quotation, 'Customer');
+          const totalAmount = getQuotationAmountForParty(quotation, 'Customer', String(customer._id));
           const allocated = allocationMap.get(String(quotation._id)) || 0;
           if (totalAmount <= 0 || allocated <= 0) return 'none';
           if (allocated >= totalAmount) return 'paid';
@@ -444,7 +507,7 @@ export const getCustomerLedger = async (req: Request, res: Response) => {
         })(),
         allocatedAmount: allocationMap.get(String(quotation._id)) || 0,
         outstandingAmount: (() => {
-          const totalAmount = getQuotationAmountForParty(quotation, 'Customer');
+          const totalAmount = getQuotationAmountForParty(quotation, 'Customer', String(customer._id));
           const allocated = allocationMap.get(String(quotation._id)) || 0;
           return totalAmount - allocated;
         })(),
@@ -859,8 +922,12 @@ const allocatePaymentsToQuotation = async (
         throw new Error('Quotation not found');
       }
 
-      const expectedPartyId = party === 'Customer' ? quotation.customerId : quotation.vendorId;
-      if (!expectedPartyId) {
+      const allowedCustomerIds = getCustomerIds(quotation);
+      const expectedVendorId = quotation.vendorId ? String(quotation.vendorId) : null;
+      if (party === 'Customer' && allowedCustomerIds.length === 0) {
+        throw new Error('Quotation is missing customer or vendor');
+      }
+      if (party === 'Vendor' && !expectedVendorId) {
         throw new Error('Quotation is missing customer or vendor');
       }
 
@@ -886,7 +953,11 @@ const allocatePaymentsToQuotation = async (
         if (!payment) {
           throw new Error('Payment not found');
         }
-        if (String(payment.partyId) !== String(expectedPartyId)) {
+        const currentPartyId = String(payment.partyId);
+        if (party === 'Customer' && !allowedCustomerIds.includes(currentPartyId)) {
+          throw new Error('Payment party does not match quotation party');
+        }
+        if (party === 'Vendor' && currentPartyId !== expectedVendorId) {
           throw new Error('Payment party does not match quotation party');
         }
         const allocationAmount = Number(allocation.amount);
@@ -1205,15 +1276,19 @@ export const createPaymentForQuotation = async (req: Request, res: Response) => 
     let resolvedParty: PartyType | null = null;
     let resolvedPartyId: mongoose.Types.ObjectId | null = null;
 
-    if (quotation.customerId && quotation.vendorId) {
+    const customerIds = getCustomerIds(quotation);
+    const hasCustomer = customerIds.length > 0;
+    const hasVendor = Boolean(quotation.vendorId);
+
+    if (hasCustomer && hasVendor) {
       if (!party || !['Customer', 'Vendor'].includes(party)) {
         res.status(400).json({ message: 'party is required when quotation has both customer and vendor' });
         return;
       }
       resolvedParty = party;
-    } else if (quotation.customerId) {
+    } else if (hasCustomer) {
       resolvedParty = 'Customer';
-    } else if (quotation.vendorId) {
+    } else if (hasVendor) {
       resolvedParty = 'Vendor';
     }
 
@@ -1222,9 +1297,27 @@ export const createPaymentForQuotation = async (req: Request, res: Response) => 
       return;
     }
 
-    resolvedPartyId = resolvedParty === 'Customer'
-      ? new mongoose.Types.ObjectId(quotation.customerId)
-      : new mongoose.Types.ObjectId(quotation.vendorId);
+    if (resolvedParty === 'Customer') {
+      const requestedPartyId = req.body.partyId;
+      if (requestedPartyId) {
+        if (!mongoose.isValidObjectId(String(requestedPartyId))) {
+          res.status(400).json({ message: 'Invalid partyId for customer allocation' });
+          return;
+        }
+        if (!customerIds.includes(String(requestedPartyId))) {
+          res.status(400).json({ message: 'Provided partyId does not belong to quotation customers' });
+          return;
+        }
+        resolvedPartyId = new mongoose.Types.ObjectId(String(requestedPartyId));
+      } else if (customerIds.length === 1) {
+        resolvedPartyId = new mongoose.Types.ObjectId(customerIds[0]);
+      } else {
+        res.status(400).json({ message: 'partyId is required when quotation has multiple customers' });
+        return;
+      }
+    } else {
+      resolvedPartyId = new mongoose.Types.ObjectId(quotation.vendorId);
+    }
 
     const allocationTotal = Number(allocationAmount ?? amount);
     if (allocationTotal > Number(amount)) {
@@ -1306,7 +1399,8 @@ export const getQuotationLedger = async (req: Request, res: Response) => {
       return;
     }
 
-    const party: PartyType | null = quotation.customerId ? 'Customer' : quotation.vendorId ? 'Vendor' : null;
+    const customerIds = getCustomerIds(quotation);
+    const party: PartyType | null = customerIds.length > 0 ? 'Customer' : quotation.vendorId ? 'Vendor' : null;
     if (!party) {
       res.status(400).json({ message: 'Quotation is missing customer or vendor' });
       return;
@@ -1332,7 +1426,11 @@ export const getQuotationLedger = async (req: Request, res: Response) => {
     ]);
 
     const totalAllocated = payments.reduce((total, payment) => total + Number(payment.allocationAmount || 0), 0);
-    const quotationAmount = getQuotationAmountForParty(quotation, party);
+    const quotationAmount = getQuotationAmountForParty(
+      quotation,
+      party,
+      party === 'Customer' && customerIds.length === 1 ? customerIds[0] : undefined
+    );
 
     res.status(200).json({
       quotation,
