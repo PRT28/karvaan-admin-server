@@ -287,7 +287,7 @@ router.delete("/delete-vendor/:id", deleteVendor);
  * /vendor/bulk-upload:
  *   post:
  *     summary: Bulk upload vendors from CSV or XLSX
- *     description: Upload a CSV or XLSX file (field name: `file`) to create multiple vendors at once.
+ *     description: "Upload a CSV or XLSX file (field name: file) to create multiple vendors at once."
  *     tags: [Vendors]
  *     security:
  *       - karvaanToken: []

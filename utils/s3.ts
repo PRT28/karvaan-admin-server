@@ -1,5 +1,11 @@
 import { S3Client, PutObjectCommand, DeleteObjectCommand } from '@aws-sdk/client-s3';
-import { v4 as uuidv4 } from 'uuid';
+
+// Use dynamic import for `uuid` to avoid ESM require issues
+// Generate UUIDs on demand.
+const generateUuid = async (): Promise<string> => {
+  const mod = await import('uuid');
+  return (mod && (mod.v4 as () => string)()) as string;
+};
 
 // Lazy initialization of S3 Client to ensure env vars are loaded
 let s3Client: S3Client | null = null;
@@ -42,7 +48,7 @@ export const uploadToS3 = async (
   folder: string = ''
 ): Promise<UploadedDocument> => {
   const fileExtension = file.originalname.split('.').pop();
-  const uniqueFileName = `${uuidv4()}.${fileExtension}`;
+  const uniqueFileName = `${await generateUuid()}.${fileExtension}`;
   const key = folder ? `${folder}/${uniqueFileName}` : uniqueFileName;
   const bucketName = getBucketName();
   const region = process.env.AWS_REGION || '';

@@ -294,7 +294,7 @@ router.delete("/delete-team/:id", deleteTeam);
  * /team/bulk-upload:
  *   post:
  *     summary: Bulk upload team members from CSV or XLSX
- *     description: Upload a CSV or XLSX file (field name: `file`) to create multiple team members.
+ *     description: "Upload a CSV or XLSX file (field name: file) to create multiple team members."
  *     tags: [Teams]
  *     security:
  *       - karvaanToken: []

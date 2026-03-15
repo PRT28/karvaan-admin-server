@@ -1,5 +1,6 @@
 import {
     getAllQuotations,
+    getMyQuotations,
     getQuotationsByParty,
     createQuotation,
     updateQuotation,
@@ -104,6 +105,73 @@ const router = express.Router();
  *               $ref: '#/components/schemas/ErrorResponse'
  */
 router.get('/get-all-quotations', getAllQuotations);
+
+/**
+ * @swagger
+ * /quotation/get-my-quotations:
+ *   get:
+ *     summary: Get quotations owned by the logged-in user
+ *     description: Returns quotations where the authenticated user is primaryOwner or in secondaryOwner. Supports pagination, date and status filters.
+ *     tags: [Quotations]
+ *     security:
+ *       - karvaanToken: []
+ *     parameters:
+ *       - in: query
+ *         name: bookingStartDate
+ *         schema:
+ *           type: string
+ *           format: date
+ *         description: Filter by createdAt start date
+ *       - in: query
+ *         name: bookingEndDate
+ *         schema:
+ *           type: string
+ *           format: date
+ *         description: Filter by createdAt end date
+ *       - in: query
+ *         name: travelStartDate
+ *         schema:
+ *           type: string
+ *           format: date
+ *         description: Filter by travelDate start date
+ *       - in: query
+ *         name: travelEndDate
+ *         schema:
+ *           type: string
+ *           format: date
+ *         description: Filter by travelDate end date
+ *       - in: query
+ *         name: isDeleted
+ *         schema:
+ *           type: boolean
+ *         description: Include soft-deleted records when true
+ *       - in: query
+ *         name: serviceStatus
+ *         schema:
+ *           type: string
+ *           enum: [pending, denied, draft, approved]
+ *         description: Filter by service status
+ *       - in: query
+ *         name: page
+ *         schema:
+ *           type: integer
+ *           default: 1
+ *         description: Page number (1-indexed)
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *           default: 25
+ *         description: Records per page (max 100)
+ *     responses:
+ *       200:
+ *         description: Quotations retrieved successfully
+ *       401:
+ *         description: User not authenticated
+ *       500:
+ *         description: Failed to fetch quotations
+ */
+router.get('/get-my-quotations', getMyQuotations);
 
 /**
  * @swagger

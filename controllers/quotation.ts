@@ -741,6 +741,180 @@ export const getAllQuotations = async (req: Request, res: Response) => {
   }
 };
 
+export const getMyQuotations = async (req: Request, res: Response) => {
+  try {
+    const userId = getUserIdFromRequest(req);
+    if (!userId) {
+      res.status(401).json({ success: false, message: 'User not authenticated' });
+      return;
+    }
+
+    const userObjectId = new mongoose.Types.ObjectId(userId);
+
+    const {
+      bookingStartDate,
+      bookingEndDate,
+      travelStartDate,
+      travelEndDate,
+      isDeleted,
+      serviceStatus,
+      page: pageParam,
+      limit: limitParam,
+    } = req.query;
+
+    // Optional pagination
+    const page = pageParam ? Math.max(1, parseInt(pageParam as string, 10) || 1) : null;
+    const limit = limitParam ? Math.min(500, Math.max(1, parseInt(limitParam as string, 10) || 50)) : null;
+    const skip = page && limit ? (page - 1) * limit : 0;
+
+    // Build query: user must be primaryOwner OR in secondaryOwner array
+    const query: any = {
+      $or: [
+        { primaryOwner: userObjectId },
+        { secondaryOwner: userObjectId },
+      ],
+      isDeleted: isDeleted === 'true' ? true : false,
+    };
+
+    // Business scoping for non-super-admins
+    if (req.user?.userType !== 'super_admin') {
+      query.businessId = req.user?.businessInfo?.businessId;
+    }
+
+    // Date filters
+    if (bookingStartDate || bookingEndDate) {
+      const bookingDateFilter: any = {};
+      if (bookingStartDate) bookingDateFilter.$gte = new Date(bookingStartDate as string);
+      if (bookingEndDate) bookingDateFilter.$lte = new Date(bookingEndDate as string);
+      query.createdAt = bookingDateFilter;
+    }
+
+    if (travelStartDate || travelEndDate) {
+      const travelDateFilter: any = {};
+      if (travelStartDate) travelDateFilter.$gte = new Date(travelStartDate as string);
+      if (travelEndDate) travelDateFilter.$lte = new Date(travelEndDate as string);
+      query.travelDate = travelDateFilter;
+    }
+
+    if (serviceStatus) {
+      query.serviceStatus = serviceStatus;
+    }
+
+    // Fetch quotations (with optional pagination)
+    let dbQuery = Quotation.find(query)
+      .populate({ path: 'businessId', select: 'businessName businessType' })
+      .populate('customerId', 'name email phone companyName')
+      .populate('vendorId', 'companyName contactPerson email phone')
+      .populate('adultTravelers', 'name email phone')
+      .populate({ path: 'childTravelers.id', model: 'Traveller', select: 'name email phone' })
+      .populate('primaryOwner', 'name email')
+      .populate('secondaryOwner', 'name email')
+      .sort({ createdAt: -1 });
+
+    // Get total count for pagination before applying skip/limit
+    const totalCount = page && limit ? await Quotation.countDocuments(query) : null;
+
+    if (page && limit) {
+      dbQuery = dbQuery.skip(skip).limit(limit);
+    }
+
+    const quotations = await dbQuery.lean();
+
+    // Payment & task enrichment (same as getAllQuotations)
+    const quotationIds = quotations
+      .map((q) => q?._id)
+      .filter((id) => mongoose.isValidObjectId(String(id)))
+      .map((id) => new mongoose.Types.ObjectId(String(id)));
+
+    const paymentBaseMatch: any = { isDeleted: { $ne: true } };
+    if (query.businessId) {
+      paymentBaseMatch.businessId = normalizeObjectId(query.businessId);
+    }
+
+    const [customerAllocations, vendorAllocations, taskCounts] = await Promise.all([
+      Payments.aggregate([
+        { $match: { ...paymentBaseMatch, party: 'Customer' } },
+        { $unwind: '$allocations' },
+        { $match: { 'allocations.quotationId': { $in: quotationIds } } },
+        { $group: { _id: '$allocations.quotationId', totalAllocated: { $sum: '$allocations.amount' } } },
+      ]),
+      Payments.aggregate([
+        { $match: { ...paymentBaseMatch, party: 'Vendor' } },
+        { $unwind: '$allocations' },
+        { $match: { 'allocations.quotationId': { $in: quotationIds } } },
+        { $group: { _id: '$allocations.quotationId', totalAllocated: { $sum: '$allocations.amount' } } },
+      ]),
+      Logs.aggregate([
+        { $match: { bookingId: { $in: quotationIds } } },
+        { $group: { _id: '$bookingId', taskCount: { $sum: 1 } } },
+      ]),
+    ]);
+
+    const customerAllocationMap = new Map<string, number>();
+    customerAllocations.forEach((item) => {
+      customerAllocationMap.set(String(item._id), Number(item.totalAllocated || 0));
+    });
+
+    const vendorAllocationMap = new Map<string, number>();
+    vendorAllocations.forEach((item) => {
+      vendorAllocationMap.set(String(item._id), Number(item.totalAllocated || 0));
+    });
+
+    const taskCountMap = new Map<string, number>();
+    taskCounts.forEach((item) => {
+      taskCountMap.set(String(item._id), Number(item.taskCount || 0));
+    });
+
+    const getPaymentStatus = (allocated: number, total: number) => {
+      if (total <= 0) return 'pending';
+      if (allocated <= 0) return 'pending';
+      if (allocated >= total) return 'paid';
+      return 'partially paid';
+    };
+
+    const quotationsWithPayments = quotations.map((quotation) => {
+      const quotationId = String(quotation._id);
+      const customerExists = hasCustomers(quotation);
+      const customerAmount = customerExists ? getQuotationAmountForParty(quotation, 'customer') : 0;
+      const vendorAmount = quotation.vendorId ? getQuotationAmountForParty(quotation, 'vendor') : 0;
+      const customerAllocated = customerAllocationMap.get(quotationId) || 0;
+      const vendorAllocated = vendorAllocationMap.get(quotationId) || 0;
+      const customerRemainingAmount = Math.max(customerAmount - customerAllocated, 0);
+      const vendorRemainingAmount = Math.max(vendorAmount - vendorAllocated, 0);
+
+      return {
+        ...quotation,
+        taskCount: taskCountMap.get(quotationId) || 0,
+        customerPaymentDone: customerExists && customerAllocated >= customerAmount,
+        vendorPaymentDone: Boolean(quotation.vendorId) && vendorAllocated >= vendorAmount,
+        customerRemainingAmount,
+        vendorRemainingAmount,
+        isBookingDataComplete: isBookingDataComplete(quotation),
+        customerPaymentStatus: customerExists ? getPaymentStatus(customerAllocated, customerAmount) : 'not_applicable',
+        vendorPaymentStatus: quotation.vendorId ? getPaymentStatus(vendorAllocated, vendorAmount) : 'not_applicable',
+      };
+    });
+
+    const response: any = {
+      success: true,
+      quotations: quotationsWithPayments,
+    };
+
+    // if (page && limit && totalCount !== null) {
+    //   response.pagination = {
+    //     page,
+    //     limit,
+    //     totalCount,
+    //     totalPages: Math.ceil(totalCount / limit),
+    //   };
+    // }
+
+    res.status(200).json(response);
+  } catch (err) {
+    res.status(500).json({ success: false, message: 'Failed to fetch my quotations', error: (err as Error).message });
+  }
+};
+
 export const getQuotationById = async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
