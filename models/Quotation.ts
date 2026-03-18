@@ -163,7 +163,6 @@ export interface IQuotation extends Document {
   remarks: string;
   isDeleted: boolean;
   serviceStatus: string;
-  documents: IQuotationDocument[];
   vendorVoucherDocuments: IQuotationDocument[];
   vendorInvoiceDocuments: IQuotationDocument[];
 }
@@ -203,11 +202,38 @@ export const getMissingFormFieldKeys = (
     const trips = Array.isArray(plainFields.trips) ? plainFields.trips : [];
     const segments = Array.isArray(plainFields.segments) ? plainFields.segments : [];
     const missingKeys: string[] = [];
+    const requiredSegmentFields = ['from', 'to', 'flightNumber', 'travelDate', 'cabinClass'] as const;
+
+    const collectMissingSegmentFields = (segmentList: unknown[], basePath: string) => {
+      segmentList.forEach((segmentValue, segmentIndex) => {
+        const segment = toPlainObject(segmentValue);
+        requiredSegmentFields.forEach((field) => {
+          if (!hasMeaningfulValue(segment[field])) {
+            missingKeys.push(`${basePath}.${segmentIndex}.${field}`);
+          }
+        });
+      });
+    };
+
     if (!hasMeaningfulValue(plainFields.tripType)) missingKeys.push('tripType');
     if (tripType === 'multi city') {
-      if (trips.length === 0) missingKeys.push('trips');
+      if (trips.length === 0) {
+        missingKeys.push('trips');
+      } else {
+        trips.forEach((tripValue, tripIndex) => {
+          const trip = toPlainObject(tripValue);
+          const tripSegments = Array.isArray(trip.segments) ? trip.segments : [];
+          if (tripSegments.length === 0) {
+            missingKeys.push(`trips.${tripIndex}.segments`);
+            return;
+          }
+          collectMissingSegmentFields(tripSegments, `trips.${tripIndex}.segments`);
+        });
+      }
     } else if (segments.length === 0) {
       missingKeys.push('segments');
+    } else {
+      collectMissingSegmentFields(segments, 'segments');
     }
     return missingKeys;
   }
@@ -267,7 +293,7 @@ export const getFormFieldsValidationError = (
     return 'formFields.samePnrForAllSegments must be a boolean';
   }
 
-  if (plainFields.pnr !== undefined) {
+  if (hasMeaningfulValue(plainFields.pnr)) {
     const pnr = String(plainFields.pnr).trim();
     if (!/^[A-Z0-9]{6}$/.test(pnr)) {
       return 'formFields.pnr must be a 6 character uppercase alphanumeric code';
@@ -280,18 +306,18 @@ export const getFormFieldsValidationError = (
       const segment = toPlainObject(segmentList[segmentIndex]);
       const path = `${basePath}.${segmentIndex}`;
 
-      if (segment.flightNumber !== undefined) {
+      if (hasMeaningfulValue(segment.flightNumber)) {
         const flightNumber = String(segment.flightNumber).trim();
         if (!/^[A-Z0-9]{3,4}$/.test(flightNumber)) {
           return `${path}.flightNumber must be a 3 to 4 character uppercase alphanumeric code`;
         }
       }
 
-      if (segment.travelDate !== undefined && !isValidDateValue(segment.travelDate)) {
+      if (hasMeaningfulValue(segment.travelDate) && !isValidDateValue(segment.travelDate)) {
         return `${path}.travelDate must be a valid date`;
       }
 
-      if (segment.cabinClass !== undefined) {
+      if (hasMeaningfulValue(segment.cabinClass)) {
         const cabinClass = String(segment.cabinClass);
         const allowedCabinClasses = ['Economy', 'Premium economy', 'Business', 'First class'];
         if (!allowedCabinClasses.includes(cabinClass)) {
@@ -299,7 +325,9 @@ export const getFormFieldsValidationError = (
         }
       }
 
-      const pnrValue = segment.pnr !== undefined ? String(segment.pnr).trim() : sharedPnr;
+      const pnrValue = hasMeaningfulValue(segment.pnr)
+        ? String(segment.pnr).trim()
+        : sharedPnr;
       if (pnrValue !== undefined && pnrValue !== '' && !/^[A-Z0-9]{6}$/.test(pnrValue)) {
         return `${path}.pnr must be a 6 character uppercase alphanumeric code`;
       }
@@ -327,7 +355,7 @@ export const getFormFieldsValidationError = (
       }
 
       const preview = toPlainObject(segment.preview);
-      if (segment.preview !== undefined && preview.duration !== undefined) {
+      if (segment.preview !== undefined && hasMeaningfulValue(preview.duration)) {
         const duration = String(preview.duration).trim();
         if (!/^\d{1,2}\s*h\s*\d{1,2}\s*m$/.test(duration)) {
           return `${path}.preview.duration must be in the format "XX h XX m"`;
@@ -338,13 +366,13 @@ export const getFormFieldsValidationError = (
         const previewTimeFields = ['std', 'sta'];
         for (const previewTimeField of previewTimeFields) {
           const value = preview[previewTimeField];
-          if (value !== undefined && !/^\d{2}:\d{2}$/.test(String(value).trim())) {
+          if (hasMeaningfulValue(value) && !/^\d{2}:\d{2}$/.test(String(value).trim())) {
             return `${path}.preview.${previewTimeField} must be in 24 hour HH:mm format`;
           }
         }
 
         const previewFlightNumber = preview.flightNumber;
-        if (previewFlightNumber !== undefined && !/^[A-Z0-9]{3,4}$/.test(String(previewFlightNumber).trim())) {
+        if (hasMeaningfulValue(previewFlightNumber) && !/^[A-Z0-9]{3,4}$/.test(String(previewFlightNumber).trim())) {
           return `${path}.preview.flightNumber must be a 3 to 4 character uppercase alphanumeric code`;
         }
       }
@@ -410,17 +438,27 @@ export const getPriceInfoValidationError = (priceInfo?: unknown): string | null 
     const value = plainPriceInfo[field];
     if (value !== undefined) {
       const plainCurrencyValue = toPlainObject(value);
-      if (!plainCurrencyValue.currency || typeof plainCurrencyValue.currency !== 'string') {
+      const hasAnyPriceValue =
+        hasMeaningfulValue(plainCurrencyValue.amount) ||
+        hasMeaningfulValue(plainCurrencyValue.currency) ||
+        hasMeaningfulValue(plainCurrencyValue.exchangeRate) ||
+        hasMeaningfulValue(plainCurrencyValue.notes);
+
+      if (!hasAnyPriceValue) {
+        continue;
+      }
+
+      if (!hasMeaningfulValue(plainCurrencyValue.currency) || typeof plainCurrencyValue.currency !== 'string') {
         return `priceInfo.${field}.currency is required`;
       }
       if (
-        plainCurrencyValue.amount !== undefined &&
+        hasMeaningfulValue(plainCurrencyValue.amount) &&
         !isFiniteNumber(plainCurrencyValue.amount)
       ) {
         return `priceInfo.${field}.amount must be a valid number`;
       }
       if (
-        plainCurrencyValue.exchangeRate !== undefined &&
+        hasMeaningfulValue(plainCurrencyValue.exchangeRate) &&
         !isFiniteNumber(plainCurrencyValue.exchangeRate)
       ) {
         return `priceInfo.${field}.exchangeRate must be a valid number`;
@@ -589,9 +627,9 @@ export const getCustomerPricingValidationError = (
 
   if (normalizedCustomerIds.length === 0) return null;
 
-  if (!Array.isArray(customerPricing) || customerPricing.length === 0) {
-    return 'customerPricing is required when customerId is provided';
-  }
+  if (customerPricing === undefined || customerPricing === null) return null;
+  if (!Array.isArray(customerPricing)) return 'customerPricing must be an array';
+  if (customerPricing.length === 0) return null;
 
   const pricingMap = new Map<string, number>();
   for (const item of customerPricing) {
@@ -647,12 +685,9 @@ const QuotationSchema = new Schema<IQuotation>(
       required: false,
       validate: {
         validator: function (this: IQuotation, value: unknown) {
-          if (this.serviceStatus === 'draft') return true;
-          if (!this.quotationType) return true;
-          const missingKeys = getMissingFormFieldKeys(this.quotationType, value);
-          return missingKeys.length === 0;
+          return getFormFieldsValidationError(this.quotationType, value) === null;
         },
-        message: 'Missing required formFields for selected quotationType'
+        message: 'Invalid formFields data'
       }
     },
     priceInfo: {
@@ -713,24 +748,6 @@ const QuotationSchema = new Schema<IQuotation>(
     childNumber: { type: Number, required: false },
     remarks: { type: String, required: false },
     isDeleted: { type: Boolean, default: false },
-    documents: {
-      type: [{
-        originalName: { type: String, required: false },
-        fileName: { type: String, required: false },
-        url: { type: String, required: false },
-        key: { type: String, required: false },
-        size: { type: Number, required: false },
-        mimeType: { type: String, required: false },
-        uploadedAt: { type: Date, default: Date.now },
-      }],
-      default: [],
-      validate: {
-        validator: function(docs: any[]) {
-          return docs.length <= 3;
-        },
-        message: 'Maximum 3 documents are allowed per quotation'
-      }
-    },
     vendorVoucherDocuments: {
       type: [{
         originalName: { type: String, required: false },

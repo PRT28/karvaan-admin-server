@@ -13,7 +13,6 @@ import Team from '../models/Team';
 import mongoose from 'mongoose';
 import Payments from '../models/Payments';
 import Logs from '../models/Logs';
-import { uploadMultipleToS3, UploadedDocument } from '../utils/s3';
 import MakerCheckerGroup from '../models/MakerCheckerGroup';
 
 const getBusinessIdFromRequest = (req: Request): string | undefined => {
@@ -468,41 +467,6 @@ export const createQuotation = async (req: Request, res: Response): Promise<void
     }
 
     quotationData.businessId = req.user?.businessInfo?.businessId;
-    
-
-
-    // Handle document uploads if files are present
-    let uploadedDocuments: UploadedDocument[] = [];
-    if (req.files && Array.isArray(req.files) && req.files.length > 0) {
-      console.log(`📁 Uploading ${req.files.length} document(s) to S3...`);
-
-      if (req.files.length > 3) {
-        res.status(400).json({
-          success: false,
-          message: 'Maximum 3 documents are allowed per quotation'
-        });
-        return;
-      }
-
-      try {
-        uploadedDocuments = await uploadMultipleToS3(
-          req.files as Express.Multer.File[],
-          `quotations/${req.user?.businessInfo?.businessId}`
-        );
-        console.log(`✅ ${uploadedDocuments.length} document(s) uploaded successfully`);
-      } catch (uploadError) {
-        console.error('❌ Error uploading documents to S3:', uploadError);
-        res.status(500).json({
-          success: false,
-          message: 'Failed to upload documents',
-          error: (uploadError as Error).message
-        });
-        return;
-      }
-    }
-
-    // Add documents to quotation data
-    quotationData.documents = uploadedDocuments;
 
     const newQuotation = new Quotation(quotationData);
     await newQuotation.save();
@@ -572,7 +536,6 @@ export const updateQuotation = async (req: Request, res: Response): Promise<void
     if (!parseJsonField('secondaryOwner', 'secondaryOwner')) return;
     if (!parseJsonField('adultTravelers', 'adultTravelers')) return;
     if (!parseJsonField('childTravelers', 'childTravelers')) return;
-    if (!parseJsonField('documents', 'documents')) return;
     if (!parseJsonField('vendorVoucherDocuments', 'vendorVoucherDocuments')) return;
     if (!parseJsonField('vendorInvoiceDocuments', 'vendorInvoiceDocuments')) return;
 
@@ -712,36 +675,6 @@ export const updateQuotation = async (req: Request, res: Response): Promise<void
         });
         return;
       }
-    }
-
-    const hasDocumentsInBody = Object.prototype.hasOwnProperty.call(updateData, 'documents');
-    let existingDocuments = Array.isArray(updateData.documents) ? updateData.documents : [];
-
-    if (req.files && Array.isArray(req.files) && req.files.length > 0) {
-      const businessIdForUploads = getBusinessIdFromRequest(req);
-      if (!hasDocumentsInBody) {
-        const existingQuotation = await Quotation.findOne(filter).select('documents');
-        if (!existingQuotation) {
-          res.status(404).json({ success: false, message: 'Quotation not found' });
-          return;
-        }
-        existingDocuments = existingQuotation.documents || [];
-      }
-
-      if (req.files.length + existingDocuments.length > 3) {
-        res.status(400).json({
-          success: false,
-          message: 'Maximum 3 documents are allowed per quotation'
-        });
-        return;
-      }
-
-      const uploadedDocuments = await uploadMultipleToS3(
-        req.files as Express.Multer.File[],
-        `quotations/${businessIdForUploads ?? 'unknown-business'}`
-      );
-
-      updateData.documents = [...existingDocuments, ...uploadedDocuments];
     }
 
     const updated = await Quotation.findOneAndUpdate(filter, updateData, { new: true })
