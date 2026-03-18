@@ -1,8 +1,10 @@
 import { Request, Response } from 'express';
 import Quotation, {
   getCustomerPricingValidationError,
+  getFormFieldsValidationError,
   getMissingFormFieldKeys,
-  getPriceInfoValidationError
+  getPriceInfoValidationError,
+  getQuotationPricingSummary
 } from '../models/Quotation';
 import Customer from '../models/Customer';
 import Vendor from '../models/Vendors';
@@ -65,21 +67,29 @@ const getQuotationAmountForParty = (
   customerId?: mongoose.Types.ObjectId | string
 ) => {
   const baseAmount = Number(quotation.totalAmount ?? 0);
+  const pricingSummary = getQuotationPricingSummary(
+    (quotation?.status as any) ?? 'confirmed',
+    quotation?.priceInfo,
+    quotation?.customerPricing
+  );
+
   if (party === 'customer') {
-    const customerPricing = Array.isArray(quotation.customerPricing) ? quotation.customerPricing : [];
-    if (customerPricing.length > 0) {
+    const customerBreakdown = Array.isArray(pricingSummary.customerBreakdown)
+      ? pricingSummary.customerBreakdown
+      : [];
+    if (customerBreakdown.length > 0) {
       if (customerId) {
-        const matched = customerPricing.find((entry: any) =>
+        const matched = customerBreakdown.find((entry: any) =>
           String(entry?.customerId) === String(customerId)
         );
         if (matched) {
-          const matchedAmount = Number(matched.sellingPrice);
+          const matchedAmount = Number(matched.newSellingPrice);
           if (!Number.isNaN(matchedAmount)) return matchedAmount;
         }
       }
 
-      const summedAmount = customerPricing.reduce(
-        (sum: number, entry: any) => sum + (Number(entry?.sellingPrice) || 0),
+      const summedAmount = customerBreakdown.reduce(
+        (sum: number, entry: any) => sum + (Number(entry?.newSellingPrice) || 0),
         0
       );
       if (!Number.isNaN(summedAmount) && summedAmount > 0) {
@@ -87,25 +97,15 @@ const getQuotationAmountForParty = (
       }
     }
 
-    const priceInfo: any = quotation.priceInfo;
-    if (priceInfo) {
-      const directSelling = priceInfo instanceof Map ? priceInfo.get('sellingPrice') : priceInfo?.sellingPrice;
-      const parsedSelling = Number(directSelling);
-      if (!Number.isNaN(parsedSelling)) {
-        return parsedSelling;
-      }
+    if (Number.isFinite(pricingSummary.customerReceivableAmount)) {
+      return pricingSummary.customerReceivableAmount;
     }
 
     return baseAmount;
   }
 
-  const priceInfo: any = quotation.priceInfo;
-  if (priceInfo) {
-    const directCost = priceInfo instanceof Map ? priceInfo.get('costPrice') : priceInfo?.costPrice;
-    const parsedCost = Number(directCost);
-    if (!Number.isNaN(parsedCost)) {
-      return parsedCost;
-    }
+  if (Number.isFinite(pricingSummary.vendorPayableAmount)) {
+    return pricingSummary.vendorPayableAmount;
   }
 
   const formFields: any = quotation.formFields;
@@ -145,22 +145,183 @@ const hasValue = (value: any): boolean => {
   return true;
 };
 
+const hasNonNegativeNumber = (value: unknown): boolean => {
+  const parsedValue = Number(value);
+  return Number.isFinite(parsedValue) && parsedValue >= 0;
+};
+
+const hasNonNegativePriceInfoValue = (value: unknown): boolean => {
+  if (value === null || value === undefined) return false;
+  if (typeof value === 'object' && 'amount' in (value as Record<string, unknown>)) {
+    return hasNonNegativeNumber((value as Record<string, unknown>).amount);
+  }
+  return hasNonNegativeNumber(value);
+};
+
+const isDraftServiceStatus = (serviceStatus: unknown): boolean => serviceStatus === 'draft';
+
+const getPriceInfoObject = (quotation: any): Record<string, any> => {
+  if (!quotation?.priceInfo) return {};
+  if (quotation.priceInfo instanceof Map) {
+    return Object.fromEntries(quotation.priceInfo.entries());
+  }
+  return quotation.priceInfo;
+};
+
+const getBookingDateValue = (quotation: any) => {
+  return quotation.bookingDate;
+};
+
+const getPricingSummary = (quotation: any) => {
+  return getQuotationPricingSummary(
+    (quotation?.status as any) ?? 'confirmed',
+    quotation?.priceInfo,
+    quotation?.customerPricing
+  );
+};
+
+const parseDateValue = (value: unknown, fieldName: string): Date | null => {
+  if (value === undefined || value === null || value === '') return null;
+
+  const parsedDate = value instanceof Date ? value : new Date(String(value));
+  if (Number.isNaN(parsedDate.getTime())) {
+    throw new Error(`Invalid ${fieldName} format. Please provide a valid date.`);
+  }
+
+  return parsedDate;
+};
+
+const parseNumberValue = (value: unknown, fieldName: string): number | undefined => {
+  if (value === undefined || value === null || value === '') return undefined;
+
+  const parsedValue = Number(value);
+  if (Number.isNaN(parsedValue)) {
+    throw new Error(`${fieldName} must be a valid number`);
+  }
+
+  return parsedValue;
+};
+
+const getQuotationStateValidationError = (quotation: any): string | null => {
+  const status = quotation?.status;
+
+  if (status && !['confirmed', 'cancelled', 'rescheduled'].includes(String(status))) {
+    return 'status must be one of: confirmed, cancelled, rescheduled';
+  }
+
+  if (status === 'cancelled' && !hasValue(quotation?.cancellationDate)) {
+    return 'cancellationDate is required when status is cancelled';
+  }
+
+  if (status === 'rescheduled') {
+    if (!hasValue(quotation?.newBookingDate)) {
+      return 'newBookingDate is required when status is rescheduled';
+    }
+    if (!hasValue(quotation?.newTravelDate)) {
+      return 'newTravelDate is required when status is rescheduled';
+    }
+  }
+
+  const formFieldsError = getFormFieldsValidationError(quotation?.quotationType, quotation?.formFields);
+  if (formFieldsError) return formFieldsError;
+
+  return null;
+};
+
+const getMandatoryBookingFields = (quotation: any): string[] => {
+  const missingFields: string[] = [];
+
+  if (!hasValue(quotation.quotationType)) missingFields.push('quotationType');
+  if (!hasValue(quotation.channel)) missingFields.push('channel');
+  if (!hasValue(quotation.formFields)) missingFields.push('formFields');
+  if (!hasNonNegativeNumber(quotation.adultNumber)) missingFields.push('adultNumber');
+  if (!hasNonNegativeNumber(quotation.childNumber)) missingFields.push('childNumber');
+  if (!hasValue(quotation.primaryOwner)) missingFields.push('primaryOwner');
+  if (!hasValue(quotation.status)) missingFields.push('status');
+  if (!hasValue(getBookingDateValue(quotation))) missingFields.push('bookingDate');
+
+  return missingFields;
+};
+
+
+const getSemiMandatoryBookingFields = (quotation: any): string[] => {
+  const missingFields: string[] = [];
+  const priceInfo = getPriceInfoObject(quotation);
+  const status = String(quotation?.status ?? 'confirmed');
+  const advancedPricing = priceInfo.advancedPricing === true;
+
+  if (!hasCustomers(quotation)) missingFields.push('customerId');
+  if (!hasValue(quotation.vendorId)) missingFields.push('vendorId');
+  if (!hasValue(quotation.travelDate)) missingFields.push('travelDate');
+
+  const hasSellingPrice =
+    hasNonNegativePriceInfoValue(priceInfo.sellingPrice) ||
+    (Array.isArray(quotation.customerPricing) && quotation.customerPricing.length > 0);
+
+  const semiMandatoryPriceFields: string[] = [];
+
+  if (status === 'confirmed') {
+    if (advancedPricing) {
+      semiMandatoryPriceFields.push(
+        'vendorInvoiceBase',
+        'vendorIncentiveReceived',
+        'commissionPayout'
+      );
+    } else {
+      semiMandatoryPriceFields.push('costPrice');
+    }
+    if (!hasSellingPrice) missingFields.push('priceInfo.sellingPrice');
+  }
+
+  if (status === 'rescheduled') {
+    if (advancedPricing) {
+      semiMandatoryPriceFields.push(
+        'vendorInvoiceBase',
+        'additionalVendorInvoiceBase',
+        'vendorIncentiveReceived',
+        'additionalVendorIncentiveReceived',
+        'commissionPayout',
+        'additionalCommissionPayout',
+        'additionalSellingPrice'
+      );
+    } else {
+      semiMandatoryPriceFields.push('costPrice', 'additionalCostPrice', 'additionalSellingPrice');
+    }
+    if (!hasSellingPrice) missingFields.push('priceInfo.sellingPrice');
+  }
+
+  if (status === 'cancelled') {
+    if (advancedPricing) {
+      semiMandatoryPriceFields.push(
+        'vendorInvoiceBase',
+        'refundReceived',
+        'vendorIncentiveReceived',
+        'vendorIncentiveChargeback',
+        'commissionPayout',
+        'commissionPayoutChargeback',
+        'refundPaid'
+      );
+    } else {
+      semiMandatoryPriceFields.push('costPrice', 'refundReceived', 'refundPaid');
+    }
+    if (!hasSellingPrice) missingFields.push('priceInfo.sellingPrice');
+  }
+
+  for (const field of semiMandatoryPriceFields) {
+    if (!hasNonNegativePriceInfoValue(priceInfo[field])) {
+      missingFields.push(`priceInfo.${field}`);
+    }
+  }
+
+  return missingFields;
+};
+
 const isBookingDataComplete = (quotation: any): boolean => {
-  const requiredTopLevelFields = [
-    quotation.quotationType,
-    quotation.travelDate,
-    quotation.totalAmount,
-    quotation.primaryOwner,
-    quotation.customerId
-  ];
+  const mandatoryFields = getMandatoryBookingFields(quotation);
+  const semiMandatoryFields = getSemiMandatoryBookingFields(quotation);
+  const missingServiceFields = getMissingFormFieldKeys(quotation?.quotationType, quotation?.formFields);
 
-  const areRequiredTopLevelFieldsPresent = requiredTopLevelFields.every((field) => hasValue(field));
-  const areFormFieldsComplete = hasValue(quotation.formFields);
-  const hasAnyTraveller =
-    (Array.isArray(quotation.adultTravelers) && quotation.adultTravelers.length > 0) ||
-    (Array.isArray(quotation.childTravelers) && quotation.childTravelers.length > 0);
-
-  return areRequiredTopLevelFieldsPresent && areFormFieldsComplete && hasAnyTraveller;
+  return mandatoryFields.length === 0 && semiMandatoryFields.length === 0 && missingServiceFields.length === 0;
 };
 
 export const createQuotation = async (req: Request, res: Response): Promise<void> => {
@@ -169,73 +330,10 @@ export const createQuotation = async (req: Request, res: Response): Promise<void
 
     console.log('📝 Creating quotation with payload:', JSON.stringify(quotationData, null, 2));
 
-    if (quotationData.serviceStatus !== 'draft') {
-
-      if (!quotationData.quotationType || !quotationData.channel) {
-      res.status(400).json({
-        success: false,
-        message: 'Missing required fields: quotationType and channel are required'
-      });
-      return;
-    }
-
-    if (!quotationData.formFields) {
-      res.status(400).json({
-        success: false,
-        message: 'formFields is required'
-      });
-      return;
-    }
-
-    if (quotationData.totalAmount === undefined || quotationData.totalAmount === null) {
-      res.status(400).json({
-        success: false,
-        message: 'totalAmount is required'
-      });
-      return;
-    }
-
-    console.log(typeof quotationData.formFields, typeof quotationData.travellers, quotationData)
-
-    if (!quotationData.travelDate) {
-      res.status(400).json({
-        success: false,
-        message: 'travelDate is required'
-      });
-      return;
-    }
-
-    // Validate and convert travelDate if provided as string
-    if (typeof quotationData.travelDate === 'string') {
-      const travelDate = new Date(quotationData.travelDate);
-      if (isNaN(travelDate.getTime())) {
-        res.status(400).json({
-          success: false,
-          message: 'Invalid travelDate format. Please provide a valid date.'
-        });
-        return;
-      }
-      quotationData.travelDate = travelDate;
-    }
-
-    // Ensure totalAmount is a number
-    quotationData.totalAmount = Number(quotationData.totalAmount);
-    if (isNaN(quotationData.totalAmount)) {
-      res.status(400).json({
-        success: false,
-        message: 'totalAmount must be a valid number'
-      });
-      return;
-    }
-      
-    }
-
-    // Validate required fields
-
-      // formFields
-    if (typeof quotationData.formFields === "string") {
+    if (typeof quotationData.formFields === 'string') {
       quotationData.formFields = JSON.parse(quotationData.formFields);
     }
+
     if (typeof quotationData.customerId === 'string') {
       const trimmedValue = quotationData.customerId.trim();
       if (trimmedValue.startsWith('[')) {
@@ -254,21 +352,76 @@ export const createQuotation = async (req: Request, res: Response): Promise<void
     } else if (quotationData.customerId !== undefined) {
       quotationData.customerId = normalizeCustomerIdsInput(quotationData.customerId);
     }
+
     if (typeof quotationData.customerPricing === 'string') {
       quotationData.customerPricing = JSON.parse(quotationData.customerPricing);
     }
+
     if (typeof quotationData.priceInfo === 'string') {
       quotationData.priceInfo = JSON.parse(quotationData.priceInfo);
     }
 
-    const missingCreateFields = getMissingFormFieldKeys(
-      quotationData.quotationType,
-      quotationData.formFields
-    );
-    if (missingCreateFields.length > 0) {
+    if (typeof quotationData.secondaryOwner === 'string') {
+      quotationData.secondaryOwner = JSON.parse(quotationData.secondaryOwner);
+    }
+
+    if (typeof quotationData.vendorVoucherDocuments === 'string') {
+      quotationData.vendorVoucherDocuments = JSON.parse(quotationData.vendorVoucherDocuments);
+    }
+
+    if (typeof quotationData.vendorInvoiceDocuments === 'string') {
+      quotationData.vendorInvoiceDocuments = JSON.parse(quotationData.vendorInvoiceDocuments);
+    }
+
+    if (typeof quotationData.adultTravelers === 'string') {
+      quotationData.adultTravelers = JSON.parse(quotationData.adultTravelers);
+    }
+
+    if (typeof quotationData.childTravelers === 'string') {
+      quotationData.childTravelers = JSON.parse(quotationData.childTravelers);
+    }
+
+    try {
+      const parsedTravelDate = parseDateValue(quotationData.travelDate, 'travelDate');
+      if (parsedTravelDate) quotationData.travelDate = parsedTravelDate;
+
+      const parsedBookingDate = parseDateValue(
+        quotationData.bookingDate,
+        'bookingDate'
+      );
+      if (parsedBookingDate) {
+        quotationData.bookingDate = parsedBookingDate;
+      }
+
+      const parsedNewBookingDate = parseDateValue(quotationData.newBookingDate, 'newBookingDate');
+      if (parsedNewBookingDate) quotationData.newBookingDate = parsedNewBookingDate;
+
+      const parsedNewTravelDate = parseDateValue(quotationData.newTravelDate, 'newTravelDate');
+      if (parsedNewTravelDate) quotationData.newTravelDate = parsedNewTravelDate;
+
+      const parsedCancellationDate = parseDateValue(quotationData.cancellationDate, 'cancellationDate');
+      if (parsedCancellationDate) quotationData.cancellationDate = parsedCancellationDate;
+
+      const parsedTotalAmount = parseNumberValue(quotationData.totalAmount, 'totalAmount');
+      if (parsedTotalAmount !== undefined) quotationData.totalAmount = parsedTotalAmount;
+
+      const parsedAdultNumber = parseNumberValue(quotationData.adultNumber, 'adultNumber');
+      if (parsedAdultNumber !== undefined) quotationData.adultNumber = parsedAdultNumber;
+
+      const parsedChildNumber = parseNumberValue(quotationData.childNumber, 'childNumber');
+      if (parsedChildNumber !== undefined) quotationData.childNumber = parsedChildNumber;
+    } catch (error) {
       res.status(400).json({
         success: false,
-        message: `Missing required formFields for type "${quotationData.quotationType}": ${missingCreateFields.join(', ')}`
+        message: (error as Error).message
+      });
+      return;
+    }
+
+    if (quotationData.serviceStatus !== 'draft' && (!quotationData.quotationType || !quotationData.channel)) {
+      res.status(400).json({
+        success: false,
+        message: 'Missing required fields: quotationType and channel are required'
       });
       return;
     }
@@ -278,6 +431,15 @@ export const createQuotation = async (req: Request, res: Response): Promise<void
       res.status(400).json({
         success: false,
         message: priceInfoError
+      });
+      return;
+    }
+
+    const quotationStateError = getQuotationStateValidationError(quotationData);
+    if (quotationStateError) {
+      res.status(400).json({
+        success: false,
+        message: quotationStateError
       });
       return;
     }
@@ -294,26 +456,18 @@ export const createQuotation = async (req: Request, res: Response): Promise<void
       return;
     }
 
-    // secondaryOwner
-    if (typeof quotationData.secondaryOwner === "string") {
-      quotationData.secondaryOwner = JSON.parse(quotationData.secondaryOwner);
+    if (quotationData.serviceStatus !== 'draft') {
+      const missingMandatoryFields = getMandatoryBookingFields(quotationData);
+      if (missingMandatoryFields.length > 0) {
+        res.status(400).json({
+          success: false,
+          message: `Missing mandatory fields: ${missingMandatoryFields.join(', ')}`
+        });
+        return;
+      }
     }
 
-    // adultTravelers
-    if (typeof quotationData.adultTravelers === "string") {
-      quotationData.adultTravelers = JSON.parse(quotationData.adultTravelers);
-    }
-
-    // childTravelers
-    if (typeof quotationData.childTravelers === "string") {
-      quotationData.childTravelers = JSON.parse(quotationData.childTravelers);
-    }
-
-    
-
-    // Add businessId to quotation data
     quotationData.businessId = req.user?.businessInfo?.businessId;
-
     
 
 
@@ -355,7 +509,13 @@ export const createQuotation = async (req: Request, res: Response): Promise<void
 
     console.log('✅ Quotation created successfully:', newQuotation.customId);
 
-    res.status(201).json({ success: true, quotation: newQuotation });
+    res.status(201).json({
+      success: true,
+      quotation: {
+        ...newQuotation.toObject(),
+        pricingSummary: getPricingSummary(newQuotation),
+      }
+    });
   } catch (err) {
     console.error('❌ Error creating quotation:', err);
     res.status(500).json({
@@ -413,6 +573,8 @@ export const updateQuotation = async (req: Request, res: Response): Promise<void
     if (!parseJsonField('adultTravelers', 'adultTravelers')) return;
     if (!parseJsonField('childTravelers', 'childTravelers')) return;
     if (!parseJsonField('documents', 'documents')) return;
+    if (!parseJsonField('vendorVoucherDocuments', 'vendorVoucherDocuments')) return;
+    if (!parseJsonField('vendorInvoiceDocuments', 'vendorInvoiceDocuments')) return;
 
     if (typeof updateData.travelDate === 'string') {
       const travelDate = new Date(updateData.travelDate);
@@ -424,6 +586,37 @@ export const updateQuotation = async (req: Request, res: Response): Promise<void
         return;
       }
       updateData.travelDate = travelDate;
+    }
+
+    try {
+      const parsedBookingDate = parseDateValue(
+        updateData.bookingDate,
+        'bookingDate'
+      );
+      if (parsedBookingDate) {
+        updateData.bookingDate = parsedBookingDate;
+      }
+
+      const parsedNewBookingDate = parseDateValue(updateData.newBookingDate, 'newBookingDate');
+      if (parsedNewBookingDate) updateData.newBookingDate = parsedNewBookingDate;
+
+      const parsedNewTravelDate = parseDateValue(updateData.newTravelDate, 'newTravelDate');
+      if (parsedNewTravelDate) updateData.newTravelDate = parsedNewTravelDate;
+
+      const parsedCancellationDate = parseDateValue(updateData.cancellationDate, 'cancellationDate');
+      if (parsedCancellationDate) updateData.cancellationDate = parsedCancellationDate;
+
+      const parsedAdultNumber = parseNumberValue(updateData.adultNumber, 'adultNumber');
+      if (parsedAdultNumber !== undefined) updateData.adultNumber = parsedAdultNumber;
+
+      const parsedChildNumber = parseNumberValue(updateData.childNumber, 'childNumber');
+      if (parsedChildNumber !== undefined) updateData.childNumber = parsedChildNumber;
+    } catch (error) {
+      res.status(400).json({
+        success: false,
+        message: (error as Error).message
+      });
+      return;
     }
 
     if (updateData.totalAmount !== undefined && updateData.totalAmount !== null) {
@@ -456,71 +649,66 @@ export const updateQuotation = async (req: Request, res: Response): Promise<void
       updateData.customerId = normalizeCustomerIdsInput(updateData.customerId);
     }
 
-    if (
-      Object.prototype.hasOwnProperty.call(updateData, 'quotationType') ||
-      Object.prototype.hasOwnProperty.call(updateData, 'formFields')
-    ) {
-      const existingQuotationForValidation = await Quotation.findOne(filter).select('quotationType formFields');
-      if (!existingQuotationForValidation) {
-        res.status(404).json({ success: false, message: 'Quotation not found' });
-        return;
-      }
+    const existingQuotationForValidation = await Quotation.findOne(filter).lean();
+    if (!existingQuotationForValidation) {
+      res.status(404).json({ success: false, message: 'Quotation not found' });
+      return;
+    }
 
-      const effectiveQuotationType =
-        (updateData.quotationType as string | undefined) ?? existingQuotationForValidation.quotationType;
-      const effectiveFormFields =
-        Object.prototype.hasOwnProperty.call(updateData, 'formFields')
-          ? updateData.formFields
-          : existingQuotationForValidation.formFields;
+    const effectiveQuotation = {
+      ...existingQuotationForValidation,
+      ...updateData
+    };
 
-      const missingUpdateFields = getMissingFormFieldKeys(effectiveQuotationType, effectiveFormFields);
-      if (missingUpdateFields.length > 0) {
+    const effectiveServiceStatus = effectiveQuotation.serviceStatus;
+    const effectiveQuotationType = effectiveQuotation.quotationType;
+    const effectiveFormFields = effectiveQuotation.formFields;
+    const effectivePriceInfo = effectiveQuotation.priceInfo;
+
+    const priceInfoError = getPriceInfoValidationError(effectivePriceInfo);
+    if (priceInfoError) {
+      res.status(400).json({
+        success: false,
+        message: priceInfoError
+      });
+      return;
+    }
+
+    const quotationStateError = getQuotationStateValidationError(effectiveQuotation);
+    if (quotationStateError) {
+      res.status(400).json({
+        success: false,
+        message: quotationStateError
+      });
+      return;
+    }
+
+    const customerPricingError = getCustomerPricingValidationError(
+      effectiveQuotation.customerId,
+      effectiveQuotation.customerPricing
+    );
+    if (customerPricingError) {
+      res.status(400).json({
+        success: false,
+        message: customerPricingError
+      });
+      return;
+    }
+
+    if (!isDraftServiceStatus(effectiveServiceStatus)) {
+      if (!effectiveQuotationType || !effectiveQuotation.channel) {
         res.status(400).json({
           success: false,
-          message: `Missing required formFields for type "${effectiveQuotationType}": ${missingUpdateFields.join(', ')}`
+          message: 'Missing required fields: quotationType and channel are required'
         });
         return;
       }
-    }
 
-    if (Object.prototype.hasOwnProperty.call(updateData, 'priceInfo')) {
-      const priceInfoError = getPriceInfoValidationError(updateData.priceInfo);
-      if (priceInfoError) {
+      const missingMandatoryFields = getMandatoryBookingFields(effectiveQuotation);
+      if (missingMandatoryFields.length > 0) {
         res.status(400).json({
           success: false,
-          message: priceInfoError
-        });
-        return;
-      }
-    }
-
-    if (
-      Object.prototype.hasOwnProperty.call(updateData, 'customerId') ||
-      Object.prototype.hasOwnProperty.call(updateData, 'customerPricing')
-    ) {
-      const existingQuotationForCustomerPricing = await Quotation.findOne(filter).select('customerId customerPricing');
-      if (!existingQuotationForCustomerPricing) {
-        res.status(404).json({ success: false, message: 'Quotation not found' });
-        return;
-      }
-
-      const effectiveCustomerIds =
-        Object.prototype.hasOwnProperty.call(updateData, 'customerId')
-          ? updateData.customerId
-          : existingQuotationForCustomerPricing.customerId;
-      const effectiveCustomerPricing =
-        Object.prototype.hasOwnProperty.call(updateData, 'customerPricing')
-          ? updateData.customerPricing
-          : existingQuotationForCustomerPricing.customerPricing;
-
-      const customerPricingError = getCustomerPricingValidationError(
-        effectiveCustomerIds,
-        effectiveCustomerPricing
-      );
-      if (customerPricingError) {
-        res.status(400).json({
-          success: false,
-          message: customerPricingError
+          message: `Missing mandatory fields: ${missingMandatoryFields.join(', ')}`
         });
         return;
       }
@@ -567,7 +755,13 @@ export const updateQuotation = async (req: Request, res: Response): Promise<void
       res.status(404).json({ success: false, message: 'Quotation not found' });
       return;
     }
-    res.status(200).json({ success: true, quotation: updated });
+    res.status(200).json({
+      success: true,
+      quotation: {
+        ...updated.toObject(),
+        pricingSummary: getPricingSummary(updated),
+      }
+    });
   } catch (err) {
     res.status(500).json({ success: false, message: 'Failed to update quotation', error: (err as Error).message });
   }
@@ -632,7 +826,7 @@ export const getAllQuotations = async (req: Request, res: Response) => {
 
     const query: any = { ...businessFilter };
     if (bookingStartDate || bookingEndDate) {
-      query.createdAt = bookingDateFilter;
+      query.bookingDate = bookingDateFilter;
     }
     if (travelStartDate || travelEndDate) {
       query.travelDate = travelDateFilter;
@@ -730,6 +924,7 @@ export const getAllQuotations = async (req: Request, res: Response) => {
         customerRemainingAmount,
         vendorRemainingAmount,
         isBookingDataComplete: isBookingDataComplete(quotation),
+        pricingSummary: getPricingSummary(quotation),
         customerPaymentStatus: customerExists ? getPaymentStatus(customerAllocated, customerAmount) : 'not_applicable',
         vendorPaymentStatus: quotation.vendorId ? getPaymentStatus(vendorAllocated, vendorAmount) : 'not_applicable'
       };
@@ -786,7 +981,7 @@ export const getMyQuotations = async (req: Request, res: Response) => {
       const bookingDateFilter: any = {};
       if (bookingStartDate) bookingDateFilter.$gte = new Date(bookingStartDate as string);
       if (bookingEndDate) bookingDateFilter.$lte = new Date(bookingEndDate as string);
-      query.createdAt = bookingDateFilter;
+      query.bookingDate = bookingDateFilter;
     }
 
     if (travelStartDate || travelEndDate) {
@@ -890,6 +1085,7 @@ export const getMyQuotations = async (req: Request, res: Response) => {
         customerRemainingAmount,
         vendorRemainingAmount,
         isBookingDataComplete: isBookingDataComplete(quotation),
+        pricingSummary: getPricingSummary(quotation),
         customerPaymentStatus: customerExists ? getPaymentStatus(customerAllocated, customerAmount) : 'not_applicable',
         vendorPaymentStatus: quotation.vendorId ? getPaymentStatus(vendorAllocated, vendorAmount) : 'not_applicable',
       };
@@ -932,7 +1128,13 @@ export const getQuotationById = async (req: Request, res: Response) => {
       return;
     }
 
-    res.status(200).json({ success: true, quotation });
+    res.status(200).json({
+      success: true,
+      quotation: {
+        ...quotation.toObject(),
+        pricingSummary: getPricingSummary(quotation),
+      }
+    });
   } catch (err) {
     res.status(500).json({ success: false, message: 'Failed to fetch quotation', error: (err as Error).message });
   }
@@ -952,7 +1154,13 @@ export const getQuotationsByParty = async (req: Request, res: Response): Promise
     // Query by businessId, not id
     const quotations = await Quotation.find({ businessId: id }).populate('businessId').sort({ createdAt: -1 });
 
-    res.status(200).json({ success: true, quotations });
+    res.status(200).json({
+      success: true,
+      quotations: quotations.map((quotation) => ({
+        ...quotation.toObject(),
+        pricingSummary: getPricingSummary(quotation),
+      }))
+    });
   } catch (err) {
     res.status(500).json({ success: false, message: 'Failed to fetch quotations', error: (err as Error).message });
   }
@@ -1023,9 +1231,9 @@ export const getBookingHistoryByCustomer = async (req: Request, res: Response): 
 
     // Date filters for booking date (createdAt)
     if (startDate || endDate) {
-      filter.createdAt = {};
-      if (startDate) filter.createdAt.$gte = new Date(startDate as string);
-      if (endDate) filter.createdAt.$lte = new Date(endDate as string);
+      filter.bookingDate = {};
+      if (startDate) filter.bookingDate.$gte = new Date(startDate as string);
+      if (endDate) filter.bookingDate.$lte = new Date(endDate as string);
     }
 
     // Date filters for travel date
@@ -1068,7 +1276,10 @@ export const getBookingHistoryByCustomer = async (req: Request, res: Response): 
     res.status(200).json({
       success: true,
       data: {
-        quotations,
+        quotations: quotations.map((quotation) => ({
+          ...quotation.toObject(),
+          pricingSummary: getPricingSummary(quotation),
+        })),
         pagination: {
           currentPage: pageNum,
           totalPages,
@@ -1158,9 +1369,10 @@ export const getBookingHistoryByVendor = async (req: Request, res: Response): Pr
 
     // Date filters for booking date (createdAt)
     if (startDate || endDate) {
-      filter.createdAt = {};
-      if (startDate) filter.createdAt.$gte = new Date(startDate as string);
-      if (endDate) filter.createdAt.$lte = new Date(endDate as string);
+      filter.bookingDate = {};
+      if (startDate) filter.bookingDate.$gte = new Date(startDate as string);
+      if (endDate) filter.bookingDate.$lte = new Date(endDate as string);
+
     }
 
     // Date filters for travel date
@@ -1203,7 +1415,10 @@ export const getBookingHistoryByVendor = async (req: Request, res: Response): Pr
     res.status(200).json({
       success: true,
       data: {
-        quotations,
+        quotations: quotations.map((quotation) => ({
+          ...quotation.toObject(),
+          pricingSummary: getPricingSummary(quotation),
+        })),
         pagination: {
           currentPage: pageNum,
           totalPages,
@@ -1295,9 +1510,10 @@ export const getBookingHistoryByTraveller = async (req: Request, res: Response):
 
     // Date filters for booking date (createdAt)
     if (startDate || endDate) {
-      filter.createdAt = {};
-      if (startDate) filter.createdAt.$gte = new Date(startDate as string);
-      if (endDate) filter.createdAt.$lte = new Date(endDate as string);
+      filter.bookingDate = {};
+      if (startDate) filter.bookingDate.$gte = new Date(startDate as string);
+      if (endDate) filter.bookingDate.$lte = new Date(endDate as string);
+
     }
 
     // Date filters for travel date
@@ -1340,7 +1556,10 @@ export const getBookingHistoryByTraveller = async (req: Request, res: Response):
     res.status(200).json({
       success: true,
       data: {
-        quotations,
+        quotations: quotations.map((quotation) => ({
+          ...quotation.toObject(),
+          pricingSummary: getPricingSummary(quotation),
+        })),
         pagination: {
           currentPage: pageNum,
           totalPages,
@@ -1430,9 +1649,10 @@ export const getBookingHistoryByTeamMember = async (req: Request, res: Response)
 
     // Date filters for booking date (createdAt)
     if (startDate || endDate) {
-      filter.createdAt = {};
-      if (startDate) filter.createdAt.$gte = new Date(startDate as string);
-      if (endDate) filter.createdAt.$lte = new Date(endDate as string);
+      filter.bookingDate = {};
+      if (startDate) filter.bookingDate.$gte = new Date(startDate as string);
+      if (endDate) filter.bookingDate.$lte = new Date(endDate as string);
+
     }
 
     // Date filters for travel date
@@ -1475,7 +1695,10 @@ export const getBookingHistoryByTeamMember = async (req: Request, res: Response)
     res.status(200).json({
       success: true,
       data: {
-        quotations,
+        quotations: quotations.map((quotation) => ({
+          ...quotation.toObject(),
+          pricingSummary: getPricingSummary(quotation),
+        })),
         pagination: {
           currentPage: pageNum,
           totalPages,

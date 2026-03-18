@@ -3,7 +3,7 @@ import mongoose from 'mongoose';
 import Payments, { PartyType, PaymentAmountType } from '../models/Payments';
 import Customer from '../models/Customer';
 import Vendor from '../models/Vendors';
-import Quotation, { IQuotation } from '../models/Quotation';
+import Quotation, { getQuotationPricingSummary, IQuotation } from '../models/Quotation';
 import { UploadedDocument, uploadMultipleToS3 } from '../utils/s3';
 
 type LedgerEntryType = 'opening' | 'quotation' | 'payment';
@@ -65,48 +65,43 @@ const getQuotationAmountForParty = (
   customerId?: mongoose.Types.ObjectId | string
 ) => {
   const baseAmount = Number(quotation.totalAmount ?? 0);
-  if (party === 'Customer') {
-    const customerPricing: any[] = Array.isArray((quotation as any).customerPricing)
-      ? (quotation as any).customerPricing
-      : [];
+  const pricingSummary = getQuotationPricingSummary(
+    ((quotation as any)?.status ?? 'confirmed') as any,
+    (quotation as any)?.priceInfo,
+    (quotation as any)?.customerPricing
+  );
 
-    if (customerPricing.length > 0) {
+  if (party === 'Customer') {
+    const customerBreakdown = Array.isArray(pricingSummary.customerBreakdown)
+      ? pricingSummary.customerBreakdown
+      : [];
+    if (customerBreakdown.length > 0) {
       if (customerId) {
-        const matched = customerPricing.find(
+        const matched = customerBreakdown.find(
           (entry: any) => String(entry?.customerId) === String(customerId)
         );
         if (matched) {
-          const matchedAmount = Number(matched.sellingPrice);
+          const matchedAmount = Number(matched.newSellingPrice);
           if (!Number.isNaN(matchedAmount)) return matchedAmount;
         }
       }
 
-      const summedAmount = customerPricing.reduce(
-        (sum, entry) => sum + (Number(entry?.sellingPrice) || 0),
+      const summedAmount = customerBreakdown.reduce(
+        (sum, entry) => sum + (Number(entry?.newSellingPrice) || 0),
         0
       );
       if (!Number.isNaN(summedAmount) && summedAmount > 0) return summedAmount;
     }
 
-    const priceInfo: any = quotation.priceInfo;
-    if (priceInfo) {
-      const directSelling = priceInfo instanceof Map ? priceInfo.get('sellingPrice') : priceInfo?.sellingPrice;
-      const parsedSelling = Number(directSelling);
-      if (!Number.isNaN(parsedSelling)) {
-        return parsedSelling;
-      }
+    if (Number.isFinite(pricingSummary.customerReceivableAmount)) {
+      return pricingSummary.customerReceivableAmount;
     }
 
     return baseAmount;
   }
 
-  const priceInfo: any = quotation.priceInfo;
-  if (priceInfo) {
-    const directCost = priceInfo instanceof Map ? priceInfo.get('costPrice') : priceInfo?.costPrice;
-    const parsedCost = Number(directCost);
-    if (!Number.isNaN(parsedCost)) {
-      return parsedCost;
-    }
+  if (Number.isFinite(pricingSummary.vendorPayableAmount)) {
+    return pricingSummary.vendorPayableAmount;
   }
 
   const formFields: any = quotation.formFields;
@@ -295,16 +290,10 @@ export const listCustomerClosingBalances = async (req: Request, res: Response) =
                               })
                               .sort({ createdAt: -1 });
 
-    const quotationTotals = await Quotation.aggregate([
-      { $match: { businessId: normalizeObjectId(businessId), isDeleted: { $ne: true } } },
-      { $unwind: '$customerPricing' },
-      {
-        $group: {
-          _id: '$customerPricing.customerId',
-          totalAmount: { $sum: '$customerPricing.sellingPrice' }
-        }
-      }
-    ]);
+    const quotations = await Quotation.find({
+      businessId: normalizeObjectId(businessId),
+      isDeleted: { $ne: true }
+    }).select('status priceInfo customerPricing customerId totalAmount');
 
     const paymentTotals = await Payments.aggregate([
       { $match: { businessId: normalizeObjectId(businessId), party: 'Customer', isDeleted: { $ne: true } } },
@@ -312,7 +301,32 @@ export const listCustomerClosingBalances = async (req: Request, res: Response) =
     ]);
 
     const quotationMap = new Map<string, number>();
-    quotationTotals.forEach((item) => quotationMap.set(String(item._id), Number(item.totalAmount || 0)));
+    quotations.forEach((quotation: any) => {
+      const pricingSummary = getQuotationPricingSummary(
+        quotation.status,
+        quotation.priceInfo,
+        quotation.customerPricing
+      );
+      const customerBreakdown = Array.isArray(pricingSummary.customerBreakdown)
+        ? pricingSummary.customerBreakdown
+        : [];
+
+      if (customerBreakdown.length > 0) {
+        customerBreakdown.forEach((entry) => {
+          const key = String(entry.customerId);
+          quotationMap.set(key, (quotationMap.get(key) || 0) + Number(entry.newSellingPrice || 0));
+        });
+        return;
+      }
+
+      const customerIds = Array.isArray(quotation.customerId) ? quotation.customerId : quotation.customerId ? [quotation.customerId] : [];
+      if (customerIds.length === 0) return;
+      const splitAmount = pricingSummary.customerReceivableAmount / customerIds.length;
+      customerIds.forEach((customerId: any) => {
+        const key = String(customerId);
+        quotationMap.set(key, (quotationMap.get(key) || 0) + splitAmount);
+      });
+    });
 
     const paymentMap = new Map<string, { debit: number; credit: number }>();
     paymentTotals.forEach((item) => {
@@ -358,21 +372,27 @@ export const listVendorClosingBalances = async (req: Request, res: Response) => 
                             .find({ businessId, isDeleted: { $ne: true } })
                             .sort({ createdAt: -1 });
 
-    const quotationTotals = await Quotation.aggregate([
-      { $match: { businessId: normalizeObjectId(businessId), isDeleted: { $ne: true }, vendorId: { $ne: null } } },
-      { $group: { _id: '$vendorId', totalAmount: { $sum: '$totalAmount' } } }
-    ]);
+    const quotations = await Quotation.find({
+      businessId: normalizeObjectId(businessId),
+      isDeleted: { $ne: true },
+      vendorId: { $ne: null }
+    }).select('status priceInfo customerPricing vendorId totalAmount');
 
     const paymentTotals = await Payments.aggregate([
       { $match: { businessId: normalizeObjectId(businessId), party: 'Vendor', isDeleted: { $ne: true } } },
       { $group: { _id: { partyId: '$partyId', entryType: '$entryType' }, totalAmount: { $sum: '$amount' } } }
     ]);
 
-    console.log(paymentTotals, 'Payment Totals');
-    console.log(quotationTotals, 'Quotation Totals');
-
     const quotationMap = new Map<string, number>();
-    quotationTotals.forEach((item) => quotationMap.set(String(item._id), Number(item.totalAmount || 0)));
+    quotations.forEach((quotation: any) => {
+      const pricingSummary = getQuotationPricingSummary(
+        quotation.status,
+        quotation.priceInfo,
+        quotation.customerPricing
+      );
+      const key = String(quotation.vendorId);
+      quotationMap.set(key, (quotationMap.get(key) || 0) + Number(pricingSummary.vendorPayableAmount || 0));
+    });
 
     const paymentMap = new Map<string, { debit: number; credit: number }>();
     paymentTotals.forEach((item) => {

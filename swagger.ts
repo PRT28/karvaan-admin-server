@@ -1007,50 +1007,185 @@ const options = {
             },
             formFields: {
               type: 'object',
-              description: 'Dynamic form fields based on quotation type',
+              description: 'Dynamic form fields based on quotation type. Flight quotations use tripType, optional shared pnr, top-level segments for one way/round trip, and trips with nested segments for multi city.',
               example: {
-                from: 'DEL',
-                to: 'DXB',
-                departureDate: '2026-04-18T05:30:00.000Z',
-                airline: 'Emirates',
+                pnr: 'AB12CD',
+                samePnrForAllSegments: true,
+                tripType: 'multi city',
+                trips: [
+                  {
+                    title: 'Trip 1',
+                    segments: [
+                      {
+                        pnr: 'AB12CD',
+                        from: 'DEL',
+                        to: 'DXB',
+                        flightNumber: 'EK51',
+                        travelDate: '2026-04-18T00:00:00.000Z',
+                        cabinClass: 'Economy',
+                        cabinBaggage: {
+                          pieces: 1,
+                          weight: 7,
+                        },
+                        checkInBaggage: {
+                          pieces: 1,
+                          weight: 20,
+                        },
+                        preview: {
+                          airline: 'Emirates',
+                          airlineLogo: 'https://cdn.example.com/emirates.png',
+                          flightNumber: 'EK51',
+                          originAirportCode: 'DEL',
+                          destinationAirportCode: 'DXB',
+                          originCity: 'Delhi',
+                          destinationCity: 'Dubai',
+                          std: '09:45',
+                          sta: '12:30',
+                          duration: '03 h 45 m',
+                        },
+                      },
+                      {
+                        pnr: 'AB12CD',
+                        from: 'DXB',
+                        to: 'JFK',
+                        flightNumber: 'EK203',
+                        travelDate: '2026-04-19T00:00:00.000Z',
+                        cabinClass: 'Economy',
+                      },
+                    ],
+                  },
+                ],
+                rulesAndConditions: 'Standard fare rules apply.',
+                rulesTemplateId: '65f1b6f8d1a1111111111111',
+                internalNotes: 'Customer requested aisle seat.',
               },
             },
             priceInfo: {
               type: 'object',
-              description: 'Pricing details including base/advanced breakdown',
+              description: 'Pricing details where each monetary field is stored as a currency-aware value object',
               properties: {
                 advancedPricing: {
                   type: 'boolean',
                   example: true,
                 },
                 sellingPrice: {
-                  type: 'number',
-                  example: 21000,
+                  type: 'object',
+                  properties: {
+                    amount: { type: 'number', example: 21000 },
+                    currency: { type: 'string', example: 'USD' },
+                    exchangeRate: { type: 'number', example: 83.1 },
+                    notes: { type: 'string', example: 'Quoted in customer currency' },
+                  },
                 },
                 costPrice: {
-                  type: 'number',
-                  example: 17000,
-                },
-                costPriceBreakdown: {
                   type: 'object',
-                  additionalProperties: {
-                    type: 'number',
-                  },
-                  example: {
-                    vendorBasePrice: 16000,
-                    supplierIncentive: 500,
-                    commissionPayout: 500,
+                  properties: {
+                    amount: { type: 'number', example: 17000 },
+                    currency: { type: 'string', example: 'AED' },
+                    exchangeRate: { type: 'number', example: 22.64 },
+                    notes: { type: 'string', example: 'Vendor fare in source currency' },
                   },
                 },
-                cancellationBreakdown: {
+                vendorInvoiceBase: {
                   type: 'object',
-                  additionalProperties: {
-                    type: 'number',
+                  properties: {
+                    amount: { type: 'number', example: 16000 },
+                    currency: { type: 'string', example: 'AED' },
+                    exchangeRate: { type: 'number', example: 22.64 },
+                    notes: { type: 'string', example: 'Base vendor invoice' },
                   },
-                  example: {
-                    vendorBasePrice: 12000,
-                    supplierIncentive: 200,
+                },
+                additionalVendorInvoiceBase: {
+                  type: 'object',
+                  properties: {
+                    amount: { type: 'number', example: 0 },
+                    currency: { type: 'string', example: 'AED' },
+                    exchangeRate: { type: 'number', example: 22.64 },
                   },
+                },
+                vendorIncentiveReceived: {
+                  type: 'object',
+                  properties: {
+                    amount: { type: 'number', example: 500 },
+                    currency: { type: 'string', example: 'AED' },
+                    exchangeRate: { type: 'number', example: 22.64 },
+                  },
+                },
+                commissionPayout: {
+                  type: 'object',
+                  properties: {
+                    amount: { type: 'number', example: 500 },
+                    currency: { type: 'string', example: 'INR' },
+                    exchangeRate: { type: 'number', example: 1 },
+                  },
+                },
+                refundReceived: {
+                  type: 'object',
+                  properties: {
+                    amount: { type: 'number', example: 0 },
+                    currency: { type: 'string', example: 'AED' },
+                    exchangeRate: { type: 'number', example: 22.64 },
+                  },
+                },
+                refundPaid: {
+                  type: 'object',
+                  properties: {
+                    amount: { type: 'number', example: 0 },
+                    currency: { type: 'string', example: 'USD' },
+                    exchangeRate: { type: 'number', example: 83.1 },
+                  },
+                },
+                vendorIncentiveChargeback: {
+                  type: 'object',
+                  properties: {
+                    amount: { type: 'number', example: 0 },
+                    currency: { type: 'string', example: 'AED' },
+                    exchangeRate: { type: 'number', example: 22.64 },
+                  },
+                },
+                commissionPayoutChargeback: {
+                  type: 'object',
+                  properties: {
+                    amount: { type: 'number', example: 0 },
+                    currency: { type: 'string', example: 'INR' },
+                    exchangeRate: { type: 'number', example: 1 },
+                  },
+                },
+                additionalCostPrice: {
+                  type: 'object',
+                  properties: {
+                    amount: { type: 'number', example: 0 },
+                    currency: { type: 'string', example: 'AED' },
+                    exchangeRate: { type: 'number', example: 22.64 },
+                  },
+                },
+                additionalSellingPrice: {
+                  type: 'object',
+                  properties: {
+                    amount: { type: 'number', example: 1000 },
+                    currency: { type: 'string', example: 'USD' },
+                    exchangeRate: { type: 'number', example: 83.1 },
+                  },
+                },
+                additionalVendorIncentiveReceived: {
+                  type: 'object',
+                  properties: {
+                    amount: { type: 'number', example: 0 },
+                    currency: { type: 'string', example: 'AED' },
+                    exchangeRate: { type: 'number', example: 22.64 },
+                  },
+                },
+                additionalCommissionPayout: {
+                  type: 'object',
+                  properties: {
+                    amount: { type: 'number', example: 0 },
+                    currency: { type: 'string', example: 'INR' },
+                    exchangeRate: { type: 'number', example: 1 },
+                  },
+                },
+                notes: {
+                  type: 'string',
+                  example: 'Issue ticket after passport recheck.',
                 },
               },
             },
@@ -1061,7 +1196,7 @@ const options = {
             },
             status: {
               type: 'string',
-              enum: ['confirmed', 'cancelled'],
+              enum: ['confirmed', 'cancelled', 'rescheduled'],
               description: 'Quotation status',
               example: 'confirmed',
             },
@@ -1105,6 +1240,30 @@ const options = {
               description: 'Additional remarks or notes',
               example: 'Business trip with special requirements',
             },
+            bookingDate: {
+              type: 'string',
+              format: 'date-time',
+              description: 'Booking date',
+              example: '2026-03-05T00:00:00.000Z',
+            },
+            newBookingDate: {
+              type: 'string',
+              format: 'date-time',
+              description: 'New booking date used when status is rescheduled',
+              example: '2026-03-08T00:00:00.000Z',
+            },
+            newTravelDate: {
+              type: 'string',
+              format: 'date-time',
+              description: 'New travel date used when status is rescheduled',
+              example: '2026-04-20T00:00:00.000Z',
+            },
+            cancellationDate: {
+              type: 'string',
+              format: 'date-time',
+              description: 'Cancellation date used when status is cancelled',
+              example: '2026-03-10T00:00:00.000Z',
+            },
             isDeleted: {
               type: 'boolean',
               description: 'Soft delete flag',
@@ -1113,6 +1272,20 @@ const options = {
             documents: {
               type: 'array',
               description: 'Array of uploaded documents (max 3)',
+              items: {
+                $ref: '#/components/schemas/UploadedDocument',
+              },
+            },
+            vendorVoucherDocuments: {
+              type: 'array',
+              description: 'Array of uploaded vendor voucher documents (max 3)',
+              items: {
+                $ref: '#/components/schemas/UploadedDocument',
+              },
+            },
+            vendorInvoiceDocuments: {
+              type: 'array',
+              description: 'Array of uploaded vendor invoice documents (max 3)',
               items: {
                 $ref: '#/components/schemas/UploadedDocument',
               },

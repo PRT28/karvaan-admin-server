@@ -1,6 +1,4 @@
 import mongoose, { Document, Schema } from 'mongoose';
-import Business from './Business';
-import Counter from './Counter';
 
 export const QUOTATION_TYPES = [
   'flight',
@@ -14,15 +12,55 @@ export const QUOTATION_TYPES = [
 ] as const;
 
 export type QuotationType = (typeof QUOTATION_TYPES)[number];
-export type QuotationStatus = 'confirmed' | 'cancelled';
+export type QuotationStatus = 'confirmed' | 'cancelled' | 'rescheduled';
 
 export type ServiceStatus = 'pending' | 'denied' | 'draft' | 'approved';
 
 export interface FlightFormFields {
-  from: string;
-  to: string;
-  departureDate: Date | string;
-  airline: string;
+  pnr?: string;
+  samePnrForAllSegments?: boolean;
+  tripType?: 'one way' | 'round trip' | 'multi city';
+  trips?: FlightTrip[];
+  segments?: FlightSegment[];
+  rulesAndConditions?: string;
+  rulesTemplateId?: string;
+  internalNotes?: string;
+}
+
+export interface FlightTrip {
+  title?: string;
+  notes?: string;
+  segments: FlightSegment[];
+}
+
+export interface FlightBagInfo {
+  pieces?: number;
+  weight?: number;
+}
+
+export interface FlightSegmentPreview {
+  airline?: string;
+  airlineLogo?: string;
+  flightNumber?: string;
+  originAirportCode?: string;
+  destinationAirportCode?: string;
+  originCity?: string;
+  destinationCity?: string;
+  std?: string;
+  sta?: string;
+  duration?: string;
+}
+
+export interface FlightSegment {
+  pnr?: string;
+  from?: string;
+  to?: string;
+  flightNumber?: string;
+  travelDate?: Date | string;
+  cabinClass?: 'Economy' | 'Premium economy' | 'Business' | 'First class';
+  cabinBaggage?: FlightBagInfo;
+  checkInBaggage?: FlightBagInfo;
+  preview?: FlightSegmentPreview;
 }
 
 export interface ActivityFormFields {
@@ -42,19 +80,54 @@ export interface IQuotationDocument {
   uploadedAt: Date;
 }
 
-export interface PriceBreakdown {
-  vendorBasePrice?: number;
-  supplierIncentive?: number;
-  commissionPayout?: number;
-  [key: string]: number | undefined;
-}
-
 export interface PriceInfo {
   advancedPricing: boolean;
-  sellingPrice: number;
-  costPrice: number;
-  costPriceBreakdown?: PriceBreakdown;
-  cancellationBreakdown?: PriceBreakdown;
+  sellingPrice?: PriceInfoCurrencyValue;
+  costPrice?: PriceInfoCurrencyValue;
+  vendorInvoiceBase?: PriceInfoCurrencyValue;
+  additionalVendorInvoiceBase?: PriceInfoCurrencyValue;
+  vendorIncentiveReceived?: PriceInfoCurrencyValue;
+  additionalVendorIncentiveReceived?: PriceInfoCurrencyValue;
+  commissionPayout?: PriceInfoCurrencyValue;
+  additionalCommissionPayout?: PriceInfoCurrencyValue;
+  refundReceived?: PriceInfoCurrencyValue;
+  refundPaid?: PriceInfoCurrencyValue;
+  vendorIncentiveChargeback?: PriceInfoCurrencyValue;
+  commissionPayoutChargeback?: PriceInfoCurrencyValue;
+  additionalCostPrice?: PriceInfoCurrencyValue;
+  additionalSellingPrice?: PriceInfoCurrencyValue;
+  notes?: string;
+}
+
+export interface PriceInfoCurrencyValue {
+  amount?: number;
+  currency: string;
+  exchangeRate?: number;
+  notes?: string;
+}
+
+export interface QuotationPricingSummary {
+  status: QuotationStatus;
+  advancedPricing: boolean;
+  oldCostPrice: number;
+  newCostPrice: number;
+  oldSellingPrice: number;
+  newSellingPrice: number;
+  oldNet: number;
+  newNet: number;
+  oldNetPercentage: number;
+  newNetPercentage: number;
+  vendorPayableAmount: number;
+  customerReceivableAmount: number;
+  journalCommissionAmount: number;
+  formulaLabel: string;
+  customerBreakdown: QuotationPricingCustomerBreakdownEntry[];
+}
+
+export interface QuotationPricingCustomerBreakdownEntry {
+  customerId: string;
+  oldSellingPrice: number;
+  newSellingPrice: number;
 }
 
 export interface CustomerPricingEntry {
@@ -65,6 +138,7 @@ export interface CustomerPricingEntry {
 export interface IQuotation extends Document {
   customId: string;
   quotationType: QuotationType;
+  channel: string;
   businessId: mongoose.Types.ObjectId;
   formFields: Map<String, unknown>,
   priceInfo?: PriceInfo;
@@ -73,6 +147,10 @@ export interface IQuotation extends Document {
   status: QuotationStatus;
   createdAt: Date;
   updatedAt: Date;
+  bookingDate: Date;
+  newBookingDate?: Date;
+  newTravelDate?: Date;
+  cancellationDate?: Date;
   primaryOwner: mongoose.Types.ObjectId;
   secondaryOwner: Array<mongoose.Types.ObjectId>;
   travelDate: Date;
@@ -86,10 +164,12 @@ export interface IQuotation extends Document {
   isDeleted: boolean;
   serviceStatus: string;
   documents: IQuotationDocument[];
+  vendorVoucherDocuments: IQuotationDocument[];
+  vendorInvoiceDocuments: IQuotationDocument[];
 }
 
 const REQUIRED_FORM_FIELDS_BY_TYPE: Record<string, string[]> = {
-  flight: ['from', 'to', 'departureDate', 'airline'],
+  flight: ['tripType'],
   activity: ['activityName', 'activityDate', 'location', 'pax'],
 };
 
@@ -117,10 +197,24 @@ export const getMissingFormFieldKeys = (
 ): string[] => {
   if (!quotationType) return [];
 
+  const plainFields = toPlainObject(formFields);
+  if (quotationType === 'flight') {
+    const tripType = String(plainFields.tripType ?? '');
+    const trips = Array.isArray(plainFields.trips) ? plainFields.trips : [];
+    const segments = Array.isArray(plainFields.segments) ? plainFields.segments : [];
+    const missingKeys: string[] = [];
+    if (!hasMeaningfulValue(plainFields.tripType)) missingKeys.push('tripType');
+    if (tripType === 'multi city') {
+      if (trips.length === 0) missingKeys.push('trips');
+    } else if (segments.length === 0) {
+      missingKeys.push('segments');
+    }
+    return missingKeys;
+  }
+
   const requiredKeys = REQUIRED_FORM_FIELDS_BY_TYPE[quotationType] ?? [];
   if (requiredKeys.length === 0) return [];
 
-  const plainFields = toPlainObject(formFields);
   return requiredKeys.filter((key) => !hasMeaningfulValue(plainFields[key]));
 };
 
@@ -132,46 +226,357 @@ const isFiniteNumber = (value: unknown): boolean => {
   return false;
 };
 
+const isValidDateValue = (value: unknown): boolean => {
+  if (value === undefined || value === null || value === '') return false;
+  const parsedDate = value instanceof Date ? value : new Date(String(value));
+  return !Number.isNaN(parsedDate.getTime());
+};
+
+const isNonNegativeNumberLike = (value: unknown): boolean => {
+  if (!isFiniteNumber(value)) return false;
+  return Number(value) >= 0;
+};
+
+export const getPriceInfoCurrencyAmount = (value: unknown): number => {
+  if (value && typeof value === 'object' && 'amount' in (value as Record<string, unknown>)) {
+    const parsedAmount = Number((value as Record<string, unknown>).amount);
+    return Number.isFinite(parsedAmount) ? parsedAmount : 0;
+  }
+  const parsedValue = Number(value);
+  return Number.isFinite(parsedValue) ? parsedValue : 0;
+};
+
+export const getFormFieldsValidationError = (
+  quotationType?: string,
+  formFields?: unknown
+): string | null => {
+  if (!quotationType || !formFields) return null;
+
+  const plainFields = toPlainObject(formFields);
+
+  if (quotationType !== 'flight') return null;
+
+  const tripType = plainFields.tripType;
+  const allowedTripTypes = ['one way', 'round trip', 'multi city'];
+  if (tripType !== undefined && !allowedTripTypes.includes(String(tripType))) {
+    return 'formFields.tripType must be one of: one way, round trip, multi city';
+  }
+
+  const samePnrForAllSegments = plainFields.samePnrForAllSegments;
+  if (samePnrForAllSegments !== undefined && typeof samePnrForAllSegments !== 'boolean') {
+    return 'formFields.samePnrForAllSegments must be a boolean';
+  }
+
+  if (plainFields.pnr !== undefined) {
+    const pnr = String(plainFields.pnr).trim();
+    if (!/^[A-Z0-9]{6}$/.test(pnr)) {
+      return 'formFields.pnr must be a 6 character uppercase alphanumeric code';
+    }
+  }
+
+  const sharedPnr = plainFields.pnr ? String(plainFields.pnr).trim() : undefined;
+  const validateSegmentList = (segmentList: unknown[], basePath: string): string | null => {
+    for (let segmentIndex = 0; segmentIndex < segmentList.length; segmentIndex += 1) {
+      const segment = toPlainObject(segmentList[segmentIndex]);
+      const path = `${basePath}.${segmentIndex}`;
+
+      if (segment.flightNumber !== undefined) {
+        const flightNumber = String(segment.flightNumber).trim();
+        if (!/^[A-Z0-9]{3,4}$/.test(flightNumber)) {
+          return `${path}.flightNumber must be a 3 to 4 character uppercase alphanumeric code`;
+        }
+      }
+
+      if (segment.travelDate !== undefined && !isValidDateValue(segment.travelDate)) {
+        return `${path}.travelDate must be a valid date`;
+      }
+
+      if (segment.cabinClass !== undefined) {
+        const cabinClass = String(segment.cabinClass);
+        const allowedCabinClasses = ['Economy', 'Premium economy', 'Business', 'First class'];
+        if (!allowedCabinClasses.includes(cabinClass)) {
+          return `${path}.cabinClass must be one of: Economy, Premium economy, Business, First class`;
+        }
+      }
+
+      const pnrValue = segment.pnr !== undefined ? String(segment.pnr).trim() : sharedPnr;
+      if (pnrValue !== undefined && pnrValue !== '' && !/^[A-Z0-9]{6}$/.test(pnrValue)) {
+        return `${path}.pnr must be a 6 character uppercase alphanumeric code`;
+      }
+
+      if (samePnrForAllSegments === true && sharedPnr && pnrValue && pnrValue !== sharedPnr) {
+        return `${path}.pnr must match formFields.pnr when samePnrForAllSegments is enabled`;
+      }
+
+      const baggageFields: Array<{ key: 'cabinBaggage' | 'checkInBaggage'; label: string }> = [
+        { key: 'cabinBaggage', label: 'cabinBaggage' },
+        { key: 'checkInBaggage', label: 'checkInBaggage' },
+      ];
+
+      for (const baggageField of baggageFields) {
+        const baggage = toPlainObject(segment[baggageField.key]);
+        if (segment[baggageField.key] === undefined) continue;
+
+        if (baggage.pieces !== undefined && !isNonNegativeNumberLike(baggage.pieces)) {
+          return `${path}.${baggageField.label}.pieces must be a non-negative number`;
+        }
+
+        if (baggage.weight !== undefined && !isNonNegativeNumberLike(baggage.weight)) {
+          return `${path}.${baggageField.label}.weight must be a non-negative number`;
+        }
+      }
+
+      const preview = toPlainObject(segment.preview);
+      if (segment.preview !== undefined && preview.duration !== undefined) {
+        const duration = String(preview.duration).trim();
+        if (!/^\d{1,2}\s*h\s*\d{1,2}\s*m$/.test(duration)) {
+          return `${path}.preview.duration must be in the format "XX h XX m"`;
+        }
+      }
+
+      if (segment.preview !== undefined) {
+        const previewTimeFields = ['std', 'sta'];
+        for (const previewTimeField of previewTimeFields) {
+          const value = preview[previewTimeField];
+          if (value !== undefined && !/^\d{2}:\d{2}$/.test(String(value).trim())) {
+            return `${path}.preview.${previewTimeField} must be in 24 hour HH:mm format`;
+          }
+        }
+
+        const previewFlightNumber = preview.flightNumber;
+        if (previewFlightNumber !== undefined && !/^[A-Z0-9]{3,4}$/.test(String(previewFlightNumber).trim())) {
+          return `${path}.preview.flightNumber must be a 3 to 4 character uppercase alphanumeric code`;
+        }
+      }
+    }
+
+    return null;
+  };
+
+  if (tripType === 'multi city') {
+    const trips = plainFields.trips;
+    if (trips === undefined) return null;
+    if (!Array.isArray(trips)) return 'formFields.trips must be an array';
+
+    for (let tripIndex = 0; tripIndex < trips.length; tripIndex += 1) {
+      const trip = toPlainObject(trips[tripIndex]);
+      const tripPath = `formFields.trips.${tripIndex}`;
+      if (trip.segments !== undefined && !Array.isArray(trip.segments)) {
+        return `${tripPath}.segments must be an array`;
+      }
+      const tripSegments = Array.isArray(trip.segments) ? trip.segments : [];
+      const segmentError = validateSegmentList(tripSegments, `${tripPath}.segments`);
+      if (segmentError) return segmentError;
+    }
+
+    return null;
+  }
+
+  const segments = plainFields.segments;
+  if (segments === undefined) return null;
+  if (!Array.isArray(segments)) return 'formFields.segments must be an array';
+
+  return validateSegmentList(segments, 'formFields.segments');
+};
+
 export const getPriceInfoValidationError = (priceInfo?: unknown): string | null => {
   if (!priceInfo) return null;
 
   const plainPriceInfo = toPlainObject(priceInfo);
-  const { sellingPrice, costPrice, advancedPricing } = plainPriceInfo;
-
-  if (!isFiniteNumber(sellingPrice)) {
-    return 'priceInfo.sellingPrice must be a valid number';
-  }
-  if (!isFiniteNumber(costPrice)) {
-    return 'priceInfo.costPrice must be a valid number';
-  }
+  const { advancedPricing } = plainPriceInfo;
 
   if (advancedPricing !== undefined && typeof advancedPricing !== 'boolean') {
     return 'priceInfo.advancedPricing must be a boolean';
   }
 
-  if (advancedPricing === true) {
-    const costPriceBreakdown = plainPriceInfo.costPriceBreakdown;
-    if (costPriceBreakdown !== undefined) {
-      const plainBreakdown = toPlainObject(costPriceBreakdown);
-      for (const [key, value] of Object.entries(plainBreakdown)) {
-        if (!isFiniteNumber(value)) {
-          return `priceInfo.costPriceBreakdown.${key} must be a valid number`;
-        }
-      }
-    }
+  const numericFields = [
+    'sellingPrice',
+    'costPrice',
+    'vendorInvoiceBase',
+    'additionalVendorInvoiceBase',
+    'vendorIncentiveReceived',
+    'commissionPayout',
+    'refundReceived',
+    'refundPaid',
+    'vendorIncentiveChargeback',
+    'commissionPayoutChargeback',
+    'additionalCostPrice',
+    'additionalSellingPrice',
+    'additionalVendorIncentiveReceived',
+    'additionalCommissionPayout',
+  ];
 
-    const cancellationBreakdown = plainPriceInfo.cancellationBreakdown;
-    if (cancellationBreakdown !== undefined) {
-      const plainCancellation = toPlainObject(cancellationBreakdown);
-      for (const [key, value] of Object.entries(plainCancellation)) {
-        if (!isFiniteNumber(value)) {
-          return `priceInfo.cancellationBreakdown.${key} must be a valid number`;
-        }
+  for (const field of numericFields) {
+    const value = plainPriceInfo[field];
+    if (value !== undefined) {
+      const plainCurrencyValue = toPlainObject(value);
+      if (!plainCurrencyValue.currency || typeof plainCurrencyValue.currency !== 'string') {
+        return `priceInfo.${field}.currency is required`;
+      }
+      if (
+        plainCurrencyValue.amount !== undefined &&
+        !isFiniteNumber(plainCurrencyValue.amount)
+      ) {
+        return `priceInfo.${field}.amount must be a valid number`;
+      }
+      if (
+        plainCurrencyValue.exchangeRate !== undefined &&
+        !isFiniteNumber(plainCurrencyValue.exchangeRate)
+      ) {
+        return `priceInfo.${field}.exchangeRate must be a valid number`;
       }
     }
   }
 
   return null;
+};
+
+export const getQuotationPricingSummary = (
+  status: QuotationStatus = 'confirmed',
+  rawPriceInfo?: unknown,
+  rawCustomerPricing?: unknown
+): QuotationPricingSummary => {
+  const priceInfo = toPlainObject(rawPriceInfo);
+  const advancedPricing = priceInfo.advancedPricing === true;
+
+  const sellingPrice = getPriceInfoCurrencyAmount(priceInfo.sellingPrice);
+  const costPrice = getPriceInfoCurrencyAmount(priceInfo.costPrice);
+  const vendorInvoiceBase = getPriceInfoCurrencyAmount(priceInfo.vendorInvoiceBase);
+  const additionalVendorInvoiceBase = getPriceInfoCurrencyAmount(priceInfo.additionalVendorInvoiceBase);
+  const vendorIncentiveReceived = getPriceInfoCurrencyAmount(priceInfo.vendorIncentiveReceived);
+  const additionalVendorIncentiveReceived = getPriceInfoCurrencyAmount(priceInfo.additionalVendorIncentiveReceived);
+  const commissionPayout = getPriceInfoCurrencyAmount(priceInfo.commissionPayout);
+  const additionalCommissionPayout = getPriceInfoCurrencyAmount(priceInfo.additionalCommissionPayout);
+  const refundReceived = getPriceInfoCurrencyAmount(priceInfo.refundReceived);
+  const refundPaid = getPriceInfoCurrencyAmount(priceInfo.refundPaid);
+  const vendorIncentiveChargeback = getPriceInfoCurrencyAmount(priceInfo.vendorIncentiveChargeback);
+  const commissionPayoutChargeback = getPriceInfoCurrencyAmount(priceInfo.commissionPayoutChargeback);
+  const additionalCostPrice = getPriceInfoCurrencyAmount(priceInfo.additionalCostPrice);
+  const additionalSellingPrice = getPriceInfoCurrencyAmount(priceInfo.additionalSellingPrice);
+
+  let oldCostPrice = costPrice;
+  let newCostPrice = costPrice;
+  let oldSellingPrice = sellingPrice;
+  let newSellingPrice = sellingPrice;
+  let vendorPayableAmount = costPrice;
+  let customerReceivableAmount = sellingPrice;
+  let journalCommissionAmount = 0;
+  let formulaLabel = 'Net = Selling Price - Cost Price';
+
+  if (status === 'confirmed') {
+    if (advancedPricing) {
+      oldCostPrice = vendorInvoiceBase - vendorIncentiveReceived + commissionPayout;
+      newCostPrice = oldCostPrice;
+      vendorPayableAmount = vendorInvoiceBase - vendorIncentiveReceived;
+      customerReceivableAmount = sellingPrice;
+      journalCommissionAmount = commissionPayout;
+      formulaLabel = 'Cost Price = Vendor Invoice (Base) - Vendor Incentive Received + Commission Payout';
+    } else {
+      vendorPayableAmount = costPrice;
+      customerReceivableAmount = sellingPrice;
+    }
+  }
+
+  if (status === 'rescheduled') {
+    oldCostPrice = advancedPricing
+      ? vendorInvoiceBase - vendorIncentiveReceived + commissionPayout
+      : costPrice;
+    oldSellingPrice = sellingPrice;
+
+    newCostPrice = advancedPricing
+      ? oldCostPrice + additionalVendorInvoiceBase - additionalVendorIncentiveReceived + additionalCommissionPayout
+      : costPrice + additionalCostPrice;
+    newSellingPrice = sellingPrice + additionalSellingPrice;
+
+    vendorPayableAmount = advancedPricing
+      ? (vendorInvoiceBase - vendorIncentiveReceived) +
+        (additionalVendorInvoiceBase - additionalVendorIncentiveReceived)
+      : costPrice + additionalCostPrice;
+    customerReceivableAmount = sellingPrice + additionalSellingPrice;
+    journalCommissionAmount = advancedPricing
+      ? commissionPayout + additionalCommissionPayout
+      : 0;
+    formulaLabel = advancedPricing
+      ? 'Cost Price = Vendor Invoice (Base) + Additional Vendor Invoice (Base) - Vendor Incentives + Commission Payouts'
+      : 'Cost Price = Cost Price + Additional Cost Price';
+  }
+
+  if (status === 'cancelled') {
+    oldCostPrice = advancedPricing
+      ? vendorInvoiceBase - vendorIncentiveReceived + commissionPayout
+      : costPrice;
+    oldSellingPrice = sellingPrice;
+
+    newCostPrice = advancedPricing
+      ? (vendorInvoiceBase - refundReceived) -
+        (vendorIncentiveReceived - vendorIncentiveChargeback) +
+        (commissionPayout - commissionPayoutChargeback)
+      : costPrice - refundReceived;
+    newSellingPrice = sellingPrice - refundPaid;
+
+    vendorPayableAmount = advancedPricing
+      ? (vendorInvoiceBase - refundReceived) -
+        (vendorIncentiveReceived - vendorIncentiveChargeback)
+      : costPrice - refundReceived;
+    customerReceivableAmount = sellingPrice - refundPaid;
+    journalCommissionAmount = advancedPricing
+      ? commissionPayout - commissionPayoutChargeback
+      : 0;
+    formulaLabel = advancedPricing
+      ? 'New Cost Price = (Vendor Invoice (Base) - Refund Received) - (Vendor Incentive Received - Vendor Incentive Chargeback) + (Commission Payout - Commission Payout Chargeback)'
+      : 'New Cost Price = Cost Price - Refund Received';
+  }
+
+  const oldNet = oldSellingPrice - oldCostPrice;
+  const newNet = newSellingPrice - newCostPrice;
+  const oldNetPercentage = oldSellingPrice > 0 ? (oldNet / oldSellingPrice) * 100 : 0;
+  const newNetPercentage = newSellingPrice > 0 ? (newNet / newSellingPrice) * 100 : 0;
+  const customerPricingEntries = Array.isArray(rawCustomerPricing) ? rawCustomerPricing : [];
+  const totalCustomerSellingPrice = customerPricingEntries.reduce((sum, item) => {
+    const plainItem = toPlainObject(item);
+    return sum + getPriceInfoCurrencyAmount(plainItem.sellingPrice);
+  }, 0);
+  const customerBreakdown = customerPricingEntries.map((item, index) => {
+    const plainItem = toPlainObject(item);
+    const entrySellingPrice = getPriceInfoCurrencyAmount(plainItem.sellingPrice);
+    const shareBase = totalCustomerSellingPrice > 0
+      ? entrySellingPrice / totalCustomerSellingPrice
+      : customerPricingEntries.length > 0
+        ? 1 / customerPricingEntries.length
+        : 0;
+
+    let newCustomerSellingPrice = entrySellingPrice;
+    if (status === 'rescheduled') {
+      newCustomerSellingPrice = entrySellingPrice + (additionalSellingPrice * shareBase);
+    }
+    if (status === 'cancelled') {
+      newCustomerSellingPrice = entrySellingPrice - (refundPaid * shareBase);
+    }
+
+    return {
+      customerId: plainItem.customerId ? String(plainItem.customerId) : `customer-${index + 1}`,
+      oldSellingPrice: entrySellingPrice,
+      newSellingPrice: newCustomerSellingPrice,
+    };
+  });
+
+  return {
+    status,
+    advancedPricing,
+    oldCostPrice,
+    newCostPrice,
+    oldSellingPrice,
+    newSellingPrice,
+    oldNet,
+    newNet,
+    oldNetPercentage,
+    newNetPercentage,
+    vendorPayableAmount,
+    customerReceivableAmount,
+    journalCommissionAmount,
+    formulaLabel,
+    customerBreakdown,
+  };
 };
 
 export const getCustomerPricingValidationError = (
@@ -226,6 +631,11 @@ const QuotationSchema = new Schema<IQuotation>(
       enum: QUOTATION_TYPES,
       required: false,
     },
+    channel: {
+      type: String,
+      required: false,
+      trim: true,
+    },
     businessId: {
       type: Schema.Types.ObjectId,
       ref: 'Business',
@@ -237,6 +647,7 @@ const QuotationSchema = new Schema<IQuotation>(
       required: false,
       validate: {
         validator: function (this: IQuotation, value: unknown) {
+          if (this.serviceStatus === 'draft') return true;
           if (!this.quotationType) return true;
           const missingKeys = getMissingFormFieldKeys(this.quotationType, value);
           return missingKeys.length === 0;
@@ -257,9 +668,13 @@ const QuotationSchema = new Schema<IQuotation>(
     totalAmount: { type: Number },
     status: {
       type: String,
-      enum: [ 'confirmed', 'cancelled'],
+      enum: [ 'confirmed', 'cancelled', 'rescheduled'],
       default: 'confirmed',
     },
+    bookingDate: { type: Date, required: false },
+    newBookingDate: { type: Date, required: false },
+    newTravelDate: { type: Date, required: false },
+    cancellationDate: { type: Date, required: false },
     primaryOwner: {
       type: Schema.Types.ObjectId,
       ref: 'User',
@@ -314,6 +729,42 @@ const QuotationSchema = new Schema<IQuotation>(
           return docs.length <= 3;
         },
         message: 'Maximum 3 documents are allowed per quotation'
+      }
+    },
+    vendorVoucherDocuments: {
+      type: [{
+        originalName: { type: String, required: false },
+        fileName: { type: String, required: false },
+        url: { type: String, required: false },
+        key: { type: String, required: false },
+        size: { type: Number, required: false },
+        mimeType: { type: String, required: false },
+        uploadedAt: { type: Date, default: Date.now },
+      }],
+      default: [],
+      validate: {
+        validator: function(docs: any[]) {
+          return docs.length <= 3;
+        },
+        message: 'Maximum 3 vendor voucher documents are allowed per quotation'
+      }
+    },
+    vendorInvoiceDocuments: {
+      type: [{
+        originalName: { type: String, required: false },
+        fileName: { type: String, required: false },
+        url: { type: String, required: false },
+        key: { type: String, required: false },
+        size: { type: Number, required: false },
+        mimeType: { type: String, required: false },
+        uploadedAt: { type: Date, default: Date.now },
+      }],
+      default: [],
+      validate: {
+        validator: function(docs: any[]) {
+          return docs.length <= 3;
+        },
+        message: 'Maximum 3 vendor invoice documents are allowed per quotation'
       }
     },
   },
