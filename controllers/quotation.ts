@@ -262,9 +262,9 @@ const getSemiMandatoryBookingFields = (quotation: any): string[] => {
   if (status === 'confirmed') {
     if (advancedPricing) {
       semiMandatoryPriceFields.push(
-        'priceInfo.vendorInvoiceBase',
-        'priceInfo.vendorIncentiveReceived',
-        'priceInfo.commissionPayout'
+        'vendorInvoiceBase',
+        'vendorIncentiveReceived',
+        'commissionPayout'
       );
     } else {
       semiMandatoryPriceFields.push('costPrice');
@@ -275,16 +275,16 @@ const getSemiMandatoryBookingFields = (quotation: any): string[] => {
   if (status === 'rescheduled') {
     if (advancedPricing) {
       semiMandatoryPriceFields.push(
-        'priceInfo.vendorInvoiceBase',
-        'priceInfo.additionalVendorInvoiceBase',
-        'priceInfo.vendorIncentiveReceived',
-        'priceInfo.additionalVendorIncentiveReceived',
-        'priceInfo.commissionPayout',
-        'priceInfo.additionalCommissionPayout',
-        'priceInfo.additionalSellingPrice'
+        'vendorInvoiceBase',
+        'additionalVendorInvoiceBase',
+        'vendorIncentiveReceived',
+        'additionalVendorIncentiveReceived',
+        'commissionPayout',
+        'additionalCommissionPayout',
+        'additionalSellingPrice'
       );
     } else {
-      semiMandatoryPriceFields.push('priceInfo.costPrice', 'price.additionalCostPrice', 'price.additionalSellingPrice');
+      semiMandatoryPriceFields.push('costPrice', 'additionalCostPrice', 'additionalSellingPrice');
     }
     if (!hasSellingPrice) missingFields.push('priceInfo.sellingPrice');
   }
@@ -292,16 +292,16 @@ const getSemiMandatoryBookingFields = (quotation: any): string[] => {
   if (status === 'cancelled') {
     if (advancedPricing) {
       semiMandatoryPriceFields.push(
-        'priceInfo.vendorInvoiceBase',
-        'priceInfo.refundReceived',
-        'priceInfo.vendorIncentiveReceived',
-        'priceInfo.vendorIncentiveChargeback',
-        'priceInfo.commissionPayout',
-        'priceInfo.commissionPayoutChargeback',
-        'priceInfo.refundPaid'
+        'vendorInvoiceBase',
+        'refundReceived',
+        'vendorIncentiveReceived',
+        'vendorIncentiveChargeback',
+        'commissionPayout',
+        'commissionPayoutChargeback',
+        'refundPaid'
       );
     } else {
-      semiMandatoryPriceFields.push('priceInfo.costPrice', 'priceInfo.refundReceived', 'priceInfo.refundPaid');
+      semiMandatoryPriceFields.push('costPrice', 'refundReceived', 'refundPaid');
     }
     if (!hasSellingPrice) missingFields.push('priceInfo.sellingPrice');
   }
@@ -319,7 +319,7 @@ const isBookingDataComplete = (quotation: any): boolean => {
   const mandatoryFields = getMandatoryBookingFields(quotation);
   const semiMandatoryFields = getSemiMandatoryBookingFields(quotation);
   const missingServiceFields = getMissingFormFieldKeys(quotation?.quotationType, quotation?.formFields);
-  console.log(quotation.customId, mandatoryFields, semiMandatoryFields, missingServiceFields)
+
   return mandatoryFields.length === 0 && semiMandatoryFields.length === 0 && missingServiceFields.length === 0;
 };
 
