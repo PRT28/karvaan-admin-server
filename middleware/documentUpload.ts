@@ -59,18 +59,26 @@ const documentFileFilter = (
   }
 };
 
+const QUOTATION_DOCUMENT_FIELDS = [
+  { name: 'documents', maxCount: 3 },
+  { name: 'vendorVoucherDocuments', maxCount: 3 },
+  { name: 'vendorInvoiceDocuments', maxCount: 3 },
+] as const;
+
 // Configure multer for document uploads
 const documentUpload = multer({
   storage: storage,
   fileFilter: documentFileFilter,
   limits: {
     fileSize: 5 * 1024 * 1024, // 5MB limit per file
-    files: 3, // Maximum 3 files
+    files: 9, // Maximum files across legacy and quotation document fields
   },
 });
 
-// Middleware to upload up to 3 documents
-export const uploadQuotationDocuments = documentUpload.array('documents', 3);
+// Middleware to upload quotation documents across multiple fields
+export const uploadQuotationDocuments = documentUpload.fields([
+  ...QUOTATION_DOCUMENT_FIELDS,
+]);
 
 // Wrapper to handle multer errors in the upload middleware
 export const handleDocumentUploadError = (
@@ -90,13 +98,14 @@ export const handleDocumentUploadError = (
         if (err.code === 'LIMIT_FILE_COUNT') {
           return res.status(400).json({
             success: false,
-            message: 'Too many files. Maximum 3 documents are allowed.',
+            message: 'Too many files. Maximum 3 files are allowed per field.',
           });
         }
         if (err.code === 'LIMIT_UNEXPECTED_FILE') {
           return res.status(400).json({
             success: false,
-            message: 'Unexpected field name. Use "documents" as the field name.',
+            message:
+              'Unexpected field name. Use "documents", "vendorVoucherDocuments", and/or "vendorInvoiceDocuments".',
           });
         }
       }
@@ -117,6 +126,11 @@ export const handleDocumentUploadError = (
         error: err.message,
       });
     }
+
+    if (req.files && !Array.isArray(req.files) && Array.isArray(req.files.documents)) {
+      req.files = req.files.documents;
+    }
+
     next();
   });
 };

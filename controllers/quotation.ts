@@ -14,6 +14,7 @@ import mongoose from 'mongoose';
 import Payments from '../models/Payments';
 import Logs from '../models/Logs';
 import MakerCheckerGroup from '../models/MakerCheckerGroup';
+import { uploadMultipleToS3, UploadedDocument } from '../utils/s3';
 
 const getBusinessIdFromRequest = (req: Request): string | undefined => {
   const businessInfoId = req.user?.businessInfo?.businessId;
@@ -179,6 +180,10 @@ const getPricingSummary = (quotation: any) => {
   );
 };
 
+const hasCustomerPricingEntries = (quotation: any): boolean => {
+  return Array.isArray(quotation?.customerPricing) && quotation.customerPricing.length > 0;
+};
+
 const parseDateValue = (value: unknown, fieldName: string): Date | null => {
   if (value === undefined || value === null || value === '') return null;
 
@@ -199,6 +204,67 @@ const parseNumberValue = (value: unknown, fieldName: string): number | undefined
   }
 
   return parsedValue;
+};
+
+class QuotationDocumentValidationError extends Error {}
+
+const getUploadedQuotationFiles = (
+  req: Request,
+  fieldName: 'vendorVoucherDocuments' | 'vendorInvoiceDocuments'
+): Express.Multer.File[] => {
+  if (!req.files) return [];
+
+  if (Array.isArray(req.files)) {
+    return req.files.filter((file) => file.fieldname === fieldName);
+  }
+
+  const filesForField = req.files[fieldName];
+  return Array.isArray(filesForField) ? filesForField : [];
+};
+
+const appendUploadedQuotationDocuments = async (
+  req: Request,
+  quotationData: Record<string, any>,
+  businessId: string
+) => {
+  const documentFieldConfigs: Array<{
+    fieldName: 'vendorVoucherDocuments' | 'vendorInvoiceDocuments';
+    folderName: string;
+    label: string;
+  }> = [
+    {
+      fieldName: 'vendorVoucherDocuments',
+      folderName: 'vendor-voucher-documents',
+      label: 'vendor voucher documents',
+    },
+    {
+      fieldName: 'vendorInvoiceDocuments',
+      folderName: 'vendor-invoice-documents',
+      label: 'vendor invoice documents',
+    },
+  ];
+
+  for (const { fieldName, folderName, label } of documentFieldConfigs) {
+    const files = getUploadedQuotationFiles(req, fieldName);
+    if (files.length === 0) continue;
+
+    const existingDocuments = Array.isArray(quotationData[fieldName])
+      ? quotationData[fieldName]
+      : [];
+
+    if (existingDocuments.length + files.length > 3) {
+      throw new QuotationDocumentValidationError(
+        `Maximum 3 ${label} are allowed per quotation`
+      );
+    }
+
+    const uploadedDocuments: UploadedDocument[] = await uploadMultipleToS3(
+      files,
+      `quotations/${businessId}/${folderName}`
+    );
+
+    quotationData[fieldName] = [...existingDocuments, ...uploadedDocuments];
+  }
 };
 
 const getQuotationStateValidationError = (quotation: any): string | null => {
@@ -253,10 +319,6 @@ const getSemiMandatoryBookingFields = (quotation: any): string[] => {
   if (!hasValue(quotation.vendorId)) missingFields.push('vendorId');
   if (!hasValue(quotation.travelDate)) missingFields.push('travelDate');
 
-  const hasSellingPrice =
-    hasNonNegativePriceInfoValue(priceInfo.sellingPrice) ||
-    (Array.isArray(quotation.customerPricing) && quotation.customerPricing.length > 0);
-
   const semiMandatoryPriceFields: string[] = [];
 
   if (status === 'confirmed') {
@@ -269,7 +331,7 @@ const getSemiMandatoryBookingFields = (quotation: any): string[] => {
     } else {
       semiMandatoryPriceFields.push('costPrice');
     }
-    if (!hasSellingPrice) missingFields.push('priceInfo.sellingPrice');
+    if (!hasCustomerPricingEntries(quotation)) missingFields.push('customerPricing');
   }
 
   if (status === 'rescheduled') {
@@ -280,13 +342,12 @@ const getSemiMandatoryBookingFields = (quotation: any): string[] => {
         'priceInfo.vendorIncentiveReceived',
         'priceInfo.additionalVendorIncentiveReceived',
         'priceInfo.commissionPayout',
-        'priceInfo.additionalCommissionPayout',
-        'priceInfo.additionalSellingPrice'
+        'priceInfo.additionalCommissionPayout'
       );
     } else {
-      semiMandatoryPriceFields.push('priceInfo.costPrice', 'price.additionalCostPrice', 'price.additionalSellingPrice');
+      semiMandatoryPriceFields.push('priceInfo.costPrice', 'price.additionalCostPrice');
     }
-    if (!hasSellingPrice) missingFields.push('priceInfo.sellingPrice');
+    if (!hasCustomerPricingEntries(quotation)) missingFields.push('customerPricing');
   }
 
   if (status === 'cancelled') {
@@ -297,13 +358,12 @@ const getSemiMandatoryBookingFields = (quotation: any): string[] => {
         'priceInfo.vendorIncentiveReceived',
         'priceInfo.vendorIncentiveChargeback',
         'priceInfo.commissionPayout',
-        'priceInfo.commissionPayoutChargeback',
-        'priceInfo.refundPaid'
+        'priceInfo.commissionPayoutChargeback'
       );
     } else {
-      semiMandatoryPriceFields.push('priceInfo.costPrice', 'priceInfo.refundReceived', 'priceInfo.refundPaid');
+      semiMandatoryPriceFields.push('priceInfo.costPrice', 'priceInfo.refundReceived');
     }
-    if (!hasSellingPrice) missingFields.push('priceInfo.sellingPrice');
+    if (!hasCustomerPricingEntries(quotation)) missingFields.push('customerPricing');
   }
 
   for (const field of semiMandatoryPriceFields) {
@@ -445,6 +505,7 @@ export const createQuotation = async (req: Request, res: Response): Promise<void
 
     const customerPricingError = getCustomerPricingValidationError(
       quotationData.customerId,
+      quotationData.status,
       quotationData.customerPricing
     );
     if (customerPricingError) {
@@ -466,7 +527,28 @@ export const createQuotation = async (req: Request, res: Response): Promise<void
       }
     }
 
-    quotationData.businessId = req.user?.businessInfo?.businessId;
+    const businessId = getBusinessIdFromRequest(req);
+    if (!businessId) {
+      res.status(403).json({
+        success: false,
+        message: 'Business context missing'
+      });
+      return;
+    }
+
+    try {
+      await appendUploadedQuotationDocuments(req, quotationData, businessId);
+    } catch (uploadError) {
+      const isValidationError = uploadError instanceof QuotationDocumentValidationError;
+      res.status(isValidationError ? 400 : 500).json({
+        success: false,
+        message: isValidationError ? (uploadError as Error).message : 'Failed to upload quotation documents',
+        ...(isValidationError ? {} : { error: (uploadError as Error).message })
+      });
+      return;
+    }
+
+    quotationData.businessId = businessId;
 
     const newQuotation = new Quotation(quotationData);
     await newQuotation.save();
@@ -618,6 +700,32 @@ export const updateQuotation = async (req: Request, res: Response): Promise<void
       return;
     }
 
+    const businessId = getBusinessIdFromRequest(req) || String(existingQuotationForValidation.businessId);
+    if (!businessId) {
+      res.status(403).json({ success: false, message: 'Business context missing' });
+      return;
+    }
+
+    if (updateData.vendorVoucherDocuments === undefined) {
+      updateData.vendorVoucherDocuments = existingQuotationForValidation.vendorVoucherDocuments ?? [];
+    }
+
+    if (updateData.vendorInvoiceDocuments === undefined) {
+      updateData.vendorInvoiceDocuments = existingQuotationForValidation.vendorInvoiceDocuments ?? [];
+    }
+
+    try {
+      await appendUploadedQuotationDocuments(req, updateData, businessId);
+    } catch (uploadError) {
+      const isValidationError = uploadError instanceof QuotationDocumentValidationError;
+      res.status(isValidationError ? 400 : 500).json({
+        success: false,
+        message: isValidationError ? (uploadError as Error).message : 'Failed to upload quotation documents',
+        ...(isValidationError ? {} : { error: (uploadError as Error).message })
+      });
+      return;
+    }
+
     const effectiveQuotation = {
       ...existingQuotationForValidation,
       ...updateData
@@ -648,6 +756,7 @@ export const updateQuotation = async (req: Request, res: Response): Promise<void
 
     const customerPricingError = getCustomerPricingValidationError(
       effectiveQuotation.customerId,
+      effectiveQuotation.status,
       effectiveQuotation.customerPricing
     );
     if (customerPricingError) {

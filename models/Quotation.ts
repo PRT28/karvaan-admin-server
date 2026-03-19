@@ -82,7 +82,6 @@ export interface IQuotationDocument {
 
 export interface PriceInfo {
   advancedPricing: boolean;
-  sellingPrice?: PriceInfoCurrencyValue;
   costPrice?: PriceInfoCurrencyValue;
   vendorInvoiceBase?: PriceInfoCurrencyValue;
   additionalVendorInvoiceBase?: PriceInfoCurrencyValue;
@@ -91,11 +90,9 @@ export interface PriceInfo {
   commissionPayout?: PriceInfoCurrencyValue;
   additionalCommissionPayout?: PriceInfoCurrencyValue;
   refundReceived?: PriceInfoCurrencyValue;
-  refundPaid?: PriceInfoCurrencyValue;
   vendorIncentiveChargeback?: PriceInfoCurrencyValue;
   commissionPayoutChargeback?: PriceInfoCurrencyValue;
   additionalCostPrice?: PriceInfoCurrencyValue;
-  additionalSellingPrice?: PriceInfoCurrencyValue;
   notes?: string;
 }
 
@@ -132,7 +129,10 @@ export interface QuotationPricingCustomerBreakdownEntry {
 
 export interface CustomerPricingEntry {
   customerId: mongoose.Types.ObjectId;
-  sellingPrice: number;
+  sellingPrice?: number;
+  oldSellingPrice?: number;
+  newSellingPrice?: number;
+  refundPaid?: number;
 }
 
 export interface IQuotation extends Document {
@@ -413,18 +413,15 @@ export const getPriceInfoValidationError = (priceInfo?: unknown): string | null 
   }
 
   const numericFields = [
-    'sellingPrice',
     'costPrice',
     'vendorInvoiceBase',
     'additionalVendorInvoiceBase',
     'vendorIncentiveReceived',
     'commissionPayout',
     'refundReceived',
-    'refundPaid',
     'vendorIncentiveChargeback',
     'commissionPayoutChargeback',
     'additionalCostPrice',
-    'additionalSellingPrice',
     'additionalVendorIncentiveReceived',
     'additionalCommissionPayout',
   ];
@@ -472,7 +469,6 @@ export const getQuotationPricingSummary = (
   const priceInfo = toPlainObject(rawPriceInfo);
   const advancedPricing = priceInfo.advancedPricing === true;
 
-  const sellingPrice = getPriceInfoCurrencyAmount(priceInfo.sellingPrice);
   const costPrice = getPriceInfoCurrencyAmount(priceInfo.costPrice);
   const vendorInvoiceBase = getPriceInfoCurrencyAmount(priceInfo.vendorInvoiceBase);
   const additionalVendorInvoiceBase = getPriceInfoCurrencyAmount(priceInfo.additionalVendorInvoiceBase);
@@ -481,18 +477,43 @@ export const getQuotationPricingSummary = (
   const commissionPayout = getPriceInfoCurrencyAmount(priceInfo.commissionPayout);
   const additionalCommissionPayout = getPriceInfoCurrencyAmount(priceInfo.additionalCommissionPayout);
   const refundReceived = getPriceInfoCurrencyAmount(priceInfo.refundReceived);
-  const refundPaid = getPriceInfoCurrencyAmount(priceInfo.refundPaid);
   const vendorIncentiveChargeback = getPriceInfoCurrencyAmount(priceInfo.vendorIncentiveChargeback);
   const commissionPayoutChargeback = getPriceInfoCurrencyAmount(priceInfo.commissionPayoutChargeback);
   const additionalCostPrice = getPriceInfoCurrencyAmount(priceInfo.additionalCostPrice);
-  const additionalSellingPrice = getPriceInfoCurrencyAmount(priceInfo.additionalSellingPrice);
+  const customerPricingEntries = Array.isArray(rawCustomerPricing) ? rawCustomerPricing : [];
+  const customerBreakdown = customerPricingEntries.map((item, index) => {
+    const plainItem = toPlainObject(item);
+    const entrySellingPrice = getPriceInfoCurrencyAmount(plainItem.sellingPrice);
+    const entryOldSellingPrice = getPriceInfoCurrencyAmount(plainItem.oldSellingPrice);
+    const entryNewSellingPrice = getPriceInfoCurrencyAmount(plainItem.newSellingPrice);
+    const entryRefundPaid = getPriceInfoCurrencyAmount(plainItem.refundPaid);
+
+    let oldCustomerSellingPrice = entrySellingPrice;
+    let newCustomerSellingPrice = entrySellingPrice;
+
+    if (status === 'rescheduled') {
+      oldCustomerSellingPrice = entryOldSellingPrice;
+      newCustomerSellingPrice = entryNewSellingPrice;
+    }
+
+    if (status === 'cancelled') {
+      oldCustomerSellingPrice = entrySellingPrice;
+      newCustomerSellingPrice = entrySellingPrice - entryRefundPaid;
+    }
+
+    return {
+      customerId: plainItem.customerId ? String(plainItem.customerId) : `customer-${index + 1}`,
+      oldSellingPrice: oldCustomerSellingPrice,
+      newSellingPrice: newCustomerSellingPrice,
+    };
+  });
+  const oldSellingPrice = customerBreakdown.reduce((sum, item) => sum + item.oldSellingPrice, 0);
+  const newSellingPrice = customerBreakdown.reduce((sum, item) => sum + item.newSellingPrice, 0);
 
   let oldCostPrice = costPrice;
   let newCostPrice = costPrice;
-  let oldSellingPrice = sellingPrice;
-  let newSellingPrice = sellingPrice;
   let vendorPayableAmount = costPrice;
-  let customerReceivableAmount = sellingPrice;
+  let customerReceivableAmount = newSellingPrice;
   let journalCommissionAmount = 0;
   let formulaLabel = 'Net = Selling Price - Cost Price';
 
@@ -501,12 +522,12 @@ export const getQuotationPricingSummary = (
       oldCostPrice = vendorInvoiceBase - vendorIncentiveReceived + commissionPayout;
       newCostPrice = oldCostPrice;
       vendorPayableAmount = vendorInvoiceBase - vendorIncentiveReceived;
-      customerReceivableAmount = sellingPrice;
+      customerReceivableAmount = newSellingPrice;
       journalCommissionAmount = commissionPayout;
       formulaLabel = 'Cost Price = Vendor Invoice (Base) - Vendor Incentive Received + Commission Payout';
     } else {
       vendorPayableAmount = costPrice;
-      customerReceivableAmount = sellingPrice;
+      customerReceivableAmount = newSellingPrice;
     }
   }
 
@@ -514,18 +535,16 @@ export const getQuotationPricingSummary = (
     oldCostPrice = advancedPricing
       ? vendorInvoiceBase - vendorIncentiveReceived + commissionPayout
       : costPrice;
-    oldSellingPrice = sellingPrice;
 
     newCostPrice = advancedPricing
       ? oldCostPrice + additionalVendorInvoiceBase - additionalVendorIncentiveReceived + additionalCommissionPayout
       : costPrice + additionalCostPrice;
-    newSellingPrice = sellingPrice + additionalSellingPrice;
 
     vendorPayableAmount = advancedPricing
       ? (vendorInvoiceBase - vendorIncentiveReceived) +
         (additionalVendorInvoiceBase - additionalVendorIncentiveReceived)
       : costPrice + additionalCostPrice;
-    customerReceivableAmount = sellingPrice + additionalSellingPrice;
+    customerReceivableAmount = newSellingPrice;
     journalCommissionAmount = advancedPricing
       ? commissionPayout + additionalCommissionPayout
       : 0;
@@ -538,20 +557,18 @@ export const getQuotationPricingSummary = (
     oldCostPrice = advancedPricing
       ? vendorInvoiceBase - vendorIncentiveReceived + commissionPayout
       : costPrice;
-    oldSellingPrice = sellingPrice;
 
     newCostPrice = advancedPricing
       ? (vendorInvoiceBase - refundReceived) -
         (vendorIncentiveReceived - vendorIncentiveChargeback) +
         (commissionPayout - commissionPayoutChargeback)
       : costPrice - refundReceived;
-    newSellingPrice = sellingPrice - refundPaid;
 
     vendorPayableAmount = advancedPricing
       ? (vendorInvoiceBase - refundReceived) -
         (vendorIncentiveReceived - vendorIncentiveChargeback)
       : costPrice - refundReceived;
-    customerReceivableAmount = sellingPrice - refundPaid;
+    customerReceivableAmount = newSellingPrice;
     journalCommissionAmount = advancedPricing
       ? commissionPayout - commissionPayoutChargeback
       : 0;
@@ -564,35 +581,6 @@ export const getQuotationPricingSummary = (
   const newNet = newSellingPrice - newCostPrice;
   const oldNetPercentage = oldSellingPrice > 0 ? (oldNet / oldSellingPrice) * 100 : 0;
   const newNetPercentage = newSellingPrice > 0 ? (newNet / newSellingPrice) * 100 : 0;
-  const customerPricingEntries = Array.isArray(rawCustomerPricing) ? rawCustomerPricing : [];
-  const totalCustomerSellingPrice = customerPricingEntries.reduce((sum, item) => {
-    const plainItem = toPlainObject(item);
-    return sum + getPriceInfoCurrencyAmount(plainItem.sellingPrice);
-  }, 0);
-  const customerBreakdown = customerPricingEntries.map((item, index) => {
-    const plainItem = toPlainObject(item);
-    const entrySellingPrice = getPriceInfoCurrencyAmount(plainItem.sellingPrice);
-    const shareBase = totalCustomerSellingPrice > 0
-      ? entrySellingPrice / totalCustomerSellingPrice
-      : customerPricingEntries.length > 0
-        ? 1 / customerPricingEntries.length
-        : 0;
-
-    let newCustomerSellingPrice = entrySellingPrice;
-    if (status === 'rescheduled') {
-      newCustomerSellingPrice = entrySellingPrice + (additionalSellingPrice * shareBase);
-    }
-    if (status === 'cancelled') {
-      newCustomerSellingPrice = entrySellingPrice - (refundPaid * shareBase);
-    }
-
-    return {
-      customerId: plainItem.customerId ? String(plainItem.customerId) : `customer-${index + 1}`,
-      oldSellingPrice: entrySellingPrice,
-      newSellingPrice: newCustomerSellingPrice,
-    };
-  });
-
   return {
     status,
     advancedPricing,
@@ -614,6 +602,7 @@ export const getQuotationPricingSummary = (
 
 export const getCustomerPricingValidationError = (
   customerIds?: unknown,
+  status: QuotationStatus = 'confirmed',
   customerPricing?: unknown
 ): string | null => {
   const normalizedCustomerIds = (Array.isArray(customerIds) ? customerIds : customerIds ? [customerIds] : [])
@@ -626,21 +615,40 @@ export const getCustomerPricingValidationError = (
   if (!Array.isArray(customerPricing)) return 'customerPricing must be an array';
   if (customerPricing.length === 0) return null;
 
-  const pricingMap = new Map<string, number>();
+  const pricingMap = new Map<string, true>();
   for (const item of customerPricing) {
     const plainItem = toPlainObject(item);
     const customerId = plainItem.customerId ? String(plainItem.customerId) : '';
     if (!customerId) return 'customerPricing.customerId is required for each entry';
 
-    const sellingPrice = plainItem.sellingPrice;
-    if (!isFiniteNumber(sellingPrice)) {
-      return `customerPricing.sellingPrice must be a valid number for customer ${customerId}`;
+    if (status === 'confirmed') {
+      if (!isFiniteNumber(plainItem.sellingPrice)) {
+        return `customerPricing.sellingPrice must be a valid number for customer ${customerId}`;
+      }
+    }
+
+    if (status === 'rescheduled') {
+      if (!isFiniteNumber(plainItem.oldSellingPrice)) {
+        return `customerPricing.oldSellingPrice must be a valid number for customer ${customerId}`;
+      }
+      if (!isFiniteNumber(plainItem.newSellingPrice)) {
+        return `customerPricing.newSellingPrice must be a valid number for customer ${customerId}`;
+      }
+    }
+
+    if (status === 'cancelled') {
+      if (!isFiniteNumber(plainItem.sellingPrice)) {
+        return `customerPricing.sellingPrice must be a valid number for customer ${customerId}`;
+      }
+      if (!isFiniteNumber(plainItem.refundPaid)) {
+        return `customerPricing.refundPaid must be a valid number for customer ${customerId}`;
+      }
     }
 
     if (pricingMap.has(customerId)) {
       return `Duplicate customerPricing entry found for customer ${customerId}`;
     }
-    pricingMap.set(customerId, Number(sellingPrice));
+    pricingMap.set(customerId, true);
   }
 
   for (const customerId of normalizedCustomerIds) {
@@ -723,12 +731,15 @@ const QuotationSchema = new Schema<IQuotation>(
     customerPricing: {
       type: [{
         customerId: { type: Schema.Types.ObjectId, ref: 'Customer', required: true },
-        sellingPrice: { type: Number, required: true }
+        sellingPrice: { type: Number, required: false },
+        oldSellingPrice: { type: Number, required: false },
+        newSellingPrice: { type: Number, required: false },
+        refundPaid: { type: Number, required: false }
       }],
       default: [],
       validate: {
         validator: function (this: IQuotation, value: unknown) {
-          return getCustomerPricingValidationError(this.customerId, value) === null;
+          return getCustomerPricingValidationError(this.customerId, this.status, value) === null;
         },
         message: 'Invalid customerPricing for selected customers'
       }

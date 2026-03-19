@@ -297,7 +297,7 @@ router.get('/get-quotations-by-party/:id', getQuotationsByParty);
  *                 example: ["507f1f77bcf86cd799439013", "507f1f77bcf86cd799439099"]
  *               customerPricing:
  *                 type: string
- *                 description: JSON stringified array of per-customer selling prices
+ *                 description: JSON stringified array of per-customer pricing. Use `sellingPrice` for confirmed, `oldSellingPrice` and `newSellingPrice` for rescheduled, and `sellingPrice` with `refundPaid` for cancelled quotations.
  *                 example: '[{"customerId":"507f1f77bcf86cd799439013","sellingPrice":12000},{"customerId":"507f1f77bcf86cd799439099","sellingPrice":9000}]'
  *               vendorId:
  *                 type: string
@@ -309,8 +309,8 @@ router.get('/get-quotations-by-party/:id', getQuotationsByParty);
  *                 example: '{"pnr":"AB12CD","samePnrForAllSegments":true,"tripType":"multi city","trips":[{"title":"Trip 1","segments":[{"pnr":"AB12CD","from":"DEL","to":"DXB","flightNumber":"EK51","travelDate":"2026-04-18T00:00:00.000Z","cabinClass":"Economy","cabinBaggage":{"pieces":1,"weight":7},"checkInBaggage":{"pieces":1,"weight":20},"preview":{"airline":"Emirates","airlineLogo":"https://cdn.example.com/emirates.png","flightNumber":"EK51","originAirportCode":"DEL","destinationAirportCode":"DXB","originCity":"Delhi","destinationCity":"Dubai","std":"09:45","sta":"12:30","duration":"03 h 45 m"}},{"pnr":"AB12CD","from":"DXB","to":"JFK","flightNumber":"EK203","travelDate":"2026-04-19T00:00:00.000Z","cabinClass":"Economy","cabinBaggage":{"pieces":1,"weight":7},"checkInBaggage":{"pieces":2,"weight":23}}]},{"title":"Trip 2","segments":[{"pnr":"AB12CD","from":"JFK","to":"LAX","flightNumber":"AA17","travelDate":"2026-04-23T00:00:00.000Z","cabinClass":"Business","cabinBaggage":{"pieces":2,"weight":10},"checkInBaggage":{"pieces":2,"weight":23}}]}],"rulesAndConditions":"Standard fare rules apply.","rulesTemplateId":"65f1b6f8d1a1111111111111","internalNotes":"Customer requested aisle seat."}'
  *               priceInfo:
  *                 type: string
- *                 description: JSON stringified pricing details. Each monetary field is a PriceInfoCurrencyValue object with amount, currency, exchangeRate and optional notes.
- *                 example: '{"advancedPricing":true,"sellingPrice":{"amount":21000,"currency":"USD","exchangeRate":83.10},"costPrice":{"amount":17000,"currency":"AED","exchangeRate":22.64},"vendorInvoiceBase":{"amount":16000,"currency":"AED","exchangeRate":22.64},"vendorIncentiveReceived":{"amount":500,"currency":"AED","exchangeRate":22.64},"commissionPayout":{"amount":500,"currency":"INR","exchangeRate":1},"refundReceived":{"amount":0,"currency":"AED","exchangeRate":22.64},"refundPaid":{"amount":0,"currency":"USD","exchangeRate":83.10},"vendorIncentiveChargeback":{"amount":0,"currency":"AED","exchangeRate":22.64},"commissionPayoutChargeback":{"amount":0,"currency":"INR","exchangeRate":1},"additionalCostPrice":{"amount":0,"currency":"AED","exchangeRate":22.64},"additionalSellingPrice":{"amount":0,"currency":"USD","exchangeRate":83.10},"additionalVendorInvoiceBase":{"amount":0,"currency":"AED","exchangeRate":22.64},"additionalVendorIncentiveReceived":{"amount":0,"currency":"AED","exchangeRate":22.64},"additionalCommissionPayout":{"amount":0,"currency":"INR","exchangeRate":1},"notes":"Issue ticket after passport recheck."}'
+ *                 description: JSON stringified cost-side pricing details only. Each monetary field is a PriceInfoCurrencyValue object with amount, currency, exchangeRate and optional notes.
+ *                 example: '{"advancedPricing":true,"costPrice":{"amount":17000,"currency":"AED","exchangeRate":22.64},"vendorInvoiceBase":{"amount":16000,"currency":"AED","exchangeRate":22.64},"vendorIncentiveReceived":{"amount":500,"currency":"AED","exchangeRate":22.64},"commissionPayout":{"amount":500,"currency":"INR","exchangeRate":1},"refundReceived":{"amount":0,"currency":"AED","exchangeRate":22.64},"vendorIncentiveChargeback":{"amount":0,"currency":"AED","exchangeRate":22.64},"commissionPayoutChargeback":{"amount":0,"currency":"INR","exchangeRate":1},"additionalCostPrice":{"amount":0,"currency":"AED","exchangeRate":22.64},"additionalVendorInvoiceBase":{"amount":0,"currency":"AED","exchangeRate":22.64},"additionalVendorIncentiveReceived":{"amount":0,"currency":"AED","exchangeRate":22.64},"additionalCommissionPayout":{"amount":0,"currency":"INR","exchangeRate":1},"notes":"Issue ticket after passport recheck."}'
  *               bookingDate:
  *                 type: string
  *                 format: date
@@ -362,19 +362,23 @@ router.get('/get-quotations-by-party/:id', getQuotationsByParty);
  *               remarks:
  *                 type: string
  *                 example: "Special requirements noted"
- *               documents:
- *                 type: array
- *                 items:
- *                   type: string
- *                   format: binary
- *                 description: Up to 3 documents (max 5MB each). Allowed types - PDF, JPG, PNG, GIF, WEBP, DOC, DOCX, XLS, XLSX, TXT
  *               vendorVoucherDocuments:
- *                 type: string
- *                 description: JSON stringified array of uploaded vendor voucher document metadata, maximum 3 entries
+ *                 oneOf:
+ *                   - type: array
+ *                     items:
+ *                       type: string
+ *                       format: binary
+ *                   - type: string
+ *                 description: Either upload up to 3 vendor voucher files or send a JSON stringified array of existing uploaded document metadata
  *                 example: '[{"originalName":"voucher.pdf","fileName":"voucher-1.pdf","url":"https://cdn.example.com/voucher-1.pdf","key":"quotations/vendor-voucher-1.pdf","size":120455,"mimeType":"application/pdf","uploadedAt":"2026-03-05T10:00:00.000Z"}]'
  *               vendorInvoiceDocuments:
- *                 type: string
- *                 description: JSON stringified array of uploaded vendor invoice document metadata, maximum 3 entries
+ *                 oneOf:
+ *                   - type: array
+ *                     items:
+ *                       type: string
+ *                       format: binary
+ *                   - type: string
+ *                 description: Either upload up to 3 vendor invoice files or send a JSON stringified array of existing uploaded document metadata
  *                 example: '[{"originalName":"invoice.pdf","fileName":"invoice-1.pdf","url":"https://cdn.example.com/invoice-1.pdf","key":"quotations/vendor-invoice-1.pdf","size":98455,"mimeType":"application/pdf","uploadedAt":"2026-03-05T10:05:00.000Z"}]'
  *           examples:
  *             createFlightQuotation:
@@ -387,7 +391,7 @@ router.get('/get-quotations-by-party/:id', getQuotationsByParty);
  *                 customerPricing: '[{"customerId":"507f1f77bcf86cd799439013","sellingPrice":21000}]'
  *                 vendorId: "507f1f77bcf86cd799439014"
  *                 formFields: '{"pnr":"AB12CD","samePnrForAllSegments":true,"tripType":"multi city","trips":[{"title":"Trip 1","segments":[{"pnr":"AB12CD","from":"DEL","to":"DXB","flightNumber":"EK51","travelDate":"2026-04-18T00:00:00.000Z","cabinClass":"Economy","cabinBaggage":{"pieces":1,"weight":7},"checkInBaggage":{"pieces":1,"weight":20},"preview":{"airline":"Emirates","airlineLogo":"https://cdn.example.com/emirates.png","flightNumber":"EK51","originAirportCode":"DEL","destinationAirportCode":"DXB","originCity":"Delhi","destinationCity":"Dubai","std":"09:45","sta":"12:30","duration":"03 h 45 m"}},{"pnr":"AB12CD","from":"DXB","to":"JFK","flightNumber":"EK203","travelDate":"2026-04-19T00:00:00.000Z","cabinClass":"Economy","cabinBaggage":{"pieces":1,"weight":7},"checkInBaggage":{"pieces":2,"weight":23}}]},{"title":"Trip 2","segments":[{"pnr":"AB12CD","from":"JFK","to":"LAX","flightNumber":"AA17","travelDate":"2026-04-23T00:00:00.000Z","cabinClass":"Business","cabinBaggage":{"pieces":2,"weight":10},"checkInBaggage":{"pieces":2,"weight":23}}]}],"rulesAndConditions":"Standard fare rules apply.","rulesTemplateId":"65f1b6f8d1a1111111111111","internalNotes":"Customer requested aisle seat."}'
- *                 priceInfo: '{"advancedPricing":true,"sellingPrice":{"amount":21000,"currency":"USD","exchangeRate":83.10},"costPrice":{"amount":17000,"currency":"AED","exchangeRate":22.64},"vendorInvoiceBase":{"amount":16000,"currency":"AED","exchangeRate":22.64},"vendorIncentiveReceived":{"amount":500,"currency":"AED","exchangeRate":22.64},"commissionPayout":{"amount":500,"currency":"INR","exchangeRate":1},"refundReceived":{"amount":0,"currency":"AED","exchangeRate":22.64},"refundPaid":{"amount":0,"currency":"USD","exchangeRate":83.10},"vendorIncentiveChargeback":{"amount":0,"currency":"AED","exchangeRate":22.64},"commissionPayoutChargeback":{"amount":0,"currency":"INR","exchangeRate":1},"additionalCostPrice":{"amount":0,"currency":"AED","exchangeRate":22.64},"additionalSellingPrice":{"amount":0,"currency":"USD","exchangeRate":83.10},"additionalVendorInvoiceBase":{"amount":0,"currency":"AED","exchangeRate":22.64},"additionalVendorIncentiveReceived":{"amount":0,"currency":"AED","exchangeRate":22.64},"additionalCommissionPayout":{"amount":0,"currency":"INR","exchangeRate":1},"notes":"Issue ticket after passport recheck."}'
+ *                 priceInfo: '{"advancedPricing":true,"costPrice":{"amount":17000,"currency":"AED","exchangeRate":22.64},"vendorInvoiceBase":{"amount":16000,"currency":"AED","exchangeRate":22.64},"vendorIncentiveReceived":{"amount":500,"currency":"AED","exchangeRate":22.64},"commissionPayout":{"amount":500,"currency":"INR","exchangeRate":1},"refundReceived":{"amount":0,"currency":"AED","exchangeRate":22.64},"vendorIncentiveChargeback":{"amount":0,"currency":"AED","exchangeRate":22.64},"commissionPayoutChargeback":{"amount":0,"currency":"INR","exchangeRate":1},"additionalCostPrice":{"amount":0,"currency":"AED","exchangeRate":22.64},"additionalVendorInvoiceBase":{"amount":0,"currency":"AED","exchangeRate":22.64},"additionalVendorIncentiveReceived":{"amount":0,"currency":"AED","exchangeRate":22.64},"additionalCommissionPayout":{"amount":0,"currency":"INR","exchangeRate":1},"notes":"Issue ticket after passport recheck."}'
  *                 bookingDate: "2026-03-05"
  *                 totalAmount: 21000
  *                 status: "confirmed"
@@ -487,10 +491,6 @@ router.get('/get-quotations-by-party/:id', getQuotationsByParty);
  *                       internalNotes: "Customer requested aisle seat."
  *                     priceInfo:
  *                       advancedPricing: true
- *                       sellingPrice:
- *                         amount: 21000
- *                         currency: "USD"
- *                         exchangeRate: 83.1
  *                       costPrice:
  *                         amount: 17000
  *                         currency: "AED"
@@ -515,10 +515,6 @@ router.get('/get-quotations-by-party/:id', getQuotationsByParty);
  *                         amount: 0
  *                         currency: "AED"
  *                         exchangeRate: 22.64
- *                       refundPaid:
- *                         amount: 0
- *                         currency: "USD"
- *                         exchangeRate: 83.1
  *                       vendorIncentiveChargeback:
  *                         amount: 0
  *                         currency: "AED"
@@ -531,10 +527,6 @@ router.get('/get-quotations-by-party/:id', getQuotationsByParty);
  *                         amount: 0
  *                         currency: "AED"
  *                         exchangeRate: 22.64
- *                       additionalSellingPrice:
- *                         amount: 0
- *                         currency: "USD"
- *                         exchangeRate: 83.1
  *                       additionalVendorIncentiveReceived:
  *                         amount: 0
  *                         currency: "AED"
@@ -634,6 +626,12 @@ router.post('/create-quotation', handleDocumentUploadError, createQuotation);
  *                           type: string
  *                         sellingPrice:
  *                           type: number
+ *                         oldSellingPrice:
+ *                           type: number
+ *                         newSellingPrice:
+ *                           type: number
+ *                         refundPaid:
+ *                           type: number
  *                   - type: string
  *               vendorId:
  *                 type: string
@@ -686,7 +684,7 @@ router.post('/create-quotation', handleDocumentUploadError, createQuotation);
  *                 oneOf:
  *                   - type: object
  *                   - type: string
- *                 description: Pure pricing data only. Each monetary field is a PriceInfoCurrencyValue object.
+ *                 description: Pure cost-side pricing data only. Each monetary field is a PriceInfoCurrencyValue object.
  *               totalAmount:
  *                 type: number
  *               status:
@@ -697,23 +695,22 @@ router.post('/create-quotation', handleDocumentUploadError, createQuotation);
  *                 enum: [pending, denied, draft, approved]
  *               remarks:
  *                 type: string
- *               documents:
- *                 type: array
- *                 items:
- *                   type: string
- *                   format: binary
  *               vendorVoucherDocuments:
  *                 oneOf:
  *                   - type: array
  *                     items:
- *                       type: object
+ *                       type: string
+ *                       format: binary
  *                   - type: string
+ *                 description: Either upload up to 3 new vendor voucher files or send a JSON stringified array to replace the stored metadata
  *               vendorInvoiceDocuments:
  *                 oneOf:
  *                   - type: array
  *                     items:
- *                       type: object
+ *                       type: string
+ *                       format: binary
  *                   - type: string
+ *                 description: Either upload up to 3 new vendor invoice files or send a JSON stringified array to replace the stored metadata
  *           examples:
  *             rescheduleFlightQuotation:
  *               summary: Reschedule a flight quotation
@@ -722,7 +719,8 @@ router.post('/create-quotation', handleDocumentUploadError, createQuotation);
  *                 newBookingDate: "2026-03-08"
  *                 newTravelDate: "2026-04-20"
  *                 travelDate: "2026-04-20"
- *                 priceInfo: '{"advancedPricing":true,"sellingPrice":{"amount":22000,"currency":"USD","exchangeRate":83.10},"costPrice":{"amount":17500,"currency":"AED","exchangeRate":22.64},"vendorInvoiceBase":{"amount":16500,"currency":"AED","exchangeRate":22.64},"vendorIncentiveReceived":{"amount":500,"currency":"AED","exchangeRate":22.64},"commissionPayout":{"amount":500,"currency":"INR","exchangeRate":1},"refundReceived":{"amount":0,"currency":"AED","exchangeRate":22.64},"refundPaid":{"amount":0,"currency":"USD","exchangeRate":83.10},"vendorIncentiveChargeback":{"amount":0,"currency":"AED","exchangeRate":22.64},"commissionPayoutChargeback":{"amount":0,"currency":"INR","exchangeRate":1},"additionalCostPrice":{"amount":0,"currency":"AED","exchangeRate":22.64},"additionalSellingPrice":{"amount":1000,"currency":"USD","exchangeRate":83.10},"additionalVendorInvoiceBase":{"amount":0,"currency":"AED","exchangeRate":22.64},"additionalVendorIncentiveReceived":{"amount":0,"currency":"AED","exchangeRate":22.64},"additionalCommissionPayout":{"amount":0,"currency":"INR","exchangeRate":1},"notes":"Travel rescheduled by customer."}'
+ *                 customerPricing: '[{"customerId":"507f1f77bcf86cd799439013","oldSellingPrice":21000,"newSellingPrice":22000}]'
+ *                 priceInfo: '{"advancedPricing":true,"costPrice":{"amount":17500,"currency":"AED","exchangeRate":22.64},"vendorInvoiceBase":{"amount":16500,"currency":"AED","exchangeRate":22.64},"vendorIncentiveReceived":{"amount":500,"currency":"AED","exchangeRate":22.64},"commissionPayout":{"amount":500,"currency":"INR","exchangeRate":1},"refundReceived":{"amount":0,"currency":"AED","exchangeRate":22.64},"vendorIncentiveChargeback":{"amount":0,"currency":"AED","exchangeRate":22.64},"commissionPayoutChargeback":{"amount":0,"currency":"INR","exchangeRate":1},"additionalCostPrice":{"amount":0,"currency":"AED","exchangeRate":22.64},"additionalVendorInvoiceBase":{"amount":0,"currency":"AED","exchangeRate":22.64},"additionalVendorIncentiveReceived":{"amount":0,"currency":"AED","exchangeRate":22.64},"additionalCommissionPayout":{"amount":0,"currency":"INR","exchangeRate":1},"notes":"Travel rescheduled by customer."}'
  *                 formFields: '{"pnr":"AB12CD","samePnrForAllSegments":true,"tripType":"round trip","segments":[{"pnr":"AB12CD","from":"DEL","to":"DXB","flightNumber":"EK51","travelDate":"2026-04-20T00:00:00.000Z","cabinClass":"Economy","cabinBaggage":{"pieces":1,"weight":7},"checkInBaggage":{"pieces":1,"weight":20}},{"pnr":"AB12CD","from":"DXB","to":"DEL","flightNumber":"EK52","travelDate":"2026-04-27T00:00:00.000Z","cabinClass":"Economy","cabinBaggage":{"pieces":1,"weight":7},"checkInBaggage":{"pieces":1,"weight":20}}],"internalNotes":"Dates updated after customer confirmation."}'
  *     responses:
  *       200:
@@ -751,7 +749,8 @@ router.post('/create-quotation', handleDocumentUploadError, createQuotation);
  *                     customerId: ["507f1f77bcf86cd799439013"]
  *                     customerPricing:
  *                       - customerId: "507f1f77bcf86cd799439013"
- *                         sellingPrice: 22000
+ *                         oldSellingPrice: 21000
+ *                         newSellingPrice: 22000
  *                     vendorId: "507f1f77bcf86cd799439014"
  *                     formFields:
  *                       pnr: "AB12CD"
@@ -773,10 +772,6 @@ router.post('/create-quotation', handleDocumentUploadError, createQuotation);
  *                       internalNotes: "Dates updated after customer confirmation."
  *                     priceInfo:
  *                       advancedPricing: true
- *                       sellingPrice:
- *                         amount: 22000
- *                         currency: "USD"
- *                         exchangeRate: 83.1
  *                       costPrice:
  *                         amount: 17500
  *                         currency: "AED"
@@ -801,10 +796,6 @@ router.post('/create-quotation', handleDocumentUploadError, createQuotation);
  *                         amount: 0
  *                         currency: "AED"
  *                         exchangeRate: 22.64
- *                       refundPaid:
- *                         amount: 0
- *                         currency: "USD"
- *                         exchangeRate: 83.1
  *                       vendorIncentiveChargeback:
  *                         amount: 0
  *                         currency: "AED"
@@ -817,10 +808,6 @@ router.post('/create-quotation', handleDocumentUploadError, createQuotation);
  *                         amount: 0
  *                         currency: "AED"
  *                         exchangeRate: 22.64
- *                       additionalSellingPrice:
- *                         amount: 1000
- *                         currency: "USD"
- *                         exchangeRate: 83.1
  *                       additionalVendorIncentiveReceived:
  *                         amount: 0
  *                         currency: "AED"
