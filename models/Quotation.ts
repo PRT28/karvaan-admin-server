@@ -202,7 +202,7 @@ export const getMissingFormFieldKeys = (
     const trips = Array.isArray(plainFields.trips) ? plainFields.trips : [];
     const segments = Array.isArray(plainFields.segments) ? plainFields.segments : [];
     const missingKeys: string[] = [];
-    const requiredSegmentFields = ['from', 'to', 'flightNumber', 'travelDate', 'cabinClass'] as const;
+    const requiredSegmentFields = ['flightNumber', 'travelDate', 'cabinClass'] as const;
 
     const collectMissingSegmentFields = (segmentList: unknown[], basePath: string) => {
       segmentList.forEach((segmentValue, segmentIndex) => {
@@ -284,14 +284,9 @@ export const getFormFieldsValidationError = (
 
   const tripType = plainFields.tripType;
   const allowedTripTypes = ['one way', 'round trip', 'multi city'];
-  if (tripType !== undefined && !allowedTripTypes.includes(String(tripType))) {
-    return 'formFields.tripType must be one of: one way, round trip, multi city';
-  }
 
   const samePnrForAllSegments = plainFields.samePnrForAllSegments;
-  if (samePnrForAllSegments !== undefined && typeof samePnrForAllSegments !== 'boolean') {
-    return 'formFields.samePnrForAllSegments must be a boolean';
-  }
+  
 
   if (hasMeaningfulValue(plainFields.pnr)) {
     const pnr = String(plainFields.pnr).trim();
