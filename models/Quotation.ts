@@ -129,10 +129,10 @@ export interface QuotationPricingCustomerBreakdownEntry {
 
 export interface CustomerPricingEntry {
   customerId: mongoose.Types.ObjectId;
-  sellingPrice?: number;
-  oldSellingPrice?: number;
-  newSellingPrice?: number;
-  refundPaid?: number;
+  sellingPrice?: PriceInfoCurrencyValue;
+  oldSellingPrice?: PriceInfoCurrencyValue;
+  newSellingPrice?: PriceInfoCurrencyValue;
+  refundPaid?: PriceInfoCurrencyValue;
 }
 
 export interface IQuotation extends Document {
@@ -461,6 +461,43 @@ export const getPriceInfoValidationError = (priceInfo?: unknown): string | null 
   return null;
 };
 
+const getCurrencyValueValidationError = (
+  value: unknown,
+  path: string,
+  options: { requireAmount?: boolean } = {}
+): string | null => {
+  const plainCurrencyValue = toPlainObject(value);
+  const hasAnyPriceValue =
+    hasMeaningfulValue(plainCurrencyValue.amount) ||
+    hasMeaningfulValue(plainCurrencyValue.currency) ||
+    hasMeaningfulValue(plainCurrencyValue.exchangeRate) ||
+    hasMeaningfulValue(plainCurrencyValue.notes);
+
+  if (!hasAnyPriceValue) {
+    return options.requireAmount ? `${path}.amount must be a valid number` : null;
+  }
+
+  if (!hasMeaningfulValue(plainCurrencyValue.currency) || typeof plainCurrencyValue.currency !== 'string') {
+    return `${path}.currency is required`;
+  }
+
+  if (
+    (options.requireAmount || hasMeaningfulValue(plainCurrencyValue.amount)) &&
+    !isFiniteNumber(plainCurrencyValue.amount)
+  ) {
+    return `${path}.amount must be a valid number`;
+  }
+
+  if (
+    hasMeaningfulValue(plainCurrencyValue.exchangeRate) &&
+    !isFiniteNumber(plainCurrencyValue.exchangeRate)
+  ) {
+    return `${path}.exchangeRate must be a valid number`;
+  }
+
+  return null;
+};
+
 export const getQuotationPricingSummary = (
   status: QuotationStatus = 'confirmed',
   rawPriceInfo?: unknown,
@@ -622,26 +659,51 @@ export const getCustomerPricingValidationError = (
     if (!customerId) return 'customerPricing.customerId is required for each entry';
 
     if (status === 'confirmed') {
-      if (!isFiniteNumber(plainItem.sellingPrice)) {
-        return `customerPricing.sellingPrice must be a valid number for customer ${customerId}`;
+      const sellingPriceError = getCurrencyValueValidationError(
+        plainItem.sellingPrice,
+        `customerPricing.sellingPrice for customer ${customerId}`,
+        { requireAmount: true }
+      );
+      if (sellingPriceError) {
+        return sellingPriceError;
       }
     }
 
     if (status === 'rescheduled') {
-      if (!isFiniteNumber(plainItem.oldSellingPrice)) {
-        return `customerPricing.oldSellingPrice must be a valid number for customer ${customerId}`;
+      const oldSellingPriceError = getCurrencyValueValidationError(
+        plainItem.oldSellingPrice,
+        `customerPricing.oldSellingPrice for customer ${customerId}`,
+        { requireAmount: true }
+      );
+      if (oldSellingPriceError) {
+        return oldSellingPriceError;
       }
-      if (!isFiniteNumber(plainItem.newSellingPrice)) {
-        return `customerPricing.newSellingPrice must be a valid number for customer ${customerId}`;
+      const newSellingPriceError = getCurrencyValueValidationError(
+        plainItem.newSellingPrice,
+        `customerPricing.newSellingPrice for customer ${customerId}`,
+        { requireAmount: true }
+      );
+      if (newSellingPriceError) {
+        return newSellingPriceError;
       }
     }
 
     if (status === 'cancelled') {
-      if (!isFiniteNumber(plainItem.sellingPrice)) {
-        return `customerPricing.sellingPrice must be a valid number for customer ${customerId}`;
+      const sellingPriceError = getCurrencyValueValidationError(
+        plainItem.sellingPrice,
+        `customerPricing.sellingPrice for customer ${customerId}`,
+        { requireAmount: true }
+      );
+      if (sellingPriceError) {
+        return sellingPriceError;
       }
-      if (!isFiniteNumber(plainItem.refundPaid)) {
-        return `customerPricing.refundPaid must be a valid number for customer ${customerId}`;
+      const refundPaidError = getCurrencyValueValidationError(
+        plainItem.refundPaid,
+        `customerPricing.refundPaid for customer ${customerId}`,
+        { requireAmount: true }
+      );
+      if (refundPaidError) {
+        return refundPaidError;
       }
     }
 
@@ -659,6 +721,16 @@ export const getCustomerPricingValidationError = (
 
   return null;
 };
+
+const PriceInfoCurrencyValueSchema = new Schema(
+  {
+    amount: { type: Number, required: false },
+    currency: { type: String, required: false, trim: true },
+    exchangeRate: { type: Number, required: false },
+    notes: { type: String, required: false },
+  },
+  { _id: false }
+);
 
 const QuotationSchema = new Schema<IQuotation>(
   {
@@ -731,10 +803,10 @@ const QuotationSchema = new Schema<IQuotation>(
     customerPricing: {
       type: [{
         customerId: { type: Schema.Types.ObjectId, ref: 'Customer', required: true },
-        sellingPrice: { type: Number, required: false },
-        oldSellingPrice: { type: Number, required: false },
-        newSellingPrice: { type: Number, required: false },
-        refundPaid: { type: Number, required: false }
+        sellingPrice: { type: PriceInfoCurrencyValueSchema, required: false },
+        oldSellingPrice: { type: PriceInfoCurrencyValueSchema, required: false },
+        newSellingPrice: { type: PriceInfoCurrencyValueSchema, required: false },
+        refundPaid: { type: PriceInfoCurrencyValueSchema, required: false }
       }],
       default: [],
       validate: {

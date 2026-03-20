@@ -324,9 +324,9 @@ const getSemiMandatoryBookingFields = (quotation: any): string[] => {
   if (status === 'confirmed') {
     if (advancedPricing) {
       semiMandatoryPriceFields.push(
-        'priceInfo.vendorInvoiceBase',
-        'priceInfo.vendorIncentiveReceived',
-        'priceInfo.commissionPayout'
+        'vendorInvoiceBase',
+        'vendorIncentiveReceived',
+        'commissionPayout'
       );
     } else {
       semiMandatoryPriceFields.push('costPrice');
@@ -337,15 +337,15 @@ const getSemiMandatoryBookingFields = (quotation: any): string[] => {
   if (status === 'rescheduled') {
     if (advancedPricing) {
       semiMandatoryPriceFields.push(
-        'priceInfo.vendorInvoiceBase',
-        'priceInfo.additionalVendorInvoiceBase',
-        'priceInfo.vendorIncentiveReceived',
-        'priceInfo.additionalVendorIncentiveReceived',
-        'priceInfo.commissionPayout',
-        'priceInfo.additionalCommissionPayout'
+        'vendorInvoiceBase',
+        'additionalVendorInvoiceBase',
+        'vendorIncentiveReceived',
+        'additionalVendorIncentiveReceived',
+        'commissionPayout',
+        'additionalCommissionPayout'
       );
     } else {
-      semiMandatoryPriceFields.push('priceInfo.costPrice', 'price.additionalCostPrice');
+      semiMandatoryPriceFields.push('costPrice', 'additionalCostPrice');
     }
     if (!hasCustomerPricingEntries(quotation)) missingFields.push('customerPricing');
   }
@@ -353,15 +353,15 @@ const getSemiMandatoryBookingFields = (quotation: any): string[] => {
   if (status === 'cancelled') {
     if (advancedPricing) {
       semiMandatoryPriceFields.push(
-        'priceInfo.vendorInvoiceBase',
-        'priceInfo.refundReceived',
-        'priceInfo.vendorIncentiveReceived',
-        'priceInfo.vendorIncentiveChargeback',
-        'priceInfo.commissionPayout',
-        'priceInfo.commissionPayoutChargeback'
+        'vendorInvoiceBase',
+        'refundReceived',
+        'vendorIncentiveReceived',
+        'vendorIncentiveChargeback',
+        'commissionPayout',
+        'commissionPayoutChargeback'
       );
     } else {
-      semiMandatoryPriceFields.push('priceInfo.costPrice', 'priceInfo.refundReceived');
+      semiMandatoryPriceFields.push('costPrice', 'refundReceived');
     }
     if (!hasCustomerPricingEntries(quotation)) missingFields.push('customerPricing');
   }
